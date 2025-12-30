@@ -6,24 +6,33 @@
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
 #property version   "1.00"
-#property description "WidwaPa Trade Assistant - Automated zones, signals, and one-click trading"
+#property description "DJAY Smart Assistant - Automated zones, signals, and one-click trading"
 
 #include <EA_Helper/Definitions.mqh>
 #include <EA_Helper/SignalEngine.mqh>
 #include <EA_Helper/TradeManager.mqh>
 #include <EA_Helper/DashboardPanel.mqh>
+#include <EA_Helper/ChartZones.mqh>
 
 //--- Input Parameters
-input double Input_RiskPercent = 3.0;       // Risk % per trade
+input double Input_RiskPercent = 1.0;       // Risk % per trade
 input int    Input_SL_Points = 300;         // Stop Loss distance
 input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
+//--- Chart Zones Settings
+input group "=== Chart Zones Settings ==="
+input bool   Input_Show_Zones_On_Chart   = true;   // Show zones on chart
+input bool   Input_Show_Pivot_Line       = true;   // Show D1 Open pivot line
+input int    Input_Max_Zones_Show        = 10;     // Max zones above/below to display
+input int    Input_Zone_Range_Points     = 50;     // Zone depth (±points from level)
+
 //--- Global Objects
 CSignalEngine   signalEngine;
 CTradeManager   tradeManager;
 CDashboardPanel dashboardPanel;
+CChartZones     chartZones;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -34,12 +43,16 @@ int OnInit()
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
 
-   EventSetTimer(1);
-
+   // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
+   chartZones.Init(d1Open, Input_Zone_Offset1, Input_Zone_Offset2, Input_Zone_Range_Points);
+   chartZones.SetSettings(Input_Show_Zones_On_Chart, Input_Show_Pivot_Line, Input_Max_Zones_Show);
+
    dashboardPanel.UpdateWidwaZones(d1Open);
 
-   Print("WidwaPa Assistant initialized successfully.");
+   EventSetTimer(1);
+
+   Print("DJAY Smart Assistant initialized successfully.");
    return(INIT_SUCCEEDED);
 }
 
@@ -50,7 +63,8 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    dashboardPanel.Destroy();
-   Print("WidwaPa Assistant deinitialized. Reason: ", reason);
+   chartZones.Destroy();  // Cleanup chart zone objects
+   Print("DJAY Smart Assistant deinitialized. Reason: ", reason);
 }
 
 //+------------------------------------------------------------------+
@@ -190,6 +204,10 @@ void OnTimer()
 
    double d1Open = signalEngine.GetD1Open();
    dashboardPanel.UpdateWidwaZones(d1Open);
+
+   // 5. Update Chart Zones
+   double currentPrice = signalEngine.GetCurrentPrice();
+   chartZones.Update(d1Open, currentPrice);
 }
 
 //+------------------------------------------------------------------+
