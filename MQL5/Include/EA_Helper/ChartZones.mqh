@@ -158,22 +158,23 @@ void CChartZones::CalculateZones()
             break;
 
         // Check offsets: 300, 1000, 2000, 3000, 4000, 5000...
-        int offsets[];
-        ArrayResize(offsets, 0);
+        // Predefine array with maximum size needed
+        int offsets[6];
+        int offsetCount = 0;
 
         // Always add minor and major
-        ArrayPush(offsets, m_zone_offset_minor);
-        ArrayPush(offsets, m_zone_offset_major);
+        offsets[offsetCount++] = m_zone_offset_minor;
+        offsets[offsetCount++] = m_zone_offset_major;
 
         // For higher levels, add intermediate steps
         if(i > 1)
         {
-            ArrayPush(offsets, i * 1000);  // 2000, 3000, 4000...
-            ArrayPush(offsets, i * 1000 + m_zone_offset_minor);  // 2300, 3300...
-            ArrayPush(offsets, i * 1000 - m_zone_offset_minor);  // 1700, 2700...
+            offsets[offsetCount++] = i * 1000;  // 2000, 3000, 4000...
+            offsets[offsetCount++] = i * 1000 + m_zone_offset_minor;  // 2300, 3300...
+            offsets[offsetCount++] = i * 1000 - m_zone_offset_minor;  // 1700, 2700...
         }
 
-        for(int j = 0; j < ArraySize(offsets); j++)
+        for(int j = 0; j < offsetCount; j++)
         {
             int offset = offsets[j];
             double levelAbove = m_d1_open + (offset * point);
