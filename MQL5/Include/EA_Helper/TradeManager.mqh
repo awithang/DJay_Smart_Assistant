@@ -6,7 +6,6 @@
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
 #property version   "1.00"
-#property strict
 
 #include <EA_Helper/Definitions.mqh>
 #include <Trade/Trade.mqh>
@@ -70,6 +69,7 @@ void CTradeManager::Init(int magic_number)
 {
    m_magic_number = magic_number;
    m_trade.SetExpertMagicNumber(m_magic_number);
+   m_trade.SetDeviationInPoints(10); // Allow 10 points slippage
    m_point = _Point;
 }
 
@@ -126,28 +126,43 @@ double CTradeManager::CalculateLotSize(double entry_price, double sl_price, doub
       return 0.0;
    }
 
-   // Get symbol info
-   long contractSize = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+   // Get symbol info using standard MQL5 constants
+   double contractSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);
    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
 
-   // Validate symbol data
+   // Check for failure and print detailed error if data is missing
    if(contractSize == 0 || tickSize == 0 || tickValue == 0)
    {
-      Print("Error: Invalid symbol data (contract size: ", contractSize,
-            ", tick size: ", tickSize, ", tick value: ", tickValue, ")");
-      return 0.0;
+      // Attempt to refresh symbol info
+      SymbolInfoDouble(_Symbol, SYMBOL_BID); // Trigger refresh
+      
+      // Retry
+      contractSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+      tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+      tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      
+      if(contractSize == 0 || tickSize == 0 || tickValue == 0)
+      {
+         Print("CRITICAL ERROR: Failed to get Symbol Info for ", _Symbol);
+         Print("GetLastError: ", GetLastError());
+         Print("ContractSize: ", contractSize, " TickSize: ", tickSize, " TickValue: ", tickValue);
+         return 0.0;
+      }
    }
 
    // Calculate risk amount in account currency
    double riskAmount = accountBalance * (risk_percent / 100.0);
 
    // Calculate the value of one full point movement
+   // TickValue is the value of 1 TickSize for 1 Lot.
+   // PointValue = (TickValue / TickSize) * _Point => Value of 1 Point for 1 Lot.
    double pointValue = (tickValue / tickSize) * _Point;
 
-   // Calculate lot size: RiskAmount / (StopLossPoints * PointValue * ContractSize)
+   // Calculate lot size: RiskAmount / (StopLossPoints * PointValue)
+   // We DO NOT divide by contractSize because TickValue is already per Lot.
    double slPoints = priceDiff / _Point;
-   double lotSize = riskAmount / (slPoints * pointValue * contractSize);
+   double lotSize = riskAmount / (slPoints * pointValue);
 
    // Normalize to symbol's lot step
    double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
@@ -179,7 +194,7 @@ double CTradeManager::CalculateLotSize(double entry_price, double sl_price, doub
 
    double finalLot = NormalizeDouble(lotSize, 2);
    Print("Calculated lot size: ", finalLot, " (Balance: $", accountBalance,
-         ", Risk: ", riskPercent, "%, SL Distance: ", priceDiff / _Point, " points)");
+         ", Risk: ", risk_percent, "%, SL Distance: ", priceDiff / _Point, " points)");
 
    return finalLot;
 }
@@ -229,9 +244,12 @@ bool CTradeManager::ExecuteBuy(double price, double sl, double tp, double lot, s
    tp = NormalizeDouble(tp, _Digits);
    lot = NormalizeDouble(lot, 2);
 
-   // Check if price is valid (0 means market order)
-   if(price == 0)
-      price = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   // For Market Execution, prefer sending 0.0 as price to avoid "Invalid Price" errors
+   // if the price has moved slightly since the request was made.
+   double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   
+   if(MathAbs(price - currentAsk) < 5 * _Point || price == 0)
+      price = 0.0; // Market Order
 
    // Execute buy order
    if(m_trade.Buy(lot, _Symbol, price, sl, tp, comment))
@@ -241,7 +259,17 @@ bool CTradeManager::ExecuteBuy(double price, double sl, double tp, double lot, s
    }
    else
    {
-      Print("Error executing Buy order: ", m_trade.ResultRetcode(), " - ", m_trade.ResultRetcodeDescription());
+      int retcode = (int)m_trade.ResultRetcode();
+      string retcodeDesc = m_trade.ResultRetcodeDescription();
+      long stopsLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      
+      Print("CRITICAL ERROR: Buy Order Failed!");
+      Print("Return Code: ", retcode, " (", retcodeDesc, ")");
+      Print("Request Args: Price=", price, " SL=", sl, " TP=", tp, " Lot=", lot);
+      Print("Symbol Info: Ask=", SymbolInfoDouble(_Symbol, SYMBOL_ASK), 
+            " Bid=", SymbolInfoDouble(_Symbol, SYMBOL_BID), 
+            " StopsLevel=", stopsLevel);
+            
       return false;
    }
 }
@@ -264,9 +292,10 @@ bool CTradeManager::ExecuteSell(double price, double sl, double tp, double lot, 
    tp = NormalizeDouble(tp, _Digits);
    lot = NormalizeDouble(lot, 2);
 
-   // Check if price is valid (0 means market order)
-   if(price == 0)
-      price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   // For Market Execution, prefer sending 0.0 as price
+   double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if(MathAbs(price - currentBid) < 5 * _Point || price == 0)
+      price = 0.0; // Market Order
 
    // Execute sell order
    if(m_trade.Sell(lot, _Symbol, price, sl, tp, comment))
@@ -276,7 +305,17 @@ bool CTradeManager::ExecuteSell(double price, double sl, double tp, double lot, 
    }
    else
    {
-      Print("Error executing Sell order: ", m_trade.ResultRetcode(), " - ", m_trade.ResultRetcodeDescription());
+      int retcode = (int)m_trade.ResultRetcode();
+      string retcodeDesc = m_trade.ResultRetcodeDescription();
+      long stopsLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      
+      Print("CRITICAL ERROR: Sell Order Failed!");
+      Print("Return Code: ", retcode, " (", retcodeDesc, ")");
+      Print("Request Args: Price=", price, " SL=", sl, " TP=", tp, " Lot=", lot);
+      Print("Symbol Info: Ask=", SymbolInfoDouble(_Symbol, SYMBOL_ASK), 
+            " Bid=", SymbolInfoDouble(_Symbol, SYMBOL_BID), 
+            " StopsLevel=", stopsLevel);
+            
       return false;
    }
 }

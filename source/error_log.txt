@@ -1,0 +1,2 @@
+'GetActiveSignal' - function already defined and has body	SignalEngine.mqh	491	33
+   see declaration of function 'CSignalEngine::GetActiveSignal'	SignalEngine.mqh	102	22

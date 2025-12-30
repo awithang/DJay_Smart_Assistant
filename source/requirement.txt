@@ -1,0 +1,42 @@
+- Current price still really far from Daily zone.
+- Look at the graph, why panel show it SIDEWAY?
+- What is SESSION: QUIET mean?
+- At time: i need to show countdown time to next candle stick.
+- I need to attach panel to bottom left of screen.
+
+And where is this all information?
+
+2. Session & "Gold Time" Indicator
+  Gold has specific behaviors during specific times.
+   * What to show:
+       * Current Session: Asia / Europe / US.
+       * "Gold Time" Status: Highlight when it's the "Best Trading 
+         Time" (Run Time):
+           * 08:00 - 10:00 (Asia Run)
+           * 13:30 - 16:00 (Europe Run)
+           * 19:30 - 22:00 (US Run)
+       * Why: To tell you when the graph is likely to move vs. when         it is "Sideway/Buffalo Market" (Talat Kwai).
+
+  3. EMA "Wick" Trading (Touch Trade)
+  The strategy uses EMA 100, 200, and 720 on M15, H1, H4 as strong 
+  support/resistance for "First Touch" trades.
+   * What to show:
+       * Distance to EMA: Show how far the current price is from   
+         the nearest EMA 100/200 on M15 and H1.
+       * Signal: Alert "TOUCH" when price hits these lines for the 
+         first time.
+
+  4. Price Action (PA) Status
+  The strategy relies on H1 PA (Hammer/Shooting Star) for direction  and M5 for entry.
+   * What to show:
+       * H1 Signal: Detect if the previous H1 candle was a Hammer  
+         (Buy) or Shooting Star (Sell).
+       * M5 Entry: "Wait" or "Go" status based on M5 pattern       
+         confirmation inside the zone.
+
+  5. Risk Management Recommendations
+  The PDF suggests different SL/TP based on the session.
+   * What to show:
+       * Recommended SL: Display "SL: 300 pts" (Normal) or "SL: 500         pts" (US Session/News).
+       * Recommended TP: Display targets based on the strategy     
+         (e.g., 300-600 pts for M5 trade).

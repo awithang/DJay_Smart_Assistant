@@ -5,424 +5,360 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
-#property version   "1.00"
-#property strict
+#property version   "4.00"
 
 #include <EA_Helper/Definitions.mqh>
-#include <ChartObjects/ChartObjectsTxtControls.mqh>
-#include <ChartObjects/ChartObjectsControls.mqh>
 
-//+------------------------------------------------------------------+
-//| Dashboard Panel Class - UI Management                            |
-//+------------------------------------------------------------------+
 class CDashboardPanel
 {
 private:
-   long              m_chart_id;       // Chart ID
-   int               m_corner;         // Panel corner position
-   color             m_bg_color;       // Background color
-   color             m_text_color;     // Text color
-   color             m_signal_color;   // Signal color
+   long              m_chart_id;
+   int               m_corner;
+   string            m_prefix;
+   
+   int               m_panel_width;
+   int               m_panel_height;
+   int               m_base_x;
+   int               m_base_y;
 
-   // UI Elements
-   CChartObjectLabel m_lbl_title;      // Title label
-   CChartObjectLabel m_lbl_session;    // Session label
-   CChartObjectLabel m_lbl_signal;     // Signal label
-   CChartObjectLabel m_lbl_price;      // Current price label
-   CChartObjectLabel m_lbl_profit;     // Profit label
+   color             m_bg_color;       
+   color             m_header_color;
+   color             m_text_color;     
+   color             m_label_color;
+   color             m_buy_color;
+   color             m_sell_color;
+   color             m_accent_color;
 
-   CChartObjectEdit  m_edit_risk;      // Risk percentage input
-   CChartObjectButton m_btn_buy;       // Buy button
-   CChartObjectButton m_btn_sell;      // Sell button
+   // Helper: Convert relative Y (0 at top of panel) to absolute Y (distance from anchor)
+   int Y(int relative_y) { return (m_base_y + m_panel_height) - relative_y; }
 
-   // Zone lines
-   CChartObjectHLine m_hline_buy1;     // Buy Zone 1 line
-   CChartObjectHLine m_hline_buy2;     // Buy Zone 2 line
-   CChartObjectHLine m_hline_sell1;    // Sell Zone 1 line
-   CChartObjectHLine m_hline_sell2;    // Sell Zone 2 line
+   void CreateRect(const string name, int x, int ry, int w, int h, color bg, bool border=false, color border_color=clrNONE);
+   void CreateLabel(const string name, int x, int ry, const string text, color clr, int font_size, const string font="Arial", string align="left");
+   void CreateEdit(const string name, int x, int ry, int width, int height, const string text);
+   void CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr=clrWhite);
+   void CreateHLine(const string name, double price, color clr, ENUM_LINE_STYLE style, int width, const string desc);
+   void AddLevel(double &arr[], string &lbls[], double price, string label);
 
 public:
-   //--- Constructor/Destructor
    CDashboardPanel();
-   ~CDashboardPanel();
+   ~CDashboardPanel() { Destroy(); }
 
-   //--- Initialization
    void Init(long chart_id);
    void CreatePanel();
-   void CreateZoneLines();
-   void SetColors(color bg, color txt, color signal);
+   
+   void UpdateAccountInfo();
+   void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
+   void UpdateWidwaZones(double d1_open);
+   void UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec);
+   void UpdateTrendStrength(string strengthText, color strengthColor);
+   void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
 
-   //--- Value Updates
-   void UpdateSession(ENUM_MARKET_SESSION session);
-   void UpdateSignal(ENUM_SIGNAL_TYPE signal, string signal_text);
-   void UpdatePrice(double bid, double ask);
-   void UpdateProfit(double profit);
-   void UpdateValues(double price, double profit, string signal_text);
-
-   //--- Zone Drawing
-   void DrawZones(double buy1, double buy2, double sell1, double sell2);
-   void UpdateZones(double d1_open, int offset1, int offset2);
-
-   //--- Event Handling
-   void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam);
-
-   //--- Interactive UI Methods
-   double GetRiskPercent();              // Get risk percentage from edit box
-   bool IsBuyButtonClicked(string sparam);  // Check if buy button was clicked
-   bool IsSellButtonClicked(string sparam); // Check if sell button was clicked
-   void SetRiskPercent(double risk);     // Set risk percentage value
-
-   //--- Cleanup
-   void Destroy();
+   double GetRiskPercent();              
+   bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
+   bool IsSellButtonClicked(string sparam) { return (sparam == m_prefix+"BtnSell"); }
+   
+   void Destroy() { ObjectsDeleteAll(m_chart_id, "EA_"); ChartRedraw(m_chart_id); }
 };
 
-//+------------------------------------------------------------------+
-//| Constructor                                                      |
-//+------------------------------------------------------------------+
 CDashboardPanel::CDashboardPanel()
 {
    m_chart_id = 0;
-   m_corner = CORNER_LEFT_UPPER;
-   m_bg_color = clrNONE;
+   m_corner = CORNER_LEFT_LOWER;
+   m_prefix = "EA_"; // Simple prefix to catch everything
+   m_base_x = 10;
+   m_base_y = 10;
+   m_panel_width = 280;
+   m_panel_height = 520;
+
+   m_bg_color = C'20,20,35';
+   m_header_color = C'255,215,0';
    m_text_color = clrWhite;
-   m_signal_color = clrLime;
+   m_label_color = C'180,180,180';
+   m_buy_color = C'46,204,113';
+   m_sell_color = C'231,76,60';
+   m_accent_color = C'52,152,219';
 }
 
-//+------------------------------------------------------------------+
-//| Destructor                                                       |
-//+------------------------------------------------------------------+
-CDashboardPanel::~CDashboardPanel()
-{
-   Destroy();
-}
-
-//+------------------------------------------------------------------+
-//| Initialize panel with chart ID                                   |
-//+------------------------------------------------------------------+
 void CDashboardPanel::Init(long chart_id)
 {
    m_chart_id = chart_id;
    CreatePanel();
 }
 
-//+------------------------------------------------------------------+
-//| Create panel UI elements                                        |
-//+------------------------------------------------------------------+
 void CDashboardPanel::CreatePanel()
 {
-   // Create Title Label
-   m_lbl_title.Create(0, "EA_Helper_Title", 0, 20, 20);
-   m_lbl_title.Description("WidwaPa Assistant");
-   m_lbl_title.Color(clrGold);
-   m_lbl_title.FontSize(14);
-   m_lbl_title.Font("Arial Bold");
+   Destroy(); 
 
-   // Create Session Label
-   m_lbl_session.Create(0, "EA_Helper_Session", 0, 20, 45);
-   m_lbl_session.Description("Session: --");
-   m_lbl_session.Color(m_text_color);
-   m_lbl_session.FontSize(10);
+   int x = m_base_x;
+   int pad = 10;
 
-   // Create Signal Label
-   m_lbl_signal.Create(0, "EA_Helper_Signal", 0, 20, 65);
-   m_lbl_signal.Description("Signal: WAITING...");
-   m_lbl_signal.Color(clrGray);
-   m_lbl_signal.FontSize(10);
+   // 1. Background
+   CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, m_header_color);
 
-   // Create Price Label
-   m_lbl_price.Create(0, "EA_Helper_Price", 0, 20, 85);
-   m_lbl_price.Description("Price: --");
-   m_lbl_price.Color(m_text_color);
-   m_lbl_price.FontSize(10);
+   // 2. Header
+   CreateLabel("Title", x + pad, 15, "WIDWA PA ASSISTANT", m_header_color, 10, "Arial Bold");
+   CreateLabel("Balance", x + m_panel_width - pad, 15, "$--", m_text_color, 9, "Arial Bold", "right");
 
-   // Create Profit Label
-   m_lbl_profit.Create(0, "EA_Helper_Profit", 0, 20, 105);
-   m_lbl_profit.Description("Profit: $0.00");
-   m_lbl_profit.Color(m_text_color);
-   m_lbl_profit.FontSize(10);
+   // 3. Market Status
+   CreateRect("StatusBG", x+5, 40, m_panel_width-10, 50, C'30,30,50');
+   CreateLabel("LblSes", x+15, 50, "SESSION: --", m_text_color, 8);
+   CreateLabel("LblTime", x+15, 65, "COUNTDOWN: --:--", clrGray, 8);
+   CreateLabel("LblStat", x+m_panel_width-15, 60, "WAITING", clrGray, 10, "Arial Bold", "right");
 
-   // Create Risk Edit Box
-   m_edit_risk.Create(0, "EA_Helper_EditRisk", 0, 20, 130, 60, 20);
-   m_edit_risk.Description("3.0");  // Default 3% risk
-   m_edit_risk.Color(clrWhite);
-   m_edit_risk.BackColor(clrNavy);
-   m_edit_risk.FontSize(10);
-   m_edit_risk.Tooltip("Risk % (1-10): Lot size auto-calculated based on this");
-
-   // Create Buy/Sell buttons
-   m_btn_buy.Create(0, "EA_Helper_BtnBuy", 0, 90, 130, 80, 25);
-   m_btn_buy.Description("BUY");
-   m_btn_buy.Color(clrForestGreen);
-   m_btn_buy.FontSize(10);
-   m_btn_buy.Locked(false);  // Enable button
-   m_btn_buy.Tooltip("Execute BUY order with auto-calculated lot size");
-
-   m_btn_sell.Create(0, "EA_Helper_BtnSell", 0, 180, 130, 80, 25);
-   m_btn_sell.Description("SELL");
-   m_btn_sell.Color(clrCrimson);
-   m_btn_sell.FontSize(10);
-   m_btn_sell.Locked(false);  // Enable button
-   m_btn_sell.Tooltip("Execute SELL order with auto-calculated lot size");
-
-   // Create Zone Horizontal Lines
-   CreateZoneLines();
-}
-
-//+------------------------------------------------------------------+
-//| Create zone horizontal lines                                     |
-//+------------------------------------------------------------------+
-void CDashboardPanel::CreateZoneLines()
-{
-   // Buy Zone 1 (Green, Solid)
-   m_hline_buy1.Create(0, "EA_Helper_ZoneBuy1", 0, 0, clrLime);
-   m_hline_buy1.Style(STYLE_SOLID);
-   m_hline_buy1.Width(2);
-   m_hline_buy1.Selectable(true);
-   m_hline_buy1.Description("Buy Zone 1");
-
-   // Buy Zone 2 (Green, Dashed)
-   m_hline_buy2.Create(0, "EA_Helper_ZoneBuy2", 0, 0, clrLime);
-   m_hline_buy2.Style(STYLE_DASH);
-   m_hline_buy2.Width(1);
-   m_hline_buy2.Selectable(true);
-   m_hline_buy2.Description("Buy Zone 2");
-
-   // Sell Zone 1 (Red, Solid)
-   m_hline_sell1.Create(0, "EA_Helper_ZoneSell1", 0, 0, clrRed);
-   m_hline_sell1.Style(STYLE_SOLID);
-   m_hline_sell1.Width(2);
-   m_hline_sell1.Selectable(true);
-   m_hline_sell1.Description("Sell Zone 1");
-
-   // Sell Zone 2 (Red, Dashed)
-   m_hline_sell2.Create(0, "EA_Helper_ZoneSell2", 0, 0, clrRed);
-   m_hline_sell2.Style(STYLE_DASH);
-   m_hline_sell2.Width(1);
-   m_hline_sell2.Selectable(true);
-   m_hline_sell2.Description("Sell Zone 2");
-}
-
-//+------------------------------------------------------------------+
-//| Set panel colors                                                 |
-//+------------------------------------------------------------------+
-void CDashboardPanel::SetColors(color bg, color txt, color signal)
-{
-   m_bg_color = bg;
-   m_text_color = txt;
-   m_signal_color = signal;
-}
-
-//+------------------------------------------------------------------+
-//| Update session display                                           |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateSession(ENUM_MARKET_SESSION session)
-{
-   string sessionText = "";
-   color sessionColor = clrGray;
-
-   switch(session)
+   // 4. Daily Zones Table
+   CreateLabel("LblZ", x + pad, 105, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
+   CreateRect("TableBG", x+5, 120, m_panel_width-10, 130, C'25,25,40', true, C'60,60,80');
+   
+   CreateLabel("H_Z", x+15, 125, "ZONE", clrGray, 7);
+   CreateLabel("H_P", x+110, 125, "PRICE", clrGray, 7);
+   CreateLabel("H_D", x+200, 125, "DIST", clrGray, 7);
+   
+   for(int i=0; i<5; i++)
    {
-      case SESSION_ASIA:
-         sessionText = "ASIA";
-         sessionColor = clrYellow;
-         break;
-      case SESSION_EUROPE:
-         sessionText = "EUROPE";
-         sessionColor = clrOrange;
-         break;
-      case SESSION_US:
-         sessionText = "US";
-         sessionColor = clrDodgerBlue;
-         break;
-      case SESSION_QUIET:
-         sessionText = "QUIET";
-         sessionColor = clrGray;
-         break;
+      string id = IntegerToString(i);
+      int ry = 145 + (i * 18);
+      CreateLabel("L_N_"+id, x+15, ry, "--", clrWhite, 8);
+      CreateLabel("L_P_"+id, x+110, ry, "0.00", m_text_color, 8);
+      CreateLabel("L_D_"+id, x+200, ry, "0 pts", clrGray, 8);
    }
 
-   // Get current time and format it
-   MqlDateTime timeStruct;
-   TimeToStruct(TimeCurrent(), timeStruct);
-   string timeStr = StringFormat("%02d:%02d:%02d", timeStruct.hour, timeStruct.min, timeStruct.sec);
+   // 5. Execution
+   CreateLabel("LblCtrl", x+pad, 265, "EXECUTION", m_text_color, 9, "Arial Bold");
+   CreateLabel("LblRisk", x+m_panel_width-70, 265, "Risk %", clrGray, 8);
+   CreateEdit("EditRisk", x+m_panel_width-30, 262, 25, 18, "3.0");
+   
+   CreateButton("BtnBuy", x+10, 285, 125, 30, "BUY", m_buy_color);
+   CreateButton("BtnSell", x+145, 285, 125, 30, "SELL", m_sell_color);
 
-   // Display session and time together
-   m_lbl_session.Description("[" + timeStr + "] " + sessionText);
-   m_lbl_session.Color(sessionColor);
+   // 6. Strategy Info
+   CreateLabel("LblSig", x+pad, 335, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
+   CreateRect("InfoBG", x+5, 350, m_panel_width-10, 150, C'25,25,35');
+
+   CreateLabel("Trend_T", x+15, 360, "Trend:", clrGold, 8);
+   CreateLabel("Trend_V", x+60, 360, "--", clrGray, 8, "Arial Bold");
+
+   CreateLabel("EMA_T", x+15, 375, "EMA Distance:", clrGold, 8);
+   CreateLabel("EMA_M15", x+15, 390, "M15 (100/200): --", clrWhite, 8);
+   CreateLabel("EMA_H1", x+15, 405, "H1 (100/200): --", clrWhite, 8);
+
+   CreateLabel("PA_T", x+15, 430, "PA Signal:", clrGold, 8);
+   CreateLabel("PA_V", x+80, 430, "NONE", clrGray, 8);
+
+   CreateLabel("Risk_T", x+15, 455, "Rec. SL/TP:", clrGold, 8);
+   CreateLabel("Risk_V", x+80, 455, "-- / --", clrWhite, 8);
+
+   CreateLabel("Ver", x+m_panel_width-35, 490, "v4.0", clrGray, 7);
+
+   UpdateAccountInfo();
+   ChartRedraw(m_chart_id);
 }
 
-//+------------------------------------------------------------------+
-//| Update signal display                                            |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateSignal(ENUM_SIGNAL_TYPE signal, string signal_text)
+void CDashboardPanel::UpdateWidwaZones(double d1_open)
 {
-   m_lbl_signal.Description("Signal: " + signal_text);
+   if(d1_open <= 0) return;
+   double current = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double pt = _Point;
+   if(pt <= 0) return;
 
-   // Update signal color based on type
-   switch(signal)
+   double levels[]; string labels[];
+   for(int i=-30; i<=30; i++)
    {
-      case SIGNAL_BUY_ZONE:
-      case SIGNAL_PA_BUY:
-      case SIGNAL_EMA_TOUCH_BUY:
-         m_lbl_signal.Color(clrLime);
-         break;
-      case SIGNAL_SELL_ZONE:
-      case SIGNAL_PA_SELL:
-      case SIGNAL_EMA_TOUCH_SELL:
-         m_lbl_signal.Color(clrRed);
-         break;
-      default:
-         m_lbl_signal.Color(clrGray);
-         break;
+      double base = i * 1000;
+      AddLevel(levels, labels, d1_open + (base * pt), StringFormat("D1 %+d", (int)base));
+      double minor = (i >= 0) ? (base + 300) : (base - 300);
+      AddLevel(levels, labels, d1_open + (minor * pt), StringFormat("D1 %+d", (int)minor));
+   }
+   
+   int count = ArraySize(levels);
+   int best_idx[5]; double best_dist[5];
+   for(int k=0; k<5; k++) { best_dist[k] = 999999; best_idx[k] = -1; }
+   
+   for(int i=0; i<count; i++)
+   {
+      double dist = MathAbs(current - levels[i]);
+      for(int k=0; k<5; k++)
+      {
+         if(dist < best_dist[k])
+         {
+            for(int j=4; j>k; j--) { best_dist[j] = best_dist[j-1]; best_idx[j] = best_idx[j-1]; }
+            best_dist[k] = dist; best_idx[k] = i; break;
+         }
+      }
+   }
+   
+   // Sort by Price DESC
+   for(int i=0; i<4; i++)
+      for(int j=0; j<4-i; j++)
+         if(best_idx[j] != -1 && best_idx[j+1] != -1 && levels[best_idx[j]] < levels[best_idx[j+1]])
+         { int t = best_idx[j]; best_idx[j] = best_idx[j+1]; best_idx[j+1] = t; }
+
+   for(int i=0; i<5; i++)
+   {
+      int idx = best_idx[i];
+      if(idx == -1) continue;
+      string sid = IntegerToString(i);
+      color c = (levels[idx] > current) ? m_sell_color : m_buy_color;
+      if(MathAbs(levels[idx] - d1_open) < pt) c = m_header_color;
+
+      ObjectSetString(m_chart_id, m_prefix+"L_N_"+sid, OBJPROP_TEXT, labels[idx]);
+      ObjectSetInteger(m_chart_id, m_prefix+"L_N_"+sid, OBJPROP_COLOR, c);
+      ObjectSetString(m_chart_id, m_prefix+"L_P_"+sid, OBJPROP_TEXT, DoubleToString(levels[idx], 2));
+      ObjectSetString(m_chart_id, m_prefix+"L_D_"+sid, OBJPROP_TEXT, DoubleToString(MathAbs(current-levels[idx])/pt, 0)+" pts");
    }
 }
 
-//+------------------------------------------------------------------+
-//| Update price display                                             |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdatePrice(double bid, double ask)
+void CDashboardPanel::UpdateSessionInfo(string session_name, string countdown, bool is_gold_time)
 {
-   string priceText = StringFormat("Price: %.5f", bid);
-   m_lbl_price.Description(priceText);
+   ObjectSetString(m_chart_id, m_prefix+"LblSes", OBJPROP_TEXT, "SESSION: " + session_name);
+   ObjectSetString(m_chart_id, m_prefix+"LblTime", OBJPROP_TEXT, countdown);
+   if(is_gold_time) {
+      ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, "RUN TIME");
+      ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, clrLime);
+   } else {
+      ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, "SIDEWAY");
+      ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, clrGray);
+   }
 }
 
-//+------------------------------------------------------------------+
-//| Update profit display                                            |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateProfit(double profit)
+void CDashboardPanel::UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec)
 {
-   string profitText = StringFormat("Profit: $%.2f", profit);
-   m_lbl_profit.Description(profitText);
-
-   // Update color based on profit/loss
-   if(profit > 0)
-      m_lbl_profit.Color(clrLime);
-   else if(profit < 0)
-      m_lbl_profit.Color(clrRed);
-   else
-      m_lbl_profit.Color(m_text_color);
+   string nameM15 = m_prefix+"EMA_M15";
+   if(ObjectFind(m_chart_id, nameM15) < 0) {
+      Print("ERROR: Object ", nameM15, " not found!");
+      // Attempt to force recreate if missing? No, just log for now.
+   }
+   
+   // Correctly update the labels with the calculated strategy info
+   ObjectSetString(m_chart_id, nameM15, OBJPROP_TEXT, "M15 (100/200): " + ema_m15);
+   ObjectSetString(m_chart_id, m_prefix+"EMA_H1", OBJPROP_TEXT, "H1 (100/200): " + ema_h1);
+   
+   ObjectSetString(m_chart_id, m_prefix+"PA_V", OBJPROP_TEXT, pa_sig);
+   color pc = (StringFind(pa_sig, "BUY")>=0) ? clrLime : (StringFind(pa_sig, "SELL")>=0 ? clrRed : clrGray);
+   ObjectSetInteger(m_chart_id, m_prefix+"PA_V", OBJPROP_COLOR, pc);
+   
+   ObjectSetString(m_chart_id, m_prefix+"Risk_V", OBJPROP_TEXT, risk_rec);
+   
+   ChartRedraw(m_chart_id); // Force redraw
 }
 
-//+------------------------------------------------------------------+
-//| Update multiple values at once                                   |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateValues(double price, double profit, string signal_text)
+void CDashboardPanel::UpdateAccountInfo()
 {
-   UpdatePrice(price, price);
-   UpdateProfit(profit);
+   ObjectSetString(m_chart_id, m_prefix+"Balance", OBJPROP_TEXT, StringFormat("$%.2f", AccountInfoDouble(ACCOUNT_BALANCE)));
 }
 
-//+------------------------------------------------------------------+
-//| Draw zone lines on chart                                         |
-//+------------------------------------------------------------------+
-void CDashboardPanel::DrawZones(double buy1, double buy2, double sell1, double sell2)
-{
-   // Update Buy Zone 1
-   m_hline_buy1.Price(NormalizeDouble(buy1, _Digits));
-   m_hline_buy1.Description(StringFormat("Buy Zone 1: %.5f", buy1));
-
-   // Update Buy Zone 2
-   m_hline_buy2.Price(NormalizeDouble(buy2, _Digits));
-   m_hline_buy2.Description(StringFormat("Buy Zone 2: %.5f", buy2));
-
-   // Update Sell Zone 1
-   m_hline_sell1.Price(NormalizeDouble(sell1, _Digits));
-   m_hline_sell1.Description(StringFormat("Sell Zone 1: %.5f", sell1));
-
-   // Update Sell Zone 2
-   m_hline_sell2.Price(NormalizeDouble(sell2, _Digits));
-   m_hline_sell2.Description(StringFormat("Sell Zone 2: %.5f", sell2));
-}
-
-//+------------------------------------------------------------------+
-//| Update zone lines based on D1 open and offsets                   |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateZones(double d1_open, int offset1, int offset2)
-{
-   double point = _Point;
-
-   // Calculate zone levels
-   double buy1 = d1_open + (offset1 * point);
-   double buy2 = d1_open + (offset2 * point);
-   double sell1 = d1_open - (offset1 * point);
-   double sell2 = d1_open - (offset2 * point);
-
-   // Draw the zones
-   DrawZones(buy1, buy2, sell1, sell2);
-}
-
-//+------------------------------------------------------------------+
-//| Handle chart events (button clicks)                              |
-//+------------------------------------------------------------------+
-void CDashboardPanel::OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
-{
-   // Event is handled by the main EA OnChartEvent
-   // This method is a placeholder for future UI event handling within the panel
-}
-
-//+------------------------------------------------------------------+
-//| Get risk percentage from edit box                                |
-//+------------------------------------------------------------------+
 double CDashboardPanel::GetRiskPercent()
 {
-   string riskText = m_edit_risk.Description();
-   double risk = StringToDouble(riskText);
-
-   // Validate risk value (1% to 10%)
-   if(risk < 1.0) risk = 1.0;
-   if(risk > 10.0) risk = 10.0;
-
-   return risk;
+   return StringToDouble(ObjectGetString(m_chart_id, m_prefix+"EditRisk", OBJPROP_TEXT));
 }
 
-//+------------------------------------------------------------------+
-//| Check if buy button was clicked                                  |
-//+------------------------------------------------------------------+
-bool CDashboardPanel::IsBuyButtonClicked(string sparam)
+// Helpers
+void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h, color bg, bool border, color border_color)
 {
-   return (sparam == "EA_Helper_BtnBuy");
+   string n = m_prefix + name;
+   ObjectCreate(m_chart_id, n, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YDISTANCE, Y(ry));
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XSIZE, w);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, h);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, border ? BORDER_FLAT : BORDER_SUNKEN);
+   if(border) ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_COLOR, border_color);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_SELECTABLE, false);
 }
 
-//+------------------------------------------------------------------+
-//| Check if sell button was clicked                                 |
-//+------------------------------------------------------------------+
-bool CDashboardPanel::IsSellButtonClicked(string sparam)
+void CDashboardPanel::CreateLabel(const string name, int x, int ry, const string text, color clr, int font_size, const string font, string align)
 {
-   return (sparam == "EA_Helper_BtnSell");
+   string n = m_prefix + name;
+   ObjectCreate(m_chart_id, n, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YDISTANCE, Y(ry));
+   ObjectSetString(m_chart_id, n, OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_COLOR, clr);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_FONTSIZE, font_size);
+   ObjectSetString(m_chart_id, n, OBJPROP_FONT, font);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, (align=="right" ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER));
 }
 
-//+------------------------------------------------------------------+
-//| Set risk percentage value                                        |
-//+------------------------------------------------------------------+
-void CDashboardPanel::SetRiskPercent(double risk)
+void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr)
 {
-   // Validate and set risk value
-   if(risk < 1.0) risk = 1.0;
-   if(risk > 10.0) risk = 10.0;
-
-   m_edit_risk.Description(DoubleToString(risk, 1));
+   string n = m_prefix + name;
+   ObjectCreate(m_chart_id, n, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YDISTANCE, Y(ry));
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XSIZE, width);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, height);
+   ObjectSetString(m_chart_id, n, OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, clr);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_COLOR, txt_clr);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
 }
 
-//+------------------------------------------------------------------+
-//| Destroy panel and cleanup resources                              |
-//+------------------------------------------------------------------+
-void CDashboardPanel::Destroy()
+void CDashboardPanel::CreateEdit(const string name, int x, int ry, int width, int height, const string text)
 {
-   // Delete UI labels
-   m_lbl_title.Delete();
-   m_lbl_session.Delete();
-   m_lbl_signal.Delete();
-   m_lbl_price.Delete();
-   m_lbl_profit.Delete();
+   string n = m_prefix + name;
+   ObjectCreate(m_chart_id, n, OBJ_EDIT, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YDISTANCE, Y(ry));
+   ObjectSetInteger(m_chart_id, n, OBJPROP_XSIZE, width);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, height);
+   ObjectSetString(m_chart_id, n, OBJPROP_TEXT, text);
+}
 
-   // Delete buttons
-   m_btn_buy.Delete();
-   m_btn_sell.Delete();
-
-   // Delete zone lines
-   m_hline_buy1.Delete();
-   m_hline_buy2.Delete();
-   m_hline_sell1.Delete();
-   m_hline_sell2.Delete();
+void CDashboardPanel::AddLevel(double &arr[], string &lbls[], double price, string label)
+{
+   int s = ArraySize(arr); ArrayResize(arr, s+1); ArrayResize(lbls, s+1);
+   arr[s] = price; lbls[s] = label;
 }
 
 //+------------------------------------------------------------------+
+//| Update Trend Strength Display                                    |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateTrendStrength(string strengthText, color strengthColor)
+{
+   ObjectSetString(m_chart_id, m_prefix+"Trend_V", OBJPROP_TEXT, strengthText);
+   ObjectSetInteger(m_chart_id, m_prefix+"Trend_V", OBJPROP_COLOR, strengthColor);
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Zone Status Highlight                                     |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateZoneStatus(int zoneStatus)
+{
+   string statusText = "--";
+   color statusColor = clrGray;
+
+   switch(zoneStatus)
+   {
+      case 0: // ZONE_STATUS_NONE
+         statusText = "NEUTRAL";
+         statusColor = clrGray;
+         break;
+      case 1: // ZONE_STATUS_IN_BUY1
+         statusText = "BUY ZONE 1";
+         statusColor = m_buy_color;
+         break;
+      case 2: // ZONE_STATUS_IN_BUY2
+         statusText = "BUY ZONE 2";
+         statusColor = m_buy_color;
+         break;
+      case 3: // ZONE_STATUS_IN_SELL1
+         statusText = "SELL ZONE 1";
+         statusColor = m_sell_color;
+         break;
+      case 4: // ZONE_STATUS_IN_SELL2
+         statusText = "SELL ZONE 2";
+         statusColor = m_sell_color;
+         break;
+   }
+
+   // Update the status label in the header area
+   ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, statusText);
+   ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, statusColor);
+   ChartRedraw(m_chart_id);
+}

@@ -53,20 +53,43 @@ if ([string]::IsNullOrEmpty($Mt5Path)) {
 
     # Common MT5 data folder locations
     $AppData = [Environment]::GetFolderPath("ApplicationData")
-    $PossiblePaths = @(
-        Join-Path $AppData "MetaQuotes\Terminal\*\MQL5",
-        "$env:LOCALAPPDATA\MetaQuotes\Terminal\*\MQL5",
-        "C:\Program Files\MetaTrader 5\MQL5",
-        "${env:ProgramFiles(x86)}\MetaTrader 5\MQL5",
-        "C:\Program Files*\*MetaTrader*\MQL5"
-    )
-
     $Mt5Path = $null
-    foreach ($Pattern in $PossiblePaths) {
-        $Matches = Resolve-Path $Pattern -ErrorAction SilentlyContinue
-        if ($Matches) {
-            $Mt5Path = $Matches[0].Path
-            break
+
+    # Search in AppData
+    if (Test-Path "$AppData\MetaQuotes\Terminal") {
+        $Terminals = Get-ChildItem "$AppData\MetaQuotes\Terminal" -Directory -ErrorAction SilentlyContinue
+        foreach ($Terminal in $Terminals) {
+            $Mql5Path = Join-Path $Terminal.FullName "MQL5"
+            if (Test-Path $Mql5Path) {
+                $Mt5Path = $Mql5Path
+                break
+            }
+        }
+    }
+
+    # Search in LocalAppData if not found
+    if (-not $Mt5Path -and $env:LOCALAPPDATA) {
+        $LocalTerminals = Get-ChildItem "$env:LOCALAPPDATA\MetaQuotes\Terminal" -Directory -ErrorAction SilentlyContinue
+        foreach ($Terminal in $LocalTerminals) {
+            $Mql5Path = Join-Path $Terminal.FullName "MQL5"
+            if (Test-Path $Mql5Path) {
+                $Mt5Path = $Mql5Path
+                break
+            }
+        }
+    }
+
+    # Check Program Files
+    if (-not $Mt5Path) {
+        $ProgFilesPaths = @(
+            "C:\Program Files\MetaTrader 5",
+            "${env:ProgramFiles(x86)}\MetaTrader 5"
+        )
+        foreach ($Path in $ProgFilesPaths) {
+            if (Test-Path "$Path\MQL5") {
+                $Mt5Path = "$Path\MQL5"
+                break
+            }
         }
     }
 

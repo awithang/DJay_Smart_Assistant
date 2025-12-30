@@ -3,64 +3,9 @@
 //|                                    Copyright 2025, EA Helper Project |
 //|                                             https://ea-helper.com    |
 //+------------------------------------------------------------------+
-/*
- * WidwaPa Trade Assistant - Expert Advisor
- * --------------------------------------------
- *
- * This EA assists traders following the "Widwa Pa" strategy by:
- *
- * 1. AUTOMATIC ZONE CALCULATION
- *    - Calculates daily Buy/Sell zones based on D1 open price
- *    - Displays zones as colored lines on the chart (Green=Buy, Red=Sell)
- *    - Zone 1: D1 Open +/- 300 points (primary)
- *    - Zone 2: D1 Open +/- 1000 points (secondary)
- *
- * 2. PRICE ACTION SIGNAL DETECTION
- *    - Hammer: Bullish reversal signal
- *    - Shooting Star: Bearish reversal signal
- *    - Engulfing: Strong trend reversal signal
- *
- * 3. EMA TOUCH SIGNALS
- *    - Detects first touch of EMA 100, 200, or 720
- *    - Bullish touch: Price bounces off EMA from above
- *    - Bearish touch: Price rejects EMA from below
- *
- * 4. ONE-CLICK TRADING
- *    - Click BUY or SELL buttons to execute trades instantly
- *    - Auto-calculates lot size based on risk percentage
- *    - Automatic stop loss and take profit (1:2 risk-reward)
- *
- * 5. MARKET SESSION CLOCK
- *    - Asia: 08:00-10:00 (Yellow)
- *    - Europe: 13:30-16:00 (Orange)
- *    - US: 19:30-22:00 (Blue)
- *    - Quiet: Outside active hours (Gray)
- *
- * USAGE:
- * ------
- * 1. Attach EA to XAUUSD (Gold) chart
- * 2. Set Risk Percentage in edit box (1-10% recommended)
- * 3. Watch for signals on the dashboard
- * 4. Click BUY or SELL when signal appears
- * 5. Monitor profit in real-time on panel
- *
- * RISK MANAGEMENT:
- * ---------------
- * - Default risk: 3% per trade
- * - Maximum risk: 10% (capped for safety)
- * - Stop Loss: Configurable (default 300 points)
- * - Take Profit: 2x Stop Loss distance
- * - Trailing Stop: Activates once in profit
- *
- * DISCLAIMER:
- * This EA is a trading assistant tool. Always use proper risk management
- * and test on demo accounts before live trading. Past performance does not
- * guarantee future results.
- */
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
 #property version   "1.00"
-#property strict
 #property description "WidwaPa Trade Assistant - Automated zones, signals, and one-click trading"
 
 #include <EA_Helper/Definitions.mqh>
@@ -68,11 +13,11 @@
 #include <EA_Helper/TradeManager.mqh>
 #include <EA_Helper/DashboardPanel.mqh>
 
-//--- Input Parameters (Configurable via EA Inputs)
-input double Input_RiskPercent = 3.0;       // Risk % per trade (1-10% recommended)
-input int    Input_SL_Points = 300;         // Stop Loss distance in points
-input int    Input_Zone_Offset1 = 300;      // Zone 1 offset from D1 Open (points)
-input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset from D1 Open (points)
+//--- Input Parameters
+input double Input_RiskPercent = 3.0;       // Risk % per trade
+input int    Input_SL_Points = 300;         // Stop Loss distance
+input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
+input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
 //--- Global Objects
@@ -85,24 +30,16 @@ CDashboardPanel dashboardPanel;
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // Initialize SignalEngine with zone offsets from input parameters
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
-
-   // Initialize TradeManager with magic number
    tradeManager.Init(Input_MagicNumber);
-
-   // Initialize DashboardPanel with current chart ID
    dashboardPanel.Init(0);
 
-   // Set up timer for 1-second interval
    EventSetTimer(1);
 
-   // Initial zone drawing
    double d1Open = signalEngine.GetD1Open();
-   dashboardPanel.UpdateZones(d1Open, Input_Zone_Offset1, Input_Zone_Offset2);
+   dashboardPanel.UpdateWidwaZones(d1Open);
 
    Print("WidwaPa Assistant initialized successfully.");
-
    return(INIT_SUCCEEDED);
 }
 
@@ -111,12 +48,8 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   // Kill timer
    EventKillTimer();
-
-   // Clean up DashboardPanel resources
    dashboardPanel.Destroy();
-
    Print("WidwaPa Assistant deinitialized. Reason: ", reason);
 }
 
@@ -125,44 +58,29 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // Refresh market data in SignalEngine
    signalEngine.RefreshData();
 
-   // Get current price and D1 open
    double currentPrice = signalEngine.GetCurrentPrice();
    double d1Open = signalEngine.GetD1Open();
 
-   // Cache variables for optimization (only update when changed)
-   static double prevPrice = 0;
-   static double prevProfit = 0;
-   static ENUM_SIGNAL_TYPE prevSignal = SIGNAL_NONE;
-   static string prevSignalText = "";
-
-   // Update price only if changed significantly (more than 1 point)
-   if(MathAbs(currentPrice - prevPrice) > _Point)
-   {
-      dashboardPanel.UpdatePrice(currentPrice, currentPrice);
-      prevPrice = currentPrice;
-   }
-
-   // Update profit only if changed by more than $1
-   double totalProfit = tradeManager.GetPositionProfit();
-   if(MathAbs(totalProfit - prevProfit) > 1.0)
-   {
-      dashboardPanel.UpdateProfit(totalProfit);
-      prevProfit = totalProfit;
-   }
-
-   // Apply trailing stop to open positions
-   tradeManager.TrailingStop(Input_SL_Points);
-
-   // Update zones on new day (D1 open changed)
+   // Update zones if D1 Open changes (new day)
    static double prevD1Open = 0;
    if(d1Open != prevD1Open)
    {
-      dashboardPanel.UpdateZones(d1Open, Input_Zone_Offset1, Input_Zone_Offset2);
+      dashboardPanel.UpdateWidwaZones(d1Open);
       prevD1Open = d1Open;
    }
+
+   // Update account info on profit change
+   static double prevProfit = 0;
+   double totalProfit = tradeManager.GetPositionProfit();
+   if(MathAbs(totalProfit - prevProfit) > 0.01 || PositionsTotal() > 0)
+   {
+      dashboardPanel.UpdateAccountInfo();
+      prevProfit = totalProfit;
+   }
+
+   tradeManager.TrailingStop(Input_SL_Points);
 
    // Check for PA signals (only on new bar)
    static datetime lastBarTime = 0;
@@ -170,48 +88,45 @@ void OnTick()
    bool newBar = (currentBarTime != lastBarTime);
    if(newBar)
    {
+      // --- 1. Price Action Signals ---
       ENUM_SIGNAL_TYPE paSignal = signalEngine.GetActiveSignal();
       string newSignalText = "";
+      
+      // Get High/Low of previous bar for arrow placement
+      double prevHigh = iHigh(_Symbol, PERIOD_CURRENT, 1);
+      double prevLow = iLow(_Symbol, PERIOD_CURRENT, 1);
+      
       if(paSignal == SIGNAL_PA_BUY)
-         newSignalText = "HAMMER/ENGULFING BUY";
+      {
+         CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrLime, "PA_Buy");
+      }
       else if(paSignal == SIGNAL_PA_SELL)
-         newSignalText = "SHOOTING STAR/ENGULFING SELL";
-
-      if(paSignal != SIGNAL_NONE && newSignalText != prevSignalText)
       {
-         dashboardPanel.UpdateSignal(paSignal, newSignalText);
-         prevSignal = paSignal;
-         prevSignalText = newSignalText;
+         CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrRed, "PA_Sell");
       }
+      
+      // --- 2. EMA Touch Signals ---
+      // Check H1 EMA Touch
+      bool emaTouch100 = signalEngine.CheckEMATouch(PERIOD_H1, 100);
+      bool emaTouch200 = signalEngine.CheckEMATouch(PERIOD_H1, 200);
+      
+      if(emaTouch100 || emaTouch200)
+      {
+         double currentH1Price = iClose(_Symbol, PERIOD_H1, 1); 
+         
+         double emaVal = 0;
+         // Note: We use GetEMAValue logic manually here or assume we can get it from engine?
+         // For one-off checks, manual or helper is fine. Let's use the helper!
+         int period = emaTouch100 ? 100 : 200;
+         emaVal = signalEngine.GetEMAValue(PERIOD_H1, period, 1);
+         
+         if(currentH1Price > emaVal)
+             CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrLime, "EMA_Touch_Buy");
+         else
+             CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrRed, "EMA_Touch_Sell");
+      }
+
       lastBarTime = currentBarTime;
-   }
-
-   // Check for zone entry signals (only if no PA signal and on new bar or price moved significantly)
-   if(prevSignal == SIGNAL_NONE)
-   {
-      ENUM_SIGNAL_TYPE zoneSignal = SIGNAL_NONE;
-      string zoneSignalText = "Waiting...";
-
-      if(signalEngine.IsInZone(currentPrice, ZONE_BUY1) ||
-         signalEngine.IsInZone(currentPrice, ZONE_BUY2))
-      {
-         zoneSignal = SIGNAL_BUY_ZONE;
-         zoneSignalText = "In Buy Zone";
-      }
-      else if(signalEngine.IsInZone(currentPrice, ZONE_SELL1) ||
-              signalEngine.IsInZone(currentPrice, ZONE_SELL2))
-      {
-         zoneSignal = SIGNAL_SELL_ZONE;
-         zoneSignalText = "In Sell Zone";
-      }
-
-      // Only update if signal changed
-      if(zoneSignal != prevSignal || zoneSignalText != prevSignalText)
-      {
-         dashboardPanel.UpdateSignal(zoneSignal, zoneSignalText);
-         prevSignal = zoneSignal;
-         prevSignalText = zoneSignalText;
-      }
    }
 }
 
@@ -220,62 +135,72 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   // Update session display
+   // 1. Session & Run Time Logic
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   int hour = dt.hour;
+   int min = dt.min;
+
+   bool isRunTime = false;
+   if(hour >= 8 && hour < 10) isRunTime = true; // Asia Run
+   else if((hour == 13 && min >= 30) || (hour >= 14 && hour < 16)) isRunTime = true; // EU Run
+   else if((hour == 19 && min >= 30) || (hour >= 20 && hour < 22)) isRunTime = true; // US Run
+
    ENUM_MARKET_SESSION session = signalEngine.GetCurrentSession();
-   dashboardPanel.UpdateSession(session);
+   string sessionName = "QUIET";
+   if(session == SESSION_ASIA) sessionName = "ASIA";
+   else if(session == SESSION_EUROPE) sessionName = "EUROPE";
+   else if(session == SESSION_US) sessionName = "US";
 
-   // Check for EMA touch signals (H1 timeframe)
-   bool emaTouch100 = signalEngine.CheckEMATouch(PERIOD_H1, 100);
-   bool emaTouch200 = signalEngine.CheckEMATouch(PERIOD_H1, 200);
+   // 2. Countdown Timer (M5 Candle)
+   long timeCur = (long)TimeCurrent();
+   long timeLeft = 300 - (timeCur % 300);
+   string timeStr = StringFormat("M5: %02d:%02d", timeLeft/60, timeLeft%60);
 
-   if(emaTouch100)
-   {
-      // Determine bullish or bearish touch based on price position
-      double currentPrice = signalEngine.GetCurrentPrice();
-      if(currentPrice > iMA(_Symbol, PERIOD_H1, 100, 0, MODE_EMA, PRICE_CLOSE, 1))
-      {
-         dashboardPanel.UpdateSignal(SIGNAL_EMA_TOUCH_BUY, "EMA 100 Bullish Touch");
-      }
-      else
-      {
-         dashboardPanel.UpdateSignal(SIGNAL_EMA_TOUCH_SELL, "EMA 100 Bearish Touch");
-      }
-   }
-   else if(emaTouch200)
-   {
-      double currentPrice = signalEngine.GetCurrentPrice();
-      if(currentPrice > iMA(_Symbol, PERIOD_H1, 200, 0, MODE_EMA, PRICE_CLOSE, 1))
-      {
-         dashboardPanel.UpdateSignal(SIGNAL_EMA_TOUCH_BUY, "EMA 200 Bullish Touch");
-      }
-      else
-      {
-         dashboardPanel.UpdateSignal(SIGNAL_EMA_TOUCH_SELL, "EMA 200 Bearish Touch");
-      }
-   }
+   dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
+
+   // 3. NEW: Update Strategy Signals using SignalEngine methods
+   signalEngine.RefreshData();
+
+   // 3a. Trend Alignment (D1/H4/H1)
+   TrendAlignment trend = signalEngine.GetTrendAlignment();
+   dashboardPanel.UpdateTrendStrength(trend.strengthText, trend.strengthColor);
+
+   // 3b. Combined PA Signal (H1 primary, M5 entry)
+   CombinedSignal paSignal = signalEngine.GetCombinedPASignal();
+   string paText = paSignal.description;
+
+   // 3c. EMA Distance (M15 and H1)
+   EMADistance emaDist = signalEngine.GetEMADistance();
+   string emaM15Text = StringFormat("%.0f / %.0f", emaDist.m15_ema100, emaDist.m15_ema200);
+   string emaH1Text = StringFormat("%.0f / %.0f", emaDist.h1_ema100, emaDist.h1_ema200);
+
+   // 3d. Risk Recommendation
+   string riskRec = StringFormat("%d / %d pts", Input_SL_Points, Input_SL_Points * 2);
+
+   // Update strategy panel
+   dashboardPanel.UpdateStrategyInfo(emaM15Text, emaH1Text, paText, riskRec);
+
+   // 3e. Zone Status
+   ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
+   dashboardPanel.UpdateZoneStatus((int)zoneStatus);
+
+   // 4. Panel Updates
+   dashboardPanel.UpdateAccountInfo();
+
+   double d1Open = signalEngine.GetD1Open();
+   dashboardPanel.UpdateWidwaZones(d1Open);
 }
 
 //+------------------------------------------------------------------+
 //| Chart event handler                                              |
 //+------------------------------------------------------------------+
-void OnChartEvent(const int id,
-                  const long &lparam,
-                  const double &dparam,
-                  const string &sparam)
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   // Check if event is a chart object click
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
-      // Check if Buy button was clicked
-      if(dashboardPanel.IsBuyButtonClicked(sparam))
-      {
-         ExecuteBuyTrade();
-      }
-      // Check if Sell button was clicked
-      else if(dashboardPanel.IsSellButtonClicked(sparam))
-      {
-         ExecuteSellTrade();
-      }
+      if(dashboardPanel.IsBuyButtonClicked(sparam)) ExecuteBuyTrade();
+      else if(dashboardPanel.IsSellButtonClicked(sparam)) ExecuteSellTrade();
    }
 }
 
@@ -284,15 +209,11 @@ void OnChartEvent(const int id,
 //+------------------------------------------------------------------+
 void ExecuteBuyTrade()
 {
-   // Get current price and risk percentage
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double riskPercent = dashboardPanel.GetRiskPercent();
-
-   // Calculate stop loss and take profit
    double sl = currentPrice - (Input_SL_Points * _Point);
-   double tp = currentPrice + (Input_SL_Points * 2 * _Point);  // 1:2 risk-reward
+   double tp = currentPrice + (Input_SL_Points * 2 * _Point);
 
-   // Create trade request
    TradeRequest req;
    req.type = ORDER_TYPE_BUY;
    req.price = currentPrice;
@@ -301,16 +222,14 @@ void ExecuteBuyTrade()
    req.risk_percent = riskPercent;
    req.comment = "WidwaPa Buy";
 
-   // Execute the order
    if(tradeManager.ExecuteOrder(req))
    {
-      Print("Buy trade executed successfully at ", currentPrice);
-      dashboardPanel.UpdateSignal(SIGNAL_PA_BUY, "BUY ORDER PLACED");
+      Print("Buy trade executed at ", currentPrice);
+      dashboardPanel.UpdateAccountInfo();
    }
    else
    {
       Print("Failed to execute Buy trade");
-      dashboardPanel.UpdateSignal(SIGNAL_NONE, "ORDER FAILED");
    }
 }
 
@@ -319,15 +238,11 @@ void ExecuteBuyTrade()
 //+------------------------------------------------------------------+
 void ExecuteSellTrade()
 {
-   // Get current price and risk percentage
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double riskPercent = dashboardPanel.GetRiskPercent();
-
-   // Calculate stop loss and take profit
    double sl = currentPrice + (Input_SL_Points * _Point);
-   double tp = currentPrice - (Input_SL_Points * 2 * _Point);  // 1:2 risk-reward
+   double tp = currentPrice - (Input_SL_Points * 2 * _Point);
 
-   // Create trade request
    TradeRequest req;
    req.type = ORDER_TYPE_SELL;
    req.price = currentPrice;
@@ -336,17 +251,28 @@ void ExecuteSellTrade()
    req.risk_percent = riskPercent;
    req.comment = "WidwaPa Sell";
 
-   // Execute the order
    if(tradeManager.ExecuteOrder(req))
    {
-      Print("Sell trade executed successfully at ", currentPrice);
-      dashboardPanel.UpdateSignal(SIGNAL_PA_SELL, "SELL ORDER PLACED");
+      Print("Sell trade executed at ", currentPrice);
+      dashboardPanel.UpdateAccountInfo();
    }
    else
    {
       Print("Failed to execute Sell trade");
-      dashboardPanel.UpdateSignal(SIGNAL_NONE, "ORDER FAILED");
    }
 }
 
 //+------------------------------------------------------------------+
+//| Helper: Create signal arrow on chart                             |
+//+------------------------------------------------------------------+
+void CreateSignalArrow(datetime time, double price, int arrowCode, color clr, string type)
+{
+   string name = "WidwaArrow_" + type + "_" + TimeToString(time);
+   if(ObjectFind(0, name) >= 0) return; // Already exists
+
+   ObjectCreate(0, name, OBJ_ARROW, 0, time, price);
+   ObjectSetInteger(0, name, OBJPROP_ARROWCODE, arrowCode);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+   ObjectSetString(0, name, OBJPROP_TOOLTIP, type + " Signal");
+}

@@ -6,9 +6,54 @@
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
 #property version   "1.00"
-#property strict
 
 #include <EA_Helper/Definitions.mqh>
+
+//+------------------------------------------------------------------+
+//| Combined PA Signal Structure (H1 primary, M5 entry)               |
+//+------------------------------------------------------------------+
+struct CombinedSignal
+{
+    ENUM_SIGNAL_TYPE h1Signal;      // H1 PA signal (trend direction)
+    ENUM_SIGNAL_TYPE m5Signal;      // M5 PA signal (entry timing)
+    string description;             // Combined description
+};
+
+//+------------------------------------------------------------------+
+//| Trend Alignment Structure (D1, H4, H1)                            |
+//+------------------------------------------------------------------+
+struct TrendAlignment
+{
+    ENUM_TREND_DIRECTION d1;
+    ENUM_TREND_DIRECTION h4;
+    ENUM_TREND_DIRECTION h1;
+    int score;                      // -3 to +3 (all agree)
+    string strengthText;            // "Strong Uptrend", "Weak Downtrend", etc.
+    color strengthColor;            // Color for display
+};
+
+//+------------------------------------------------------------------+
+//| EMA Distance Structure                                            |
+//+------------------------------------------------------------------+
+struct EMADistance
+{
+    double m15_ema100;    // Distance in points from EMA 100 on M15
+    double m15_ema200;    // Distance in points from EMA 200 on M15
+    double h1_ema100;     // Distance in points from EMA 100 on H1
+    double h1_ema200;     // Distance in points from EMA 200 on H1
+};
+
+//+------------------------------------------------------------------+
+//| Zone Status Enumeration                                           |
+//+------------------------------------------------------------------+
+enum ENUM_ZONE_STATUS
+{
+    ZONE_STATUS_NONE,
+    ZONE_STATUS_IN_BUY1,
+    ZONE_STATUS_IN_BUY2,
+    ZONE_STATUS_IN_SELL1,
+    ZONE_STATUS_IN_SELL2
+};
 
 //+------------------------------------------------------------------+
 //| Signal Engine Class - Market Analysis                           |
@@ -24,6 +69,11 @@ private:
 
     int    m_zone_offset1;      // Zone offset 1 (in points)
     int    m_zone_offset2;      // Zone offset 2 (in points)
+
+    // Indicator handles (created once, reused)
+    int    m_handle_ema100;     // EMA 100 indicator handle
+    int    m_handle_ema200;     // EMA 200 indicator handle
+    int    m_handle_ema720;     // EMA 720 indicator handle
 
     // Helper method for copying indicator buffer values
     double CopyBufferValue(int handle, int buffer_num);
@@ -42,19 +92,28 @@ public:
     //--- Zone Logic
     double GetZoneLevel(ENUM_ZONE_TYPE zone_type);
     bool   IsInZone(double price, ENUM_ZONE_TYPE zone_type);
+    ENUM_ZONE_STATUS GetCurrentZoneStatus();
 
-    //--- Price Action Pattern Detection
-    bool IsHammer(int shift);
-    bool IsShootingStar(int shift);
-    bool IsEngulfing(int shift);
+    //--- Price Action Pattern Detection (multi-timeframe)
+    bool IsHammer(int shift, ENUM_TIMEFRAMES tf = PERIOD_CURRENT);
+    bool IsShootingStar(int shift, ENUM_TIMEFRAMES tf = PERIOD_CURRENT);
+    bool IsEngulfing(int shift, ENUM_TIMEFRAMES tf = PERIOD_CURRENT);
+    CombinedSignal GetCombinedPASignal();
+    ENUM_SIGNAL_TYPE GetActiveSignal();  // For current timeframe (chart arrows)
 
     //--- Trend & Session Analysis
     ENUM_MARKET_SESSION  GetCurrentSession();
     ENUM_TREND_DIRECTION GetTrendDirection(ENUM_TIMEFRAMES tf);
-    ENUM_SIGNAL_TYPE     GetActiveSignal();
+    TrendAlignment GetTrendAlignment();
+
+    //--- EMA Distance Calculation
+    EMADistance GetEMADistance();
 
     //--- EMA Touch Detection
     bool CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period);
+
+    //--- Helper to get EMA value
+    double GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift);
 
     //--- Getters for Zone Levels
     double GetD1Open()       { return m_d1_open; }
@@ -75,6 +134,9 @@ CSignalEngine::CSignalEngine()
     m_current_price = 0.0;
     m_zone_offset1 = 300;
     m_zone_offset2 = 1000;
+    m_handle_ema100 = INVALID_HANDLE;
+    m_handle_ema200 = INVALID_HANDLE;
+    m_handle_ema720 = INVALID_HANDLE;
 }
 
 //+------------------------------------------------------------------+
@@ -82,6 +144,13 @@ CSignalEngine::CSignalEngine()
 //+------------------------------------------------------------------+
 CSignalEngine::~CSignalEngine()
 {
+    // Release indicator handles
+    if(m_handle_ema100 != INVALID_HANDLE)
+        IndicatorRelease(m_handle_ema100);
+    if(m_handle_ema200 != INVALID_HANDLE)
+        IndicatorRelease(m_handle_ema200);
+    if(m_handle_ema720 != INVALID_HANDLE)
+        IndicatorRelease(m_handle_ema720);
 }
 
 //+------------------------------------------------------------------+
@@ -91,6 +160,19 @@ void CSignalEngine::Init(int zone_offset1, int zone_offset2)
 {
     m_zone_offset1 = zone_offset1;
     m_zone_offset2 = zone_offset2;
+
+    // Create indicator handles once (reused for lifetime of EA)
+    m_handle_ema100 = iMA(_Symbol, PERIOD_CURRENT, 100, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_ema200 = iMA(_Symbol, PERIOD_CURRENT, 200, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_ema720 = iMA(_Symbol, PERIOD_CURRENT, 720, 0, MODE_EMA, PRICE_CLOSE);
+
+    if(m_handle_ema100 == INVALID_HANDLE)
+        Print("Error: Failed to create EMA 100 indicator handle");
+    if(m_handle_ema200 == INVALID_HANDLE)
+        Print("Error: Failed to create EMA 200 indicator handle");
+    if(m_handle_ema720 == INVALID_HANDLE)
+        Print("Error: Failed to create EMA 720 indicator handle");
+
     RefreshData();
 }
 
@@ -106,23 +188,14 @@ void CSignalEngine::RefreshData()
    // Update current bid price
    m_current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
-   // Calculate EMA values for the current timeframe
-   int emaHandle100 = iMA(_Symbol, PERIOD_CURRENT, 100, 0, MODE_EMA, PRICE_CLOSE);
-   int emaHandle200 = iMA(_Symbol, PERIOD_CURRENT, 200, 0, MODE_EMA, PRICE_CLOSE);
-   int emaHandle720 = iMA(_Symbol, PERIOD_CURRENT, 720, 0, MODE_EMA, PRICE_CLOSE);
-
-   if(emaHandle100 != INVALID_HANDLE) {
-      m_ema_100 = CopyBufferValue(emaHandle100, 0);
-      IndicatorRelease(emaHandle100);
-   }
-   if(emaHandle200 != INVALID_HANDLE) {
-      m_ema_200 = CopyBufferValue(emaHandle200, 0);
-      IndicatorRelease(emaHandle200);
-   }
-   if(emaHandle720 != INVALID_HANDLE) {
-      m_ema_720 = CopyBufferValue(emaHandle720, 0);
-      IndicatorRelease(emaHandle720);
-   }
+   // Update EMA values using pre-created indicator handles
+   // Handles are created once in Init() and reused here
+   if(m_handle_ema100 != INVALID_HANDLE)
+      m_ema_100 = CopyBufferValue(m_handle_ema100, 0);
+   if(m_handle_ema200 != INVALID_HANDLE)
+      m_ema_200 = CopyBufferValue(m_handle_ema200, 0);
+   if(m_handle_ema720 != INVALID_HANDLE)
+      m_ema_720 = CopyBufferValue(m_handle_ema720, 0);
 }
 
 //+------------------------------------------------------------------+
@@ -183,13 +256,13 @@ bool CSignalEngine::IsInZone(double price, ENUM_ZONE_TYPE zone_type)
 //+------------------------------------------------------------------+
 //| Detect Hammer pattern                                            |
 //+------------------------------------------------------------------+
-bool CSignalEngine::IsHammer(int shift)
+bool CSignalEngine::IsHammer(int shift, ENUM_TIMEFRAMES tf)
 {
-   // Get candle data at specified shift (shift 1 = previous completed candle)
-   double open = iOpen(_Symbol, PERIOD_CURRENT, shift);
-   double close = iClose(_Symbol, PERIOD_CURRENT, shift);
-   double high = iHigh(_Symbol, PERIOD_CURRENT, shift);
-   double low = iLow(_Symbol, PERIOD_CURRENT, shift);
+   // Get candle data at specified shift and timeframe
+   double open = iOpen(_Symbol, tf, shift);
+   double close = iClose(_Symbol, tf, shift);
+   double high = iHigh(_Symbol, tf, shift);
+   double low = iLow(_Symbol, tf, shift);
 
    // Calculate body and shadows
    double body = MathAbs(close - open);
@@ -217,13 +290,13 @@ bool CSignalEngine::IsHammer(int shift)
 //+------------------------------------------------------------------+
 //| Detect Shooting Star pattern                                     |
 //+------------------------------------------------------------------+
-bool CSignalEngine::IsShootingStar(int shift)
+bool CSignalEngine::IsShootingStar(int shift, ENUM_TIMEFRAMES tf)
 {
-   // Get candle data at specified shift
-   double open = iOpen(_Symbol, PERIOD_CURRENT, shift);
-   double close = iClose(_Symbol, PERIOD_CURRENT, shift);
-   double high = iHigh(_Symbol, PERIOD_CURRENT, shift);
-   double low = iLow(_Symbol, PERIOD_CURRENT, shift);
+   // Get candle data at specified shift and timeframe
+   double open = iOpen(_Symbol, tf, shift);
+   double close = iClose(_Symbol, tf, shift);
+   double high = iHigh(_Symbol, tf, shift);
+   double low = iLow(_Symbol, tf, shift);
 
    // Calculate body and shadows
    double body = MathAbs(close - open);
@@ -251,13 +324,13 @@ bool CSignalEngine::IsShootingStar(int shift)
 //+------------------------------------------------------------------+
 //| Detect Engulfing pattern                                         |
 //+------------------------------------------------------------------+
-bool CSignalEngine::IsEngulfing(int shift)
+bool CSignalEngine::IsEngulfing(int shift, ENUM_TIMEFRAMES tf)
 {
    // Get data for current candle (shift) and previous candle (shift+1)
-   double currOpen = iOpen(_Symbol, PERIOD_CURRENT, shift);
-   double currClose = iClose(_Symbol, PERIOD_CURRENT, shift);
-   double prevOpen = iOpen(_Symbol, PERIOD_CURRENT, shift + 1);
-   double prevClose = iClose(_Symbol, PERIOD_CURRENT, shift + 1);
+   double currOpen = iOpen(_Symbol, tf, shift);
+   double currClose = iClose(_Symbol, tf, shift);
+   double prevOpen = iOpen(_Symbol, tf, shift + 1);
+   double prevClose = iClose(_Symbol, tf, shift + 1);
 
    // Current candle body
    double currBody = MathAbs(currClose - currOpen);
@@ -293,7 +366,7 @@ ENUM_MARKET_SESSION CSignalEngine::GetCurrentSession()
    TimeToStruct(TimeCurrent(), timeStruct);
 
    int hour = timeStruct.hour;
-   int minute = timeStruct.minute;
+   int minute = timeStruct.min;  // MQL5 uses 'min' not 'minute'
    int currentTime = hour * 60 + minute;  // Convert to minutes
 
    // Asia Session: 08:00 - 10:00 (480 - 600 minutes)
@@ -328,32 +401,6 @@ ENUM_TREND_DIRECTION CSignalEngine::GetTrendDirection(ENUM_TIMEFRAMES tf)
 }
 
 //+------------------------------------------------------------------+
-//| Get active signal type                                           |
-//+------------------------------------------------------------------+
-ENUM_SIGNAL_TYPE CSignalEngine::GetActiveSignal()
-{
-   // Check for Price Action signals on shift 1 (previous completed candle)
-   if(IsHammer(1))
-      return SIGNAL_PA_BUY;
-
-   if(IsShootingStar(1))
-      return SIGNAL_PA_SELL;
-
-   if(IsEngulfing(1))
-   {
-      // Determine if bullish or bearish engulfing
-      double currClose = iClose(_Symbol, PERIOD_CURRENT, 1);
-      double currOpen = iOpen(_Symbol, PERIOD_CURRENT, 1);
-      if(currClose > currOpen)
-         return SIGNAL_PA_BUY;
-      else
-         return SIGNAL_PA_SELL;
-   }
-
-   return SIGNAL_NONE;
-}
-
-//+------------------------------------------------------------------+
 //| Check EMA touch detection                                        |
 //+------------------------------------------------------------------+
 bool CSignalEngine::CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period)
@@ -368,6 +415,7 @@ bool CSignalEngine::CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period)
    double close2 = iClose(_Symbol, tf, 2);
 
    // Get EMA value for shift 1 and 2
+   // MODE_EMA = 0 (Exponential Moving Average)
    int emaHandle = iMA(_Symbol, tf, ema_period, 0, MODE_EMA, PRICE_CLOSE);
    if(emaHandle == INVALID_HANDLE) return false;
 
@@ -390,6 +438,214 @@ bool CSignalEngine::CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period)
    bool bearTouch = (high2 < ema2) && (high1 >= ema1) && (close1 < ema1);
 
    return (bullTouch || bearTouch);
+}
+
+//+------------------------------------------------------------------+
+//| Get EMA Value for specific TF                                    |
+//+------------------------------------------------------------------+
+double CSignalEngine::GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift)
+{
+   int handle = iMA(_Symbol, tf, period, 0, MODE_EMA, PRICE_CLOSE);
+   if(handle == INVALID_HANDLE) return 0.0;
+
+   double buf[];
+   ArraySetAsSeries(buf, true);
+   double result = 0.0;
+
+   if(CopyBuffer(handle, 0, shift, 1, buf) > 0)
+      result = buf[0];
+
+   IndicatorRelease(handle);
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get Active Signal (current timeframe for chart arrows)           |
+//+------------------------------------------------------------------+
+ENUM_SIGNAL_TYPE CSignalEngine::GetActiveSignal()
+{
+   // Check for Price Action signals on current timeframe (for chart arrows)
+   if(IsHammer(1, PERIOD_CURRENT))
+      return SIGNAL_PA_BUY;
+
+   if(IsShootingStar(1, PERIOD_CURRENT))
+      return SIGNAL_PA_SELL;
+
+   if(IsEngulfing(1, PERIOD_CURRENT))
+   {
+      // Determine if bullish or bearish engulfing
+      double currClose = iClose(_Symbol, PERIOD_CURRENT, 1);
+      double currOpen = iOpen(_Symbol, PERIOD_CURRENT, 1);
+      if(currClose > currOpen)
+         return SIGNAL_PA_BUY;
+      else
+         return SIGNAL_PA_SELL;
+   }
+
+   return SIGNAL_NONE;
+}
+
+//+------------------------------------------------------------------+
+//| Get Combined PA Signal (H1 primary, M5 entry)                    |
+//+------------------------------------------------------------------+
+CombinedSignal CSignalEngine::GetCombinedPASignal()
+{
+   CombinedSignal result;
+   result.h1Signal = SIGNAL_NONE;
+   result.m5Signal = SIGNAL_NONE;
+   result.description = "NONE";
+
+   // Check H1 for trend direction
+   if(IsHammer(1, PERIOD_H1))
+      result.h1Signal = SIGNAL_PA_BUY;
+   else if(IsShootingStar(1, PERIOD_H1))
+      result.h1Signal = SIGNAL_PA_SELL;
+   else if(IsEngulfing(1, PERIOD_H1))
+   {
+      double currClose = iClose(_Symbol, PERIOD_H1, 1);
+      double currOpen = iOpen(_Symbol, PERIOD_H1, 1);
+      result.h1Signal = (currClose > currOpen) ? SIGNAL_PA_BUY : SIGNAL_PA_SELL;
+   }
+
+   // Check M5 for entry timing
+   if(IsHammer(1, PERIOD_M5))
+      result.m5Signal = SIGNAL_PA_BUY;
+   else if(IsShootingStar(1, PERIOD_M5))
+      result.m5Signal = SIGNAL_PA_SELL;
+   else if(IsEngulfing(1, PERIOD_M5))
+   {
+      double currClose = iClose(_Symbol, PERIOD_M5, 1);
+      double currOpen = iOpen(_Symbol, PERIOD_M5, 1);
+      result.m5Signal = (currClose > currOpen) ? SIGNAL_PA_BUY : SIGNAL_PA_SELL;
+   }
+
+   // Generate combined description
+   if(result.h1Signal == SIGNAL_NONE && result.m5Signal == SIGNAL_NONE)
+      result.description = "NONE";
+   else if(result.h1Signal != SIGNAL_NONE && result.m5Signal == SIGNAL_NONE)
+      result.description = (result.h1Signal == SIGNAL_PA_BUY) ? "H1 BULLISH" : "H1 BEARISH";
+   else if(result.h1Signal == SIGNAL_NONE && result.m5Signal != SIGNAL_NONE)
+      result.description = (result.m5Signal == SIGNAL_PA_BUY) ? "M5 ENTRY BUY" : "M5 ENTRY SELL";
+   else if(result.h1Signal == SIGNAL_PA_BUY && result.m5Signal == SIGNAL_PA_BUY)
+      result.description = "H1 BULL + M5 ENTRY";
+   else if(result.h1Signal == SIGNAL_PA_SELL && result.m5Signal == SIGNAL_PA_SELL)
+      result.description = "H1 BEAR + M5 ENTRY";
+   else
+      result.description = "MIXED SIGNALS";
+
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get Trend Alignment (D1, H4, H1)                                 |
+//+------------------------------------------------------------------+
+TrendAlignment CSignalEngine::GetTrendAlignment()
+{
+   TrendAlignment result;
+   result.d1 = TREND_FLAT;
+   result.h4 = TREND_FLAT;
+   result.h1 = TREND_FLAT;
+   result.score = 0;
+   result.strengthText = "No Clear Trend";
+   result.strengthColor = clrGray;
+
+   // Get EMA values for each timeframe
+   double d1_ema100 = GetEMAValue(PERIOD_D1, 100, 0);
+   double d1_ema200 = GetEMAValue(PERIOD_D1, 200, 0);
+   double h4_ema100 = GetEMAValue(PERIOD_H4, 100, 0);
+   double h4_ema200 = GetEMAValue(PERIOD_H4, 200, 0);
+   double h1_ema100 = GetEMAValue(PERIOD_H1, 100, 0);
+   double h1_ema200 = GetEMAValue(PERIOD_H1, 200, 0);
+
+   // Determine trend for each timeframe
+   if(d1_ema100 > d1_ema200) { result.d1 = TREND_UP; result.score++; }
+   else if(d1_ema100 < d1_ema200) { result.d1 = TREND_DOWN; result.score--; }
+
+   if(h4_ema100 > h4_ema200) { result.h4 = TREND_UP; result.score++; }
+   else if(h4_ema100 < h4_ema200) { result.h4 = TREND_DOWN; result.score--; }
+
+   if(h1_ema100 > h1_ema200) { result.h1 = TREND_UP; result.score++; }
+   else if(h1_ema100 < h1_ema200) { result.h1 = TREND_DOWN; result.score--; }
+
+   // Generate strength text and color based on score
+   int absScore = MathAbs(result.score);
+   if(absScore == 3)
+   {
+      result.strengthText = (result.score > 0) ? "STRONG UPTREND" : "STRONG DOWNTREND";
+      result.strengthColor = (result.score > 0) ? clrLime : clrRed;
+   }
+   else if(absScore == 2)
+   {
+      result.strengthText = (result.score > 0) ? "UPTREND" : "DOWNTREND";
+      result.strengthColor = (result.score > 0) ? clrMediumSeaGreen : clrOrangeRed;
+   }
+   else if(absScore == 1)
+   {
+      result.strengthText = (result.score > 0) ? "WEAK UPTREND" : "WEAK DOWNTREND";
+      result.strengthColor = (result.score > 0) ? clrYellowGreen : clrLightSalmon;
+   }
+   else
+   {
+      result.strengthText = "SIDEWAYS";
+      result.strengthColor = clrGray;
+   }
+
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get EMA Distance (M15 and H1)                                    |
+//+------------------------------------------------------------------+
+EMADistance CSignalEngine::GetEMADistance()
+{
+   EMADistance result;
+   result.m15_ema100 = 0;
+   result.m15_ema200 = 0;
+   result.h1_ema100 = 0;
+   result.h1_ema200 = 0;
+
+   // Get EMA values
+   double m15_ema100 = GetEMAValue(PERIOD_M15, 100, 0);
+   double m15_ema200 = GetEMAValue(PERIOD_M15, 200, 0);
+   double h1_ema100 = GetEMAValue(PERIOD_H1, 100, 0);
+   double h1_ema200 = GetEMAValue(PERIOD_H1, 200, 0);
+
+   // Calculate distance in points
+   if(m15_ema100 > 0)
+      result.m15_ema100 = (m_current_price - m15_ema100) / _Point;
+   if(m15_ema200 > 0)
+      result.m15_ema200 = (m_current_price - m15_ema200) / _Point;
+   if(h1_ema100 > 0)
+      result.h1_ema100 = (m_current_price - h1_ema100) / _Point;
+   if(h1_ema200 > 0)
+      result.h1_ema200 = (m_current_price - h1_ema200) / _Point;
+
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get Current Zone Status                                          |
+//+------------------------------------------------------------------+
+ENUM_ZONE_STATUS CSignalEngine::GetCurrentZoneStatus()
+{
+   double zoneBuy1 = GetZoneLevel(ZONE_BUY1);
+   double zoneBuy2 = GetZoneLevel(ZONE_BUY2);
+   double zoneSell1 = GetZoneLevel(ZONE_SELL1);
+   double zoneSell2 = GetZoneLevel(ZONE_SELL2);
+
+   double tolerance = m_zone_offset1 * _Point; // Use offset1 as tolerance
+
+   // Check if price is in any zone (prioritize closer zones)
+   if(MathAbs(m_current_price - zoneBuy2) <= tolerance)
+      return ZONE_STATUS_IN_BUY2;
+   if(MathAbs(m_current_price - zoneBuy1) <= tolerance)
+      return ZONE_STATUS_IN_BUY1;
+   if(MathAbs(m_current_price - zoneSell2) <= tolerance)
+      return ZONE_STATUS_IN_SELL2;
+   if(MathAbs(m_current_price - zoneSell1) <= tolerance)
+      return ZONE_STATUS_IN_SELL1;
+
+   return ZONE_STATUS_NONE;
 }
 
 //+------------------------------------------------------------------+
