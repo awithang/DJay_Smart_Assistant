@@ -105,7 +105,7 @@ void CDashboardPanel::CreatePanel()
    // ============================================
 
    // 1. Header Section (Left Panel)
-   CreateLabel("Title", left_x + pad, 15, "NINJA PA ASSISTANT", m_header_color, 10, "Arial Bold");
+   CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 10, "Arial Bold");
    CreateLabel("Balance", left_x + half_width - pad, 15, "$--", m_text_color, 9, "Arial Bold", "right");
 
    // 2. Market Status (Left Panel)

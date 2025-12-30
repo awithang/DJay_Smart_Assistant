@@ -1,4 +1,4 @@
-# WidwaPa Trade Assistant - Panel Reference Guide
+# DJAY Smart Assistant - Panel Reference Guide
 
 **Version**: 4.1
 **Last Updated**: 2025-12-30
@@ -11,7 +11,7 @@
 ┌─────────────────────────────┬─────────────────────────────┐
 │ LEFT PANEL (50%)            │ RIGHT PANEL (50%)           │
 ├─────────────────────────────┼─────────────────────────────┤
-│ NINJA PA ASSISTANT $113,237 │                             │
+│ DJAY Smart Assistant $113237│                             │
 │ SESSION: QUIET  M5: 02:50   │     EXECUTION               │
 │ SIDEWAY                    │     Risk %           [1.0]  │
 ├─────────────────────────────┤     ┌───────┬───────┐      │
@@ -44,7 +44,7 @@
 
 | Element | Description | Update Frequency |
 |---------|-------------|------------------|
-| **Title** | "NINJA PA ASSISTANT" | Static |
+| **Title** | "DJAY Smart Assistant" | Static |
 | **Balance** | Current account balance in USD | Every tick |
 
 ---
