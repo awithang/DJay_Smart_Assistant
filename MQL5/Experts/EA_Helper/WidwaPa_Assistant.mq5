@@ -112,32 +112,32 @@ void OnTick()
       
       if(paSignal == SIGNAL_PA_BUY)
       {
-         CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrLime, "PA_Buy");
+         CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrBlue, "PA_Buy");
       }
       else if(paSignal == SIGNAL_PA_SELL)
       {
-         CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrRed, "PA_Sell");
+         CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrOrange, "PA_Sell");
       }
-      
+
       // --- 2. EMA Touch Signals ---
       // Check H1 EMA Touch
       bool emaTouch100 = signalEngine.CheckEMATouch(PERIOD_H1, 100);
       bool emaTouch200 = signalEngine.CheckEMATouch(PERIOD_H1, 200);
-      
+
       if(emaTouch100 || emaTouch200)
       {
-         double currentH1Price = iClose(_Symbol, PERIOD_H1, 1); 
-         
+         double currentH1Price = iClose(_Symbol, PERIOD_H1, 1);
+
          double emaVal = 0;
          // Note: We use GetEMAValue logic manually here or assume we can get it from engine?
          // For one-off checks, manual or helper is fine. Let's use the helper!
          int period = emaTouch100 ? 100 : 200;
          emaVal = signalEngine.GetEMAValue(PERIOD_H1, period, 1);
-         
+
          if(currentH1Price > emaVal)
-             CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrLime, "EMA_Touch_Buy");
+             CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrBlue, "EMA_Touch_Buy");
          else
-             CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrRed, "EMA_Touch_Sell");
+             CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrOrange, "EMA_Touch_Sell");
       }
 
       lastBarTime = currentBarTime;
