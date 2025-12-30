@@ -22,6 +22,7 @@ struct ZoneData
     bool        isMajor;        // true = Major zone (±1000), false = Minor (±300)
     int         touchCount;     // Number of times price touched this zone
     string      objPrefix;      // Object prefix for this zone
+    bool        isActive;       // true when price is currently in this zone
 };
 
 //+------------------------------------------------------------------+
@@ -57,6 +58,10 @@ private:
     // Previous close for touch detection
     double            m_prev_close;
 
+    // Active zone tracking
+    int               m_active_zone_index;      // Currently active zone index (-1 = none)
+    int               m_prev_active_zone_index; // Previously active zone index
+
     // Helper methods
     void CalculateZones();
     void CreateAllZones();
@@ -64,6 +69,9 @@ private:
     void CreateZoneRectangle(ZoneData &zone);
     void CreateZoneLabel(ZoneData &zone);
     void UpdateZoneTouches();
+    void UpdateActiveZone();
+    void HighlightZone(int zoneIndex, bool highlight);
+    color GetZoneColor(ZoneData &zone, bool isActive);
 
     // Helper: Get visible chart time range
     void GetChartTimeRange(datetime &timeStart, datetime &timeEnd);
@@ -102,6 +110,10 @@ CChartZones::CChartZones()
 
     m_zone_count = 0;
     m_prev_close = 0.0;
+
+    // Active zone tracking
+    m_active_zone_index = -1;
+    m_prev_active_zone_index = -1;
 
     ArrayResize(m_zones, 0);
 }
@@ -191,6 +203,7 @@ void CChartZones::CalculateZones()
                 zone.isBuy = false;
                 zone.isMajor = (offset >= m_zone_offset_major);
                 zone.touchCount = 0;
+                zone.isActive = false;
                 zone.objPrefix = m_prefix + "Sell_" + IntegerToString(offset);
 
                 int size = ArraySize(m_zones);
@@ -211,6 +224,7 @@ void CChartZones::CalculateZones()
                 zone.isBuy = true;
                 zone.isMajor = (offset >= m_zone_offset_major);
                 zone.touchCount = 0;
+                zone.isActive = false;
                 zone.objPrefix = m_prefix + "Buy_" + IntegerToString(offset);
 
                 int size = ArraySize(m_zones);
@@ -300,20 +314,8 @@ void CChartZones::CreateZoneRectangle(ZoneData &zone)
     // Create rectangle covering the visible chart area
     ObjectCreate(m_chart_id, rectName, OBJ_RECTANGLE, 0, timeStart, zone.top, timeEnd, zone.bottom);
 
-    // Get base RGB color components
-    color baseColor = zone.isBuy ? m_buy_color : m_sell_color;
-    uint rgb = (uint)baseColor;
-    uchar red = (uchar)(rgb >> 16);
-    uchar green = (uchar)(rgb >> 8);
-    uchar blue = (uchar)(rgb);
-
-    // 40% transparency = 60% opacity
-    // Alpha = 60% of 255 = 153 = 0x99
-    uchar alpha = 153;  // 60% opacity (40% transparent)
-
-    // Create ARGB color: 0xAA RR GG BB
-    uint argbColor = (alpha << 24) | (red << 16) | (green << 8) | blue;
-    color zoneColor = (color)argbColor;
+    // Get zone color (using helper method for consistency)
+    color zoneColor = GetZoneColor(zone, zone.isActive);
 
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_COLOR, zoneColor);
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_FILL, zoneColor);
@@ -359,6 +361,9 @@ void CChartZones::Update(double d1_open, double current_price)
 
     // Update touch counter
     UpdateZoneTouches();
+
+    // Update active zone highlighting
+    UpdateActiveZone();
 
     if(d1Changed)
     {
@@ -424,4 +429,84 @@ void CChartZones::Destroy()
 {
     ObjectsDeleteAll(m_chart_id, m_prefix);
     ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Get zone color with opacity based on active state                 |
+//+------------------------------------------------------------------+
+color CChartZones::GetZoneColor(ZoneData &zone, bool isActive)
+{
+    // Get base RGB color components
+    color baseColor = zone.isBuy ? m_buy_color : m_sell_color;
+    uint rgb = (uint)baseColor;
+    uchar red = (uchar)(rgb >> 16);
+    uchar green = (uchar)(rgb >> 8);
+    uchar blue = (uchar)(rgb);
+
+    // Opacity: Active zones are more visible (less transparent)
+    // Normal state: 40% transparency = 60% opacity (alpha = 153)
+    // Active state: 20% transparency = 80% opacity (alpha = 204)
+    uchar alpha = isActive ? 204 : 153;
+
+    // Create ARGB color: 0xAA RR GG BB
+    uint argbColor = (alpha << 24) | (red << 16) | (green << 8) | blue;
+    return (color)argbColor;
+}
+
+//+------------------------------------------------------------------+
+//| Highlight or restore a zone's appearance                           |
+//+------------------------------------------------------------------+
+void CChartZones::HighlightZone(int zoneIndex, bool highlight)
+{
+    if(zoneIndex < 0 || zoneIndex >= m_zone_count) return;
+
+    ZoneData zone = m_zones[zoneIndex];
+    string rectName = zone.objPrefix + "_Rect";
+
+    if(ObjectFind(m_chart_id, rectName) >= 0)
+    {
+        color newColor = GetZoneColor(zone, highlight);
+        ObjectSetInteger(m_chart_id, rectName, OBJPROP_COLOR, newColor);
+        ObjectSetInteger(m_chart_id, rectName, OBJPROP_FILL, newColor);
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Update active zone based on current price                          |
+//+------------------------------------------------------------------+
+void CChartZones::UpdateActiveZone()
+{
+    // Find which zone contains the current price
+    int newActiveZone = -1;
+
+    for(int i = 0; i < m_zone_count; i++)
+    {
+        // Check if current price is within this zone
+        if(m_current_price >= m_zones[i].bottom && m_current_price <= m_zones[i].top)
+        {
+            newActiveZone = i;
+            break;
+        }
+    }
+
+    // If active zone changed, update appearances
+    if(newActiveZone != m_active_zone_index)
+    {
+        // Restore previous active zone to normal appearance
+        if(m_active_zone_index >= 0)
+        {
+            m_zones[m_active_zone_index].isActive = false;
+            HighlightZone(m_active_zone_index, false);
+        }
+
+        // Highlight new active zone
+        if(newActiveZone >= 0)
+        {
+            m_zones[newActiveZone].isActive = true;
+            HighlightZone(newActiveZone, true);
+        }
+
+        m_active_zone_index = newActiveZone;
+        ChartRedraw(m_chart_id);
+    }
 }
