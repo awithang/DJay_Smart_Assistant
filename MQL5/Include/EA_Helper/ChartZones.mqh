@@ -444,9 +444,9 @@ color CChartZones::GetZoneColor(ZoneData &zone, bool isActive)
     uchar blue = (uchar)(rgb);
 
     // Opacity: Active zones are more visible (less transparent)
-    // Normal state: 40% transparency = 60% opacity (alpha = 153)
-    // Active state: 20% transparency = 80% opacity (alpha = 204)
-    uchar alpha = isActive ? 204 : 153;
+    // Normal state: 80% transparency = 20% opacity (alpha = 51)
+    // Active state: 60% transparency = 40% opacity (alpha = 102)
+    uchar alpha = isActive ? 102 : 51;
 
     // Create ARGB color: 0xAA RR GG BB
     uint argbColor = (alpha << 24) | (red << 16) | (green << 8) | blue;
