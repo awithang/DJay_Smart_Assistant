@@ -1,67 +1,61 @@
 # WidwaPa Trade Assistant - Panel Reference Guide
 
-**Version**: 4.0
+**Version**: 4.1
 **Last Updated**: 2025-12-30
 
 ---
 
-## Panel Layout Overview
+## Panel Layout Overview (Two-Panel Design)
 
 ```
-┌─────────────────────────────────────────┐
-│ WIDWA PA ASSISTANT           $1,234.56 │  ← Title + Account Balance
-├─────────────────────────────────────────┤
-│ SESSION: ASIA    M5: 04:32    BUY ZONE 1│  ← Session, Countdown, Zone Status
-├─────────────────────────────────────────┤
-│ DAILY ZONES (Smart Grid)               │
-│ ┌─────────────────────────────────────┐ │
-│ │ ZONE      PRICE         DIST        │ │
-│ │ D1 +3000  2800.50      200 pts     │ │  ← Top 5 nearest levels
-│ │ D1 +1000  2700.30      50 pts      │ │
-│ │ D1 +300   2650.10      0 pts       │ │  ← Current price area
-│ │ D1 -300   2600.00      50 pts      │ │
-│ │ D1 -1000  2500.00      150 pts     │ │
-│ └─────────────────────────────────────┘ │
-├─────────────────────────────────────────┤
-│ EXECUTION              Risk %    [3.0] │
-│ ┌────────────┐  ┌────────────┐        │
-│ │    BUY     │  │   SELL     │        │  ← One-click trading buttons
-│ └────────────┘  └────────────┘        │
-├─────────────────────────────────────────┤
-│ STRATEGY SIGNAL                        │
-│ ┌─────────────────────────────────────┐ │
-│ │ Trend:        STRONG UPTREND        │ │  ← D1+H4+H1 alignment (color-coded)
-│ │ EMA Distance:                       │ │
-│ │ M15 (100/200):  150 / 300          │ │  ← Distance from M15 EMAs
-│ │ H1 (100/200):   -50 / 200          │ │  ← Distance from H1 EMAs
-│ │ PA Signal:     H1 BULL + M5 ENTRY  │ │  ← Combined H1+M5 PA pattern
-│ │ Rec. SL/TP:    300 / 600 pts       │ │  ← Risk recommendation
-│ └─────────────────────────────────────┘ │
-│                                        │
-│                                   v4.0 │
-└─────────────────────────────────────────┘
+┌─────────────────────────────┬─────────────────────────────┐
+│ LEFT PANEL (50%)            │ RIGHT PANEL (50%)           │
+├─────────────────────────────┼─────────────────────────────┤
+│ NINJA PA ASSISTANT $113,237 │                             │
+│ SESSION: QUIET  M5: 02:50   │     EXECUTION               │
+│ SIDEWAY                    │     Risk %           [1.0]  │
+├─────────────────────────────┤     ┌───────┬───────┐      │
+│ DAILY ZONES (Smart Grid)    │     │  BUY  │ SELL  │      │
+│ ┌─────────────────────┐     │     └───────┴───────┘      │
+│ │ ZONE    PRICE  DIST │     │                             │
+│ │ D1+4000  4374.33... │     │   [Space for future        │
+│ │ ... (5 rows) ...    │     │    features: Breakout,     │
+│ └─────────────────────┘     │     Reversal, etc.]        │
+├─────────────────────────────┤                             │
+│ STRATEGY SIGNAL             │                             │
+│ Trend: STRONG UPTREND       │                             │
+│ EMA Distance:               │                             │
+│ M15 (100/200): -3600/-7191  │                             │
+│ H1 (100/200): -7819/-4516   │                             │
+│ PA Signal: H1 BULLISH       │                             │
+│ Rec. SL/TP: 300 / 600 pts   │                             │
+│                          v4.1│                             │
+└─────────────────────────────┴─────────────────────────────┘
 ```
+
+**Panel Dimensions**: 500px (width) × 520px (height)
+**Split**: Left 235px | Right 235px (with 10px gap)
 
 ---
 
 ## Section Details
 
-### 1. Header Section
+### 1. Header Section (Left Panel)
 
 | Element | Description | Update Frequency |
 |---------|-------------|------------------|
-| **Title** | "WIDWA PA ASSISTANT" | Static |
+| **Title** | "NINJA PA ASSISTANT" | Static |
 | **Balance** | Current account balance in USD | Every tick |
 
 ---
 
-### 2. Market Status Section
+### 2. Market Status Section (Left Panel)
 
 | Element | Description | Possible Values |
 |---------|-------------|-----------------|
 | **Session** | Current market session | `ASIA`, `EUROPE`, `US`, `QUIET` |
 | **Countdown** | Time until next M5 candle closes | `M5: MM:SS` format |
-| **Status** | Trading zone status | See Zone Status below |
+| **Status** | Market state (SIDEWAY/RUN TIME) | See Zone Status below |
 
 **Session Times (GMT+7)**:
 | Session | Time Range |
@@ -73,7 +67,7 @@
 
 ---
 
-### 3. Daily Zones Table
+### 3. Daily Zones Table (Left Panel)
 
 | Column | Description |
 |--------|-------------|
@@ -96,11 +90,11 @@ Sell Zone 2 = D1 Open - 1000 points
 
 ---
 
-### 4. Execution Section
+### 4. Execution Section (Right Panel - Top)
 
 | Element | Description |
 |--------|-------------|
-| **Risk %** | Editable input for risk per trade (default: 3.0%) |
+| **Risk %** | Editable input for risk per trade (default: 1.0%) |
 | **BUY Button** | Execute buy order with calculated lot size |
 | **SELL Button** | Execute sell order with calculated lot size |
 
@@ -109,9 +103,11 @@ Sell Zone 2 = D1 Open - 1000 points
 Lot = (Balance × Risk%) / (SL_Points × PointValue)
 ```
 
+**Note**: Space below Execution section is reserved for future features (Breakout detection, Reversal detection, etc.)
+
 ---
 
-### 5. Strategy Signal Section
+### 5. Strategy Signal Section (Left Panel - Bottom)
 
 #### 5.1 Trend Strength
 

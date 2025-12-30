@@ -67,11 +67,11 @@ CDashboardPanel::CDashboardPanel()
    m_prefix = "EA_"; // Simple prefix to catch everything
    m_base_x = 10;
    m_base_y = 10;
-   m_panel_width = 280;
+   m_panel_width = 500;  // Wider for two-panel layout (50/50 split)
    m_panel_height = 520;
 
-   m_bg_color = C'20,20,35';
-   m_header_color = C'255,215,0';
+   m_bg_color = C'26,26,46';      // Dark navy background
+   m_header_color = C'255,215,0'; // Gold
    m_text_color = clrWhite;
    m_label_color = C'180,180,180';
    m_buy_color = C'46,204,113';
@@ -87,67 +87,83 @@ void CDashboardPanel::Init(long chart_id)
 
 void CDashboardPanel::CreatePanel()
 {
-   Destroy(); 
+   Destroy();
 
    int x = m_base_x;
    int pad = 10;
+   int half_width = (m_panel_width - 30) / 2;  // 50/50 split with padding
+   int left_x = x + 5;
+   int right_x = x + 5 + half_width + 10;
 
-   // 1. Background
-   CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, m_header_color);
+   // ============================================
+   // MAIN BACKGROUND - Single unified panel
+   // ============================================
+   CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, C'60,60,80');
 
-   // 2. Header
-   CreateLabel("Title", x + pad, 15, "WIDWA PA ASSISTANT", m_header_color, 10, "Arial Bold");
-   CreateLabel("Balance", x + m_panel_width - pad, 15, "$--", m_text_color, 9, "Arial Bold", "right");
+   // ============================================
+   // LEFT PANEL (50%)
+   // ============================================
 
-   // 3. Market Status
-   CreateRect("StatusBG", x+5, 40, m_panel_width-10, 50, C'30,30,50');
-   CreateLabel("LblSes", x+15, 50, "SESSION: --", m_text_color, 8);
-   CreateLabel("LblTime", x+15, 65, "COUNTDOWN: --:--", clrGray, 8);
-   CreateLabel("LblStat", x+m_panel_width-15, 60, "WAITING", clrGray, 10, "Arial Bold", "right");
+   // 1. Header Section (Left Panel)
+   CreateLabel("Title", left_x + pad, 15, "NINJA PA ASSISTANT", m_header_color, 10, "Arial Bold");
+   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", m_text_color, 9, "Arial Bold", "right");
 
-   // 4. Daily Zones Table
-   CreateLabel("LblZ", x + pad, 105, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
-   CreateRect("TableBG", x+5, 120, m_panel_width-10, 130, C'25,25,40', true, C'60,60,80');
-   
-   CreateLabel("H_Z", x+15, 125, "ZONE", clrGray, 7);
-   CreateLabel("H_P", x+110, 125, "PRICE", clrGray, 7);
-   CreateLabel("H_D", x+200, 125, "DIST", clrGray, 7);
-   
-   for(int i=0; i<5; i++)
+   // 2. Market Status (Left Panel)
+   CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 8);
+   CreateLabel("LblTime", left_x + pad, 50, "M5: --:--", clrGray, 8);
+   CreateLabel("LblStat", left_x + half_width - pad, 42, "SIDEWAY", clrGray, 9, "Arial Bold", "right");
+
+   // 3. Daily Zones Table (Left Panel)
+   CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", C'100,149,237', 9, "Arial Bold");
+   CreateRect("TableBG", left_x, 90, half_width, 110, C'20,20,35', true, C'60,60,80');
+
+   // Table Headers
+   CreateLabel("H_Z", left_x + 10, 100, "ZONE", clrGray, 7);
+   CreateLabel("H_P", left_x + 85, 100, "PRICE", clrGray, 7);
+   CreateLabel("H_D", left_x + 150, 100, "DIST", clrGray, 7);
+
+   // Table Rows (5 rows)
+   for(int i = 0; i < 5; i++)
    {
       string id = IntegerToString(i);
-      int ry = 145 + (i * 18);
-      CreateLabel("L_N_"+id, x+15, ry, "--", clrWhite, 8);
-      CreateLabel("L_P_"+id, x+110, ry, "0.00", m_text_color, 8);
-      CreateLabel("L_D_"+id, x+200, ry, "0 pts", clrGray, 8);
+      int ry = 115 + (i * 18);
+      CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 8);
+      CreateLabel("L_P_" + id, left_x + 85, ry, "0.00", m_text_color, 8);
+      CreateLabel("L_D_" + id, left_x + 150, ry, "0 pts", clrGray, 8);
    }
 
-   // 5. Execution
-   CreateLabel("LblCtrl", x+pad, 265, "EXECUTION", m_text_color, 9, "Arial Bold");
-   CreateLabel("LblRisk", x+m_panel_width-70, 265, "Risk %", clrGray, 8);
-   CreateEdit("EditRisk", x+m_panel_width-30, 262, 25, 18, "3.0");
-   
-   CreateButton("BtnBuy", x+10, 285, 125, 30, "BUY", m_buy_color);
-   CreateButton("BtnSell", x+145, 285, 125, 30, "SELL", m_sell_color);
+   // 4. Strategy Signal (Left Panel - Bottom)
+   CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
+   CreateRect("InfoBG", left_x, 230, half_width, 140, C'20,20,35');
 
-   // 6. Strategy Info
-   CreateLabel("LblSig", x+pad, 335, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
-   CreateRect("InfoBG", x+5, 350, m_panel_width-10, 150, C'25,25,35');
+   CreateLabel("Trend_T", left_x + 10, 240, "Trend:", clrGold, 8);
+   CreateLabel("Trend_V", left_x + 50, 240, "--", clrGray, 8, "Arial Bold");
 
-   CreateLabel("Trend_T", x+15, 360, "Trend:", clrGold, 8);
-   CreateLabel("Trend_V", x+60, 360, "--", clrGray, 8, "Arial Bold");
+   CreateLabel("EMA_T", left_x + 10, 255, "EMA Distance:", clrGold, 8);
+   CreateLabel("EMA_M15", left_x + 10, 270, "M15 (100/200): --", clrWhite, 8);
+   CreateLabel("EMA_H1", left_x + 10, 285, "H1 (100/200): --", clrWhite, 8);
 
-   CreateLabel("EMA_T", x+15, 375, "EMA Distance:", clrGold, 8);
-   CreateLabel("EMA_M15", x+15, 390, "M15 (100/200): --", clrWhite, 8);
-   CreateLabel("EMA_H1", x+15, 405, "H1 (100/200): --", clrWhite, 8);
+   CreateLabel("PA_T", left_x + 10, 305, "PA Signal:", clrGold, 8);
+   CreateLabel("PA_V", left_x + 75, 305, "NONE", clrGray, 8);
 
-   CreateLabel("PA_T", x+15, 430, "PA Signal:", clrGold, 8);
-   CreateLabel("PA_V", x+80, 430, "NONE", clrGray, 8);
+   CreateLabel("Risk_T", left_x + 10, 325, "Rec. SL/TP:", clrGold, 8);
+   CreateLabel("Risk_V", left_x + 75, 325, "-- / --", clrWhite, 8);
 
-   CreateLabel("Risk_T", x+15, 455, "Rec. SL/TP:", clrGold, 8);
-   CreateLabel("Risk_V", x+80, 455, "-- / --", clrWhite, 8);
+   CreateLabel("Ver", left_x + half_width - pad, 360, "v4.0", clrGray, 7);
 
-   CreateLabel("Ver", x+m_panel_width-35, 490, "v4.0", clrGray, 7);
+   // ============================================
+   // RIGHT PANEL (50%)
+   // ============================================
+
+   // 5. Execution Section (Right Panel - Top)
+   CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 9, "Arial Bold");
+   CreateLabel("LblRisk", right_x + pad, 35, "Risk %", clrGray, 8);
+   CreateEdit("EditRisk", right_x + half_width - pad - 25, 32, 30, 18, "1.0");
+
+   CreateButton("BtnBuy", right_x + pad, 60, (half_width - 30) / 2, 35, "BUY", m_buy_color);
+   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 60, (half_width - 30) / 2, 35, "SELL", m_sell_color);
+
+   // Note: Space below Execution section reserved for future features
 
    UpdateAccountInfo();
    ChartRedraw(m_chart_id);
