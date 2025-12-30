@@ -300,23 +300,29 @@ void CChartZones::CreateZoneRectangle(ZoneData &zone)
     // Create rectangle covering the visible chart area
     ObjectCreate(m_chart_id, rectName, OBJ_RECTANGLE, 0, timeStart, zone.top, timeEnd, zone.bottom);
 
-    // Set color based on zone type and strength
-    color zoneColor = zone.isBuy ? m_buy_color : m_sell_color;
+    // Get base RGB color components
+    color baseColor = zone.isBuy ? m_buy_color : m_sell_color;
+    uint rgb = (uint)baseColor;
+    uchar red = (uchar)(rgb >> 16);
+    uchar green = (uchar)(rgb >> 8);
+    uchar blue = (uchar)(rgb);
+
+    // 40% transparency = 60% opacity
+    // Alpha = 60% of 255 = 153 = 0x99
+    uchar alpha = 153;  // 60% opacity (40% transparent)
+
+    // Create ARGB color: 0xAA RR GG BB
+    uint argbColor = (alpha << 24) | (red << 16) | (green << 8) | blue;
+    color zoneColor = (color)argbColor;
 
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_COLOR, zoneColor);
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_FILL, zoneColor);
 
-    // Opacity based on zone strength (Major = more opaque)
-    // We use the alpha channel - note: MQL5 uses color with alpha for transparency
-    // Normal state: 30-40% opacity
-    // We achieve this by setting OBJPROP_BACK to true and using semi-transparent effect
-    // Actually, OBJ_RECTANGLE doesn't support alpha directly, we use different approach
-
-    // For semi-transparent effect, we use OBJPROP_BACK and OBJPROP_BORDER_TYPE
+    // Enable background mode for proper transparency rendering
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_BACK, true);
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
 
-    // Width: Major zones thicker
+    // Width: Major zones thicker, Minor zones thinner
     int width = zone.isMajor ? 2 : 1;
     ObjectSetInteger(m_chart_id, rectName, OBJPROP_WIDTH, width);
 
