@@ -27,6 +27,7 @@ private:
    color             m_label_color;
    color             m_buy_color;
    color             m_sell_color;
+   color             m_supply_color;
    color             m_accent_color;
 
    // Helper: Convert relative Y (0 at top of panel) to absolute Y (distance from anchor)
@@ -52,6 +53,7 @@ public:
    void UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec);
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
+   void UpdateAdvisor(string message);
 
    double GetRiskPercent();              
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
@@ -76,6 +78,7 @@ CDashboardPanel::CDashboardPanel()
    m_label_color = C'180,180,180';
    m_buy_color = C'46,204,113';
    m_sell_color = C'231,76,60';
+   m_supply_color = clrPeachPuff;
    m_accent_color = C'52,152,219';
 }
 
@@ -139,15 +142,16 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Trend_T", left_x + 10, 240, "Trend:", clrGold, 8);
    CreateLabel("Trend_V", left_x + 50, 240, "--", clrGray, 8, "Arial Bold");
 
-   CreateLabel("EMA_T", left_x + 10, 255, "EMA Distance:", clrGold, 8);
-   CreateLabel("EMA_M15", left_x + 10, 270, "M15 (100/200): --", clrWhite, 8);
-   CreateLabel("EMA_H1", left_x + 10, 285, "H1 (100/200): --", clrWhite, 8);
+   // Advisor: Natural language recommendation
+   CreateLabel("Adv_T", left_x + 10, 260, "Advisor:", m_accent_color, 9, "Arial Bold");
+   CreateLabel("Adv_V", left_x + 10, 278, "Scanning market...", clrCyan, 8);
+   CreateLabel("Adv_V2", left_x + 10, 293, "", clrCyan, 8);
 
-   CreateLabel("PA_T", left_x + 10, 305, "PA Signal:", clrGold, 8);
-   CreateLabel("PA_V", left_x + 75, 305, "NONE", clrGray, 8);
+   CreateLabel("PA_T", left_x + 10, 313, "PA Signal:", clrGold, 8);
+   CreateLabel("PA_V", left_x + 75, 313, "NONE", clrGray, 8);
 
-   CreateLabel("Risk_T", left_x + 10, 325, "Rec. SL/TP:", clrGold, 8);
-   CreateLabel("Risk_V", left_x + 75, 325, "-- / --", clrWhite, 8);
+   CreateLabel("Risk_T", left_x + 10, 333, "Rec. SL/TP:", clrGold, 8);
+   CreateLabel("Risk_V", left_x + 75, 333, "-- / --", clrWhite, 8);
 
    CreateLabel("Ver", left_x + half_width - pad, 360, "v4.0", clrGray, 7);
 
@@ -213,7 +217,7 @@ void CDashboardPanel::UpdateWidwaZones(double d1_open)
       int idx = best_idx[i];
       if(idx == -1) continue;
       string sid = IntegerToString(i);
-      color c = (levels[idx] > current) ? m_sell_color : m_buy_color;
+      color c = (levels[idx] > current) ? m_supply_color : m_buy_color;
       if(MathAbs(levels[idx] - d1_open) < pt) c = m_header_color;
 
       ObjectSetString(m_chart_id, m_prefix+"L_N_"+sid, OBJPROP_TEXT, labels[idx]);
@@ -365,16 +369,58 @@ void CDashboardPanel::UpdateZoneStatus(int zoneStatus)
          break;
       case 3: // ZONE_STATUS_IN_SELL1
          statusText = "SELL ZONE 1";
-         statusColor = m_sell_color;
+         statusColor = m_supply_color;
          break;
       case 4: // ZONE_STATUS_IN_SELL2
          statusText = "SELL ZONE 2";
-         statusColor = m_sell_color;
+         statusColor = m_supply_color;
          break;
    }
 
    // Update the status label in the header area
    ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, statusText);
    ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, statusColor);
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Advisor Message (Text Wrapping Support)                    |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateAdvisor(string message)
+{
+   // Split message into two lines if needed (max ~40 chars per line)
+   string line1 = "";
+   string line2 = "";
+
+   int maxLen = 40;
+   int msgLen = StringLen(message);
+
+   if(msgLen <= maxLen)
+   {
+      line1 = message;
+   }
+   else
+   {
+      // Find best split point (space or punctuation)
+      int splitPos = maxLen;
+      for(int i = maxLen; i > maxLen - 10; i--)
+      {
+         if(StringGetCharacter(message, i) == ' ' ||
+            StringGetCharacter(message, i) == '.' ||
+            StringGetCharacter(message, i) == ',')
+         {
+            splitPos = i + 1;
+            break;
+         }
+      }
+
+      line1 = StringSubstr(message, 0, splitPos);
+      line2 = StringSubstr(message, splitPos);
+   }
+
+   // Update labels
+   ObjectSetString(m_chart_id, m_prefix+"Adv_V", OBJPROP_TEXT, line1);
+   ObjectSetString(m_chart_id, m_prefix+"Adv_V2", OBJPROP_TEXT, line2);
+
    ChartRedraw(m_chart_id);
 }

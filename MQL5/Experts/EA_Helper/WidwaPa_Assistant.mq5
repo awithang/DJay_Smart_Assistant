@@ -199,6 +199,10 @@ void OnTimer()
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
+   // 3f. Advisor Message (Natural Language Trade Recommendation)
+   string advisorMessage = signalEngine.GetAdvisorMessage();
+   dashboardPanel.UpdateAdvisor(advisorMessage);
+
    // 4. Panel Updates
    dashboardPanel.UpdateAccountInfo();
 

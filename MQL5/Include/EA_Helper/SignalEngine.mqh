@@ -115,6 +115,9 @@ public:
     //--- Helper to get EMA value
     double GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift);
 
+    //--- Natural Language Advisor
+    string GetAdvisorMessage();
+
     //--- Getters for Zone Levels
     double GetD1Open()       { return m_d1_open; }
     double GetCurrentPrice() { return m_current_price; }
@@ -389,12 +392,24 @@ ENUM_MARKET_SESSION CSignalEngine::GetCurrentSession()
 //+------------------------------------------------------------------+
 ENUM_TREND_DIRECTION CSignalEngine::GetTrendDirection(ENUM_TIMEFRAMES tf)
 {
-   // Simple trend detection using EMA crossover
-   // If EMA 100 > EMA 200 = Uptrend, EMA 100 < EMA 200 = Downtrend
+   double ema100, ema200;
 
-   if(m_ema_100 > m_ema_200)
+   // Use cached values if requesting current chart period (optimization)
+   if(tf == PERIOD_CURRENT || tf == _Period)
+   {
+      ema100 = m_ema_100;
+      ema200 = m_ema_200;
+   }
+   else
+   {
+      // Fetch fresh values for specific timeframe
+      ema100 = GetEMAValue(tf, 100, 0);
+      ema200 = GetEMAValue(tf, 200, 0);
+   }
+
+   if(ema100 > ema200)
       return TREND_UP;
-   else if(m_ema_100 < m_ema_200)
+   else if(ema100 < ema200)
       return TREND_DOWN;
 
    return TREND_FLAT;
@@ -646,6 +661,85 @@ ENUM_ZONE_STATUS CSignalEngine::GetCurrentZoneStatus()
       return ZONE_STATUS_IN_SELL1;
 
    return ZONE_STATUS_NONE;
+}
+
+//+------------------------------------------------------------------+
+//| Get Advisor Message (Natural Language Trade Recommendation)       |
+//+------------------------------------------------------------------+
+string CSignalEngine::GetAdvisorMessage()
+{
+   // 1. Get Trend Direction (using H1 for main trend)
+   ENUM_TREND_DIRECTION trend = GetTrendDirection(PERIOD_H1);
+
+   // 2. Get Zone Status
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+
+   // 3. Get Active Signal (H1 + M5 combined for more reliable signals)
+   CombinedSignal combinedSig = GetCombinedPASignal();
+   ENUM_SIGNAL_TYPE signal = SIGNAL_NONE;
+   if(combinedSig.h1Signal == SIGNAL_PA_BUY || combinedSig.m5Signal == SIGNAL_PA_BUY)
+      signal = SIGNAL_PA_BUY;
+   else if(combinedSig.h1Signal == SIGNAL_PA_SELL || combinedSig.m5Signal == SIGNAL_PA_SELL)
+      signal = SIGNAL_PA_SELL;
+
+   // Helper: Check if zone is a Buy zone
+   bool isBuyZone = (zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2);
+
+   // Helper: Check if zone is a Sell zone
+   bool isSellZone = (zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2);
+
+   // Logic Tree based on spec
+   if(trend == TREND_UP)
+   {
+      if(isBuyZone)
+      {
+         if(signal == SIGNAL_PA_BUY)
+            return "PERFECT BUY: Uptrend + Support + Signal!";
+         return "Uptrend pullback to support. Watch for BUY signal.";
+      }
+      if(isSellZone)
+      {
+         if(signal == SIGNAL_PA_SELL)
+            return "Counter-trend Sell at resistance. Scalp with caution.";
+         return "Strong Uptrend hitting resistance. Wait for breakout or pullback.";
+      }
+      // Middle zone
+      return "Trend is Up. Wait for pullback to better price.";
+   }
+
+   if(trend == TREND_DOWN)
+   {
+      if(isSellZone)
+      {
+         if(signal == SIGNAL_PA_SELL)
+            return "PERFECT SELL: Downtrend + Resistance + Signal!";
+         return "Downtrend rally to resistance. Watch for SELL signal.";
+      }
+      if(isBuyZone)
+      {
+         if(signal == SIGNAL_PA_BUY)
+            return "Counter-trend Buy at support. Scalp with caution.";
+         return "Strong Downtrend hitting support. Wait for breakdown or bounce.";
+      }
+      // Middle zone
+      return "Trend is Down. Wait for rally to better price.";
+   }
+
+   // FLAT trend
+   if(isBuyZone)
+   {
+      if(signal == SIGNAL_PA_BUY)
+         return "Range bounce. Buying at support.";
+      return "At support in range. Watch for buy signal.";
+   }
+   if(isSellZone)
+   {
+      if(signal == SIGNAL_PA_SELL)
+         return "Range rejection. Selling at resistance.";
+      return "At resistance in range. Watch for sell signal.";
+   }
+
+   return "Market is choppy. Best to stay out.";
 }
 
 //+------------------------------------------------------------------+

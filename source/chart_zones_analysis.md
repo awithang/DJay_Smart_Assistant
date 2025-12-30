@@ -11,9 +11,9 @@ This document outlines the strategic implementation of visual zones (Buy/Sell/Pi
 *   **Trading Bias:** Price above D1 Open suggests a Bullish Bias; price below suggests a Bearish Bias.
 *   **Toggle:** User can show/hide via input parameter.
 
-### B. Resistance Zones (Sell Zones)
+### B. Resistance Zones (Sell/Supply Zones)
 *   **Location:** Levels calculated *above* the current price (e.g., D1 Open + 300, D1 Open + 1000).
-*   **Visual Style:** Red semi-transparent rectangles (`OBJ_RECTANGLE`) with zone depth.
+*   **Visual Style:** PeachPuff semi-transparent rectangles (`OBJ_RECTANGLE`) with zone depth.
 *   **Zone Depth:** Each level has a range (e.g., D1 +300 ± 50 points) creating a visual zone, not just a line.
 *   **Strength Indication:**
     *   **Minor Zones** (±300): Thinner lines, lower opacity
@@ -94,7 +94,7 @@ if(previous_close_outside_zone && current_close_inside_zone) {
 ### Color Coordination
 To maintain UI consistency, the chart colors must match the `CDashboardPanel` variables:
 *   `m_buy_color` (Green/Lime: C'46,204,113') for support zones.
-*   `m_sell_color` (Red: C'231,76,60') for resistance zones.
+*   `m_sell_color` (PeachPuff: clrPeachPuff) for resistance/supply zones.
 *   `m_header_color` (Gold: C'255,215,0') for the D1 Open pivot line.
 
 ### Zone Opacity Settings
@@ -140,10 +140,10 @@ input bool   Show_Intermediate_Levels = true;// Show levels between minor/major
 Chart Layout:
 ┌─────────────────────────────────────────────────┐
 │  D1 +1000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ [1x] │ ← Major Zone (thicker)
-│  (Red rectangle, 50pt depth, 40% opacity)      │
+│  (PeachPuff rectangle, 50pt depth, 40% opacity)│
 │                                                 │
 │  D1 +300  ────────────────────────────── [0x]  │ ← Minor Zone (thinner)
-│  (Red rectangle, 50pt depth, 30% opacity)      │
+│  (PeachPuff rectangle, 50pt depth, 30% opacity)│
 │                                                 │
 │  D1 Open  - - - - - - - - - - - - - - - - - - │ ← Pivot (Gold dashed)
 │                                                 │
