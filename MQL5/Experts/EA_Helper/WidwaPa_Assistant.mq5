@@ -34,6 +34,16 @@ CTradeManager   tradeManager;
 CDashboardPanel dashboardPanel;
 CChartZones     chartZones;
 
+//--- Trading Mode State
+ENUM_TRADING_MODE g_tradingMode = MODE_MANUAL;
+
+//--- Recommendation State (for One-Click Execution)
+ENUM_ORDER_TYPE g_rec_type = ORDER_TYPE_BUY_LIMIT; // Default placeholder
+double          g_rec_price = 0.0;
+double          g_rec_sl = 0.0;
+double          g_rec_tp = 0.0;
+bool            g_rec_active = false;
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -42,6 +52,7 @@ int OnInit()
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
+   dashboardPanel.UpdateTradingMode((int)g_tradingMode);
 
    // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
@@ -113,10 +124,16 @@ void OnTick()
       if(paSignal == SIGNAL_PA_BUY)
       {
          CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrBlue, "PA_Buy");
+         // AUTO MODE: Execute buy trade automatically
+         if(g_tradingMode == MODE_AUTO)
+            ExecuteBuyTrade();
       }
       else if(paSignal == SIGNAL_PA_SELL)
       {
          CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrOrange, "PA_Sell");
+         // AUTO MODE: Execute sell trade automatically
+         if(g_tradingMode == MODE_AUTO)
+            ExecuteSellTrade();
       }
 
       // --- 2. EMA Touch Signals ---
@@ -135,9 +152,19 @@ void OnTick()
          emaVal = signalEngine.GetEMAValue(PERIOD_H1, period, 1);
 
          if(currentH1Price > emaVal)
+         {
              CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrBlue, "EMA_Touch_Buy");
+             // AUTO MODE: Execute buy trade automatically
+             if(g_tradingMode == MODE_AUTO)
+                ExecuteBuyTrade();
+         }
          else
+         {
              CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrOrange, "EMA_Touch_Sell");
+             // AUTO MODE: Execute sell trade automatically
+             if(g_tradingMode == MODE_AUTO)
+                ExecuteSellTrade();
+         }
       }
 
       lastBarTime = currentBarTime;
@@ -176,6 +203,14 @@ void OnTimer()
    // 3. NEW: Update Strategy Signals using SignalEngine methods
    signalEngine.RefreshData();
 
+   if(!signalEngine.IsDataReady())
+   {
+      dashboardPanel.UpdateAdvisor("Synchronizing market data... Please wait.");
+      dashboardPanel.UpdateTrendStrength("LOADING...", clrGray);
+      dashboardPanel.UpdateConfirmButton("", false);
+      return;
+   }
+
    // 3a. Trend Alignment (D1/H4/H1)
    TrendAlignment trend = signalEngine.GetTrendAlignment();
    dashboardPanel.UpdateTrendStrength(trend.strengthText, trend.strengthColor);
@@ -189,8 +224,36 @@ void OnTimer()
    string emaM15Text = StringFormat("%.0f / %.0f", emaDist.m15_ema100, emaDist.m15_ema200);
    string emaH1Text = StringFormat("%.0f / %.0f", emaDist.h1_ema100, emaDist.h1_ema200);
 
-   // 3d. Risk Recommendation
-   string riskRec = StringFormat("%d / %d pts", Input_SL_Points, Input_SL_Points * 2);
+   // 3d. Smart SL/TP Price Targets (based on trend direction)
+   string riskRec = "";
+
+   // Get current price and H1 trend direction for SL/TP calculation
+   double price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   ENUM_TREND_DIRECTION h1Trend = signalEngine.GetTrendDirection(PERIOD_H1);
+
+   if(h1Trend == TREND_UP)
+   {
+      // Uptrend: Buy setup - SL below, TP above
+      double slPrice = price - (Input_SL_Points * _Point);
+      double tpPrice = price + (Input_SL_Points * 2 * _Point);
+      riskRec = StringFormat("SL:%s TP:%s",
+                             DoubleToString(slPrice, _Digits),
+                             DoubleToString(tpPrice, _Digits));
+   }
+   else if(h1Trend == TREND_DOWN)
+   {
+      // Downtrend: Sell setup - SL above, TP below
+      double slPrice = price + (Input_SL_Points * _Point);
+      double tpPrice = price - (Input_SL_Points * 2 * _Point);
+      riskRec = StringFormat("SL:%s TP:%s",
+                             DoubleToString(slPrice, _Digits),
+                             DoubleToString(tpPrice, _Digits));
+   }
+   else
+   {
+      // Flat/Sideways: Show point distances as fallback
+      riskRec = StringFormat("%d/%d pts", Input_SL_Points, Input_SL_Points * 2);
+   }
 
    // Update strategy panel
    dashboardPanel.UpdateStrategyInfo(emaM15Text, emaH1Text, paText, riskRec);
@@ -202,6 +265,27 @@ void OnTimer()
    // 3f. Advisor Message (Natural Language Trade Recommendation)
    string advisorMessage = signalEngine.GetAdvisorMessage();
    dashboardPanel.UpdateAdvisor(advisorMessage);
+
+   // 3g. Check for Pending Order Recommendation
+   ENUM_ORDER_TYPE recType;
+   double recPrice, recSL, recTP;
+   if(signalEngine.GetRecommendedPending(recType, recPrice, recSL, recTP, Input_SL_Points))
+   {
+      g_rec_active = true;
+      g_rec_type = recType;
+      g_rec_price = recPrice;
+      g_rec_sl = recSL;
+      g_rec_tp = recTP;
+      
+      string typeStr = (recType == ORDER_TYPE_BUY_LIMIT) ? "BUY LIMIT" : "SELL LIMIT";
+      string btnLabel = StringFormat("%s @ %s", typeStr, DoubleToString(recPrice, _Digits));
+      dashboardPanel.UpdateConfirmButton(btnLabel, true);
+   }
+   else
+   {
+      g_rec_active = false;
+      dashboardPanel.UpdateConfirmButton("", false);
+   }
 
    // 4. Panel Updates
    dashboardPanel.UpdateAccountInfo();
@@ -223,6 +307,22 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
    {
       if(dashboardPanel.IsBuyButtonClicked(sparam)) ExecuteBuyTrade();
       else if(dashboardPanel.IsSellButtonClicked(sparam)) ExecuteSellTrade();
+      else if(dashboardPanel.IsModeButtonClicked(sparam))
+      {
+         // Toggle Mode
+         g_tradingMode = (g_tradingMode == MODE_MANUAL) ? MODE_AUTO : MODE_MANUAL;
+         dashboardPanel.UpdateTradingMode((int)g_tradingMode);
+         Print("Trading Mode switched to: ", EnumToString(g_tradingMode));
+      }
+      else if(dashboardPanel.IsConfirmButtonClicked(sparam))
+      {
+         if(g_rec_active)
+         {
+            double risk = dashboardPanel.GetRiskPercent();
+            tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "WidwaPa Pending");
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         }
+      }
    }
 }
 
