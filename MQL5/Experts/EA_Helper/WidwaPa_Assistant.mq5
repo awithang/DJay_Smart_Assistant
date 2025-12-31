@@ -27,6 +27,12 @@ input bool   Input_Use_Smart_Trail     = true;   // Enable Smart Profit Lock
 input double Input_Trail_Trigger_Pct   = 50.0;   // Trigger % of TP Distance (e.g. 50%)
 input double Input_Trail_Lock_Pct      = 30.0;   // Lock % of TP Distance (e.g. 30%)
 
+//--- Auto Mode Options
+input group "=== Auto Mode Options ==="
+input bool   Input_Auto_Arrow          = true;   // Auto Trade on Any Arrow (PA/EMA)
+input bool   Input_Auto_Reversal       = true;   // Auto Trade on Reversal (Zone Bounce)
+input bool   Input_Auto_Breakout       = false;  // Auto Trade on Breakout (Zone Flip)
+
 //--- Chart Zones Settings
 input group "=== Chart Zones Settings ==="
 input bool   Input_Show_Zones_On_Chart   = true;   // Show zones on chart
@@ -42,6 +48,9 @@ CChartZones     chartZones;
 
 //--- Trading Mode State
 ENUM_TRADING_MODE g_tradingMode = MODE_MANUAL;
+bool g_strat_arrow;
+bool g_strat_rev;
+bool g_strat_break;
 
 //--- Recommendation State (for One-Click Execution)
 ENUM_ORDER_TYPE g_rec_type = ORDER_TYPE_BUY_LIMIT; // Default placeholder
@@ -55,10 +64,16 @@ bool            g_rec_active = false;
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   // Init Strategy Bools
+   g_strat_arrow = Input_Auto_Arrow;
+   g_strat_rev = Input_Auto_Reversal;
+   g_strat_break = Input_Auto_Breakout;
+
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
+   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
 
    // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
@@ -134,58 +149,106 @@ void OnTick()
       if(paSignal == SIGNAL_PA_BUY)
       {
          CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrBlue, "PA_Buy");
-         // AUTO MODE: Execute buy trade automatically
-         if(g_tradingMode == MODE_AUTO)
-         {
-            Print("DEBUG: PA_BUY signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
-            ExecuteBuyTrade();
-         }
       }
       else if(paSignal == SIGNAL_PA_SELL)
       {
          CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrOrange, "PA_Sell");
-         // AUTO MODE: Execute sell trade automatically
-         if(g_tradingMode == MODE_AUTO)
-         {
-            Print("DEBUG: PA_SELL signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
-            ExecuteSellTrade();
-         }
       }
 
       // --- 2. EMA Touch Signals ---
       // Check H1 EMA Touch
       bool emaTouch100 = signalEngine.CheckEMATouch(PERIOD_H1, 100);
       bool emaTouch200 = signalEngine.CheckEMATouch(PERIOD_H1, 200);
+      bool emaSignalBuy = false;
+      bool emaSignalSell = false;
 
       if(emaTouch100 || emaTouch200)
       {
          double currentH1Price = iClose(_Symbol, PERIOD_H1, 1);
-
          double emaVal = 0;
-         // Note: We use GetEMAValue logic manually here or assume we can get it from engine?
-         // For one-off checks, manual or helper is fine. Let's use the helper!
          int period = emaTouch100 ? 100 : 200;
          emaVal = signalEngine.GetEMAValue(PERIOD_H1, period, 1);
 
          if(currentH1Price > emaVal)
          {
              CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrBlue, "EMA_Touch_Buy");
-             // AUTO MODE: Execute buy trade automatically
-             if(g_tradingMode == MODE_AUTO)
-             {
-                Print("DEBUG: EMA_Touch_BUY signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
-                ExecuteBuyTrade();
-             }
+             emaSignalBuy = true;
          }
          else
          {
              CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrOrange, "EMA_Touch_Sell");
-             // AUTO MODE: Execute sell trade automatically
-             if(g_tradingMode == MODE_AUTO)
-             {
-                Print("DEBUG: EMA_Touch_SELL signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
-                ExecuteSellTrade();
-             }
+             emaSignalSell = true;
+         }
+      }
+      
+      // --- AUTO TRADING EXECUTION ---
+      if(g_tradingMode == MODE_AUTO)
+      {
+         bool doBuy = false;
+         bool doSell = false;
+         string triggeredStrategies = "";
+
+         // 1. Arrow Strategy (Any Signal)
+         if(g_strat_arrow)
+         {
+            if(paSignal == SIGNAL_PA_BUY || emaSignalBuy)
+            {
+               doBuy = true;
+               triggeredStrategies = (triggeredStrategies == "") ? "ARROW" : triggeredStrategies + "+ARROW";
+            }
+            if(paSignal == SIGNAL_PA_SELL || emaSignalSell)
+            {
+               doSell = true;
+               triggeredStrategies = (triggeredStrategies == "") ? "ARROW" : triggeredStrategies + "+ARROW";
+            }
+         }
+
+         // 2. Reversal Strategy (Zone Bounce)
+         if(g_strat_rev)
+         {
+            if(signalEngine.IsReversalSetup())
+            {
+               if(paSignal == SIGNAL_PA_BUY)
+               {
+                  doBuy = true;
+                  triggeredStrategies = (triggeredStrategies == "") ? "REV" : triggeredStrategies + "+REV";
+               }
+               if(paSignal == SIGNAL_PA_SELL)
+               {
+                  doSell = true;
+                  triggeredStrategies = (triggeredStrategies == "") ? "REV" : triggeredStrategies + "+REV";
+               }
+            }
+         }
+
+         // 3. Breakout Strategy (Zone Flip)
+         if(g_strat_break)
+         {
+            if(signalEngine.IsBreakoutSetup())
+            {
+               if(paSignal == SIGNAL_PA_BUY)
+               {
+                  doBuy = true;
+                  triggeredStrategies = (triggeredStrategies == "") ? "BREAK" : triggeredStrategies + "+BREAK";
+               }
+               if(paSignal == SIGNAL_PA_SELL)
+               {
+                  doSell = true;
+                  triggeredStrategies = (triggeredStrategies == "") ? "BREAK" : triggeredStrategies + "+BREAK";
+               }
+            }
+         }
+
+         // Execute and track which strategy triggered
+         if(doBuy)
+         {
+            ExecuteBuyTrade();
+            dashboardPanel.UpdateLastAutoTrade(triggeredStrategies, "BUY", SymbolInfoDouble(_Symbol, SYMBOL_ASK));
+         }
+         if(doSell)
+         {
+            ExecuteSellTrade();
+            dashboardPanel.UpdateLastAutoTrade(triggeredStrategies, "SELL", SymbolInfoDouble(_Symbol, SYMBOL_BID));
          }
       }
 
@@ -357,6 +420,25 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "WidwaPa Pending");
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
+      }
+      // Strategy Toggles
+      else if(dashboardPanel.IsStratArrowClicked(sparam))
+      {
+         g_strat_arrow = !g_strat_arrow;
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      else if(dashboardPanel.IsStratRevClicked(sparam))
+      {
+         g_strat_rev = !g_strat_rev;
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      else if(dashboardPanel.IsStratBreakClicked(sparam))
+      {
+         g_strat_break = !g_strat_break;
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
    }
 }

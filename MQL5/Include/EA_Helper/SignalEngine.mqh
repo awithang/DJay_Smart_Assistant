@@ -118,6 +118,10 @@ public:
     //--- Natural Language Advisor
     string GetAdvisorMessage();
     bool   IsDataReady();
+    
+    //--- Strategy Helpers
+    bool   IsReversalSetup();
+    bool   IsBreakoutSetup();
 
     //--- Pending Order Recommendation
     bool GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outPrice, double &outSL, double &outTP, int sl_points);
@@ -816,6 +820,44 @@ bool CSignalEngine::GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outP
       }
    }
 
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Check for Reversal Setup (PA Signal matches Zone)                |
+//+------------------------------------------------------------------+
+bool CSignalEngine::IsReversalSetup()
+{
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   ENUM_SIGNAL_TYPE sig = GetActiveSignal();
+   
+   // Buy Zone + Buy Signal
+   if((zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2) && sig == SIGNAL_PA_BUY)
+      return true;
+      
+   // Sell Zone + Sell Signal
+   if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_SELL)
+      return true;
+      
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Check for Breakout Setup (PA Signal opposes Zone)                |
+//+------------------------------------------------------------------+
+bool CSignalEngine::IsBreakoutSetup()
+{
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   ENUM_SIGNAL_TYPE sig = GetActiveSignal();
+   
+   // Buy Zone + Sell Signal (Breaking Support)
+   if((zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2) && sig == SIGNAL_PA_SELL)
+      return true;
+      
+   // Sell Zone + Buy Signal (Breaking Resistance)
+   if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_BUY)
+      return true;
+      
    return false;
 }
 

@@ -56,12 +56,19 @@ public:
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
-   
+   void UpdateLastAutoTrade(string strategy, string direction, double price);
+
    // New Methods
    void UpdateTradingMode(int mode);
+   void UpdateStrategyButtons(bool arrow, bool rev, bool brk);
    void UpdateConfirmButton(string text, bool enable);
+   
    bool IsModeButtonClicked(string sparam) { return (sparam == m_prefix+"BtnMode"); }
    bool IsConfirmButtonClicked(string sparam) { return (sparam == m_prefix+"BtnConfirm"); }
+   
+   bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
+   bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
+   bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
 
    double GetRiskPercent();              
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
@@ -118,12 +125,12 @@ void CDashboardPanel::CreatePanel()
 
    // 1. Header Section (Left Panel)
    CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 10, "Arial Bold");
-   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", m_text_color, 9, "Arial Bold", "right");
+   CreateLabel("Balance", left_x + pad + 130, 15, "$--", clrWhite, 10, "Arial Bold");
 
    // 2. Market Status (Left Panel)
    CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 8);
    CreateLabel("LblTime", left_x + pad, 50, "M5: --:--", clrGray, 8);
-   CreateLabel("LblStat", left_x + half_width - pad, 42, "SIDEWAY", clrGray, 9, "Arial Bold", "right");
+   CreateLabel("LblStat", left_x + pad + 130, 42, "SIDEWAY", clrGray, 9, "Arial Bold");
 
    // 3. Daily Zones Table (Left Panel)
    CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
@@ -175,19 +182,46 @@ void CDashboardPanel::CreatePanel()
    // 5. Execution Section (Right Panel - Top)
    CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 9, "Arial Bold");
    CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 9, "Arial Bold", "right");
+   
    CreateLabel("LblRisk", right_x + pad, 35, "Risk %", clrGray, 8);
    CreateEdit("EditRisk", right_x + half_width - pad - 25, 32, 30, 18, "1.0");
 
    CreateButton("BtnBuy", right_x + pad, 60, (half_width - 30) / 2, 35, "BUY", m_buy_color);
    CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 60, (half_width - 30) / 2, 35, "SELL", m_sell_color);
 
-   // Mode Button (Auto ON/OFF)
-   CreateButton("BtnMode", right_x + pad, 105, half_width - 20, 25, "AUTO: OFF", clrGray, clrWhite);
+   // Confirm Button (Pending recommendation)
+   CreateButton("BtnConfirm", right_x + pad, 105, half_width - 20, 30, "NO SIGNAL", C'50,50,60', C'100,100,100');
 
-   // Confirm Button (Hidden by default)
-   CreateButton("BtnConfirm", right_x + pad, 140, half_width - 20, 30, "", m_bg_color, m_bg_color); // Hidden initially
+   // 6. Auto Strategy Options (Right Panel - Below Confirm)
+   int stratY = 150;
+   CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 9, "Arial Bold");
+   
+   // Auto Mode Toggle (Next to title)
+   CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite);
 
-   // Note: Space below Execution section reserved for future features
+   // Section Box
+   CreateRect("StratBG", right_x, stratY + 25, half_width, 85, C'5,5,15', true, C'45,45,60');
+   
+   int chkW = 60;
+   CreateButton("BtnStratArrow", right_x + 10, stratY + 35, 15, 15, "", clrGray);
+   CreateLabel("L_Arrow", right_x + 30, stratY + 35, "Arrow", clrCyan, 8, "Arial Bold");
+   
+   CreateButton("BtnStratRev", right_x + 80, stratY + 35, 15, 15, "", clrGray);
+   CreateLabel("L_Rev", right_x + 100, stratY + 35, "Rev", clrCyan, 8, "Arial Bold");
+   
+   CreateButton("BtnStratBreak", right_x + 150, stratY + 35, 15, 15, "", clrGray);
+   CreateLabel("L_Break", right_x + 170, stratY + 35, "Break", clrCyan, 8, "Arial Bold");
+
+   // Last Trade Label
+   CreateLabel("LblLastTrade", right_x + 10, stratY + 65, "Last: ---", C'80,80,80', 7);
+
+   // 7. Active Orders Section
+   int orderY = 250;
+   CreateLabel("LblAct", right_x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 9, "Arial Bold");
+   CreateButton("BtnCloseAll", right_x + half_width - 75, orderY - 2, 65, 18, "CLOSE ALL", m_sell_color, clrWhite);
+   
+   // Empty list placeholder or area
+   CreateRect("OrderListBG", right_x, orderY + 20, half_width, 100, C'5,5,15');
 
    UpdateAccountInfo();
    ChartRedraw(m_chart_id);
@@ -207,6 +241,22 @@ void CDashboardPanel::UpdateTradingMode(int mode)
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
    Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text);
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Strategy Selection Buttons                                |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
+{
+   color bgArrow = arrow ? m_buy_color : clrGray;
+   color bgRev   = rev ? m_buy_color : clrGray;
+   color bgBrk   = brk ? m_buy_color : clrGray;
+   
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratArrow", OBJPROP_BGCOLOR, bgArrow);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratRev", OBJPROP_BGCOLOR, bgRev);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratBreak", OBJPROP_BGCOLOR, bgBrk);
+   
    ChartRedraw(m_chart_id);
 }
 
@@ -528,5 +578,24 @@ void CDashboardPanel::UpdateAdvisor(string message)
    ObjectSetString(m_chart_id, m_prefix+"Adv_V", OBJPROP_TEXT, line1);
    ObjectSetString(m_chart_id, m_prefix+"Adv_V2", OBJPROP_TEXT, line2);
 
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Last Auto Trade Label                                      |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateLastAutoTrade(string strategy, string direction, double price)
+{
+   string text = "Last: " + strategy + " " + direction + " @" + DoubleToString(price, _Digits);
+   ObjectSetString(m_chart_id, m_prefix+"LblLastAuto", OBJPROP_TEXT, text);
+
+   // Set color based on direction
+   color clr = clrGray;
+   if(direction == "BUY")
+      clr = m_buy_color;
+   else if(direction == "SELL")
+      clr = m_sell_color;
+
+   ObjectSetInteger(m_chart_id, m_prefix+"LblLastAuto", OBJPROP_COLOR, clr);
    ChartRedraw(m_chart_id);
 }

@@ -1,1 +1,1 @@
-'{' - unbalanced parentheses	TradeManager.mqh	480	1
+'{' - unbalanced parentheses	SignalEngine.mqh	782	1
