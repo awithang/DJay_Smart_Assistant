@@ -67,6 +67,8 @@ public:
    void UpdateStrategyButtons(bool arrow, bool rev, bool brk);
    void UpdateConfirmButton(string text, bool enable);
    
+   void Redraw() { ChartRedraw(m_chart_id); }
+
    bool IsModeButtonClicked(string sparam) { return (sparam == m_prefix+"BtnMode"); }
    bool IsConfirmButtonClicked(string sparam) { return (sparam == m_prefix+"BtnConfirm"); }
    bool IsCloseAllButtonClicked(string sparam) { return (sparam == m_prefix+"BtnCloseAll"); }
@@ -268,7 +270,6 @@ void CDashboardPanel::UpdateTradingMode(int mode)
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
    Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text);
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -283,8 +284,6 @@ void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratArrow", OBJPROP_BGCOLOR, bgArrow);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratRev", OBJPROP_BGCOLOR, bgRev);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratBreak", OBJPROP_BGCOLOR, bgBrk);
-   
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -319,7 +318,6 @@ void CDashboardPanel::UpdateConfirmButton(string text, bool enable)
    ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_COLOR, txt);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_STATE, false); // Ensure unpressed
-   ChartRedraw(m_chart_id);
 }
 
 void CDashboardPanel::UpdateWidwaZones(double d1_open)
@@ -413,8 +411,6 @@ void CDashboardPanel::UpdateStrategyInfo(string reversal_alert, string breakout_
 
    // Update Risk Recommendation
    ObjectSetString(m_chart_id, m_prefix+"Risk_V", OBJPROP_TEXT, risk_rec);
-
-   ChartRedraw(m_chart_id); // Force redraw
 }
 
 void CDashboardPanel::UpdateAccountInfo()
@@ -529,7 +525,6 @@ void CDashboardPanel::UpdateTrendStrength(string strengthText, color strengthCol
 {
    ObjectSetString(m_chart_id, m_prefix+"Trend_V", OBJPROP_TEXT, strengthText);
    ObjectSetInteger(m_chart_id, m_prefix+"Trend_V", OBJPROP_COLOR, strengthColor);
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -567,7 +562,6 @@ void CDashboardPanel::UpdateZoneStatus(int zoneStatus)
    // Update the status label in the header area
    ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, statusText);
    ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, statusColor);
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -608,8 +602,6 @@ void CDashboardPanel::UpdateAdvisor(string message)
    // Update labels
    ObjectSetString(m_chart_id, m_prefix+"Adv_V", OBJPROP_TEXT, line1);
    ObjectSetString(m_chart_id, m_prefix+"Adv_V2", OBJPROP_TEXT, line2);
-
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -628,7 +620,6 @@ void CDashboardPanel::UpdateLastAutoTrade(string strategy, string direction, dou
       clr = m_sell_color;
 
    ObjectSetInteger(m_chart_id, m_prefix+"LblLastAuto", OBJPROP_COLOR, clr);
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+
@@ -675,8 +666,6 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &ord
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, -100);
       }
    }
-
-   ChartRedraw(m_chart_id);
 }
 
 //+------------------------------------------------------------------+

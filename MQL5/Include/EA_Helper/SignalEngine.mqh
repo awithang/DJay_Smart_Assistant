@@ -83,9 +83,15 @@ private:
     int    m_zone_offset2;      // Zone offset 2 (in points)
 
     // Indicator handles (created once, reused)
-    int    m_handle_ema100;     // EMA 100 indicator handle
-    int    m_handle_ema200;     // EMA 200 indicator handle
-    int    m_handle_ema720;     // EMA 720 indicator handle
+    int    m_handle_ema100;     // EMA 100 indicator handle (Current)
+    int    m_handle_ema200;     // EMA 200 indicator handle (Current)
+    int    m_handle_ema720;     // EMA 720 indicator handle (Current)
+
+    // Cached Multi-Timeframe Handles
+    int    m_handle_d1_100, m_handle_d1_200;
+    int    m_handle_h4_100, m_handle_h4_200;
+    int    m_handle_h1_100, m_handle_h1_200;
+    int    m_handle_m15_100, m_handle_m15_200;
 
     // Helper method for copying indicator buffer values
     double CopyBufferValue(int handle, int buffer_num);
@@ -164,6 +170,11 @@ CSignalEngine::CSignalEngine()
     m_handle_ema100 = INVALID_HANDLE;
     m_handle_ema200 = INVALID_HANDLE;
     m_handle_ema720 = INVALID_HANDLE;
+    
+    m_handle_d1_100 = INVALID_HANDLE; m_handle_d1_200 = INVALID_HANDLE;
+    m_handle_h4_100 = INVALID_HANDLE; m_handle_h4_200 = INVALID_HANDLE;
+    m_handle_h1_100 = INVALID_HANDLE; m_handle_h1_200 = INVALID_HANDLE;
+    m_handle_m15_100 = INVALID_HANDLE; m_handle_m15_200 = INVALID_HANDLE;
 }
 
 //+------------------------------------------------------------------+
@@ -178,6 +189,18 @@ CSignalEngine::~CSignalEngine()
         IndicatorRelease(m_handle_ema200);
     if(m_handle_ema720 != INVALID_HANDLE)
         IndicatorRelease(m_handle_ema720);
+        
+    if(m_handle_d1_100 != INVALID_HANDLE) IndicatorRelease(m_handle_d1_100);
+    if(m_handle_d1_200 != INVALID_HANDLE) IndicatorRelease(m_handle_d1_200);
+    
+    if(m_handle_h4_100 != INVALID_HANDLE) IndicatorRelease(m_handle_h4_100);
+    if(m_handle_h4_200 != INVALID_HANDLE) IndicatorRelease(m_handle_h4_200);
+    
+    if(m_handle_h1_100 != INVALID_HANDLE) IndicatorRelease(m_handle_h1_100);
+    if(m_handle_h1_200 != INVALID_HANDLE) IndicatorRelease(m_handle_h1_200);
+    
+    if(m_handle_m15_100 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_100);
+    if(m_handle_m15_200 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_200);
 }
 
 //+------------------------------------------------------------------+
@@ -192,6 +215,19 @@ void CSignalEngine::Init(int zone_offset1, int zone_offset2)
     m_handle_ema100 = iMA(_Symbol, PERIOD_CURRENT, 100, 0, MODE_EMA, PRICE_CLOSE);
     m_handle_ema200 = iMA(_Symbol, PERIOD_CURRENT, 200, 0, MODE_EMA, PRICE_CLOSE);
     m_handle_ema720 = iMA(_Symbol, PERIOD_CURRENT, 720, 0, MODE_EMA, PRICE_CLOSE);
+
+    // Create Multi-Timeframe Handles
+    m_handle_d1_100 = iMA(_Symbol, PERIOD_D1, 100, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_d1_200 = iMA(_Symbol, PERIOD_D1, 200, 0, MODE_EMA, PRICE_CLOSE);
+    
+    m_handle_h4_100 = iMA(_Symbol, PERIOD_H4, 100, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_h4_200 = iMA(_Symbol, PERIOD_H4, 200, 0, MODE_EMA, PRICE_CLOSE);
+    
+    m_handle_h1_100 = iMA(_Symbol, PERIOD_H1, 100, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_h1_200 = iMA(_Symbol, PERIOD_H1, 200, 0, MODE_EMA, PRICE_CLOSE);
+    
+    m_handle_m15_100 = iMA(_Symbol, PERIOD_M15, 100, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_m15_200 = iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE);
 
     if(m_handle_ema100 == INVALID_HANDLE)
         Print("Error: Failed to create EMA 100 indicator handle");
@@ -454,17 +490,37 @@ bool CSignalEngine::CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period)
    double close2 = iClose(_Symbol, tf, 2);
 
    // Get EMA value for shift 1 and 2
-   // MODE_EMA = 0 (Exponential Moving Average)
-   int emaHandle = iMA(_Symbol, tf, ema_period, 0, MODE_EMA, PRICE_CLOSE);
+   // Try to find cached handle first
+   int emaHandle = INVALID_HANDLE;
+   bool isCached = false;
+   
+   if(ema_period == 100)
+   {
+      if(tf == PERIOD_H1) { emaHandle = m_handle_h1_100; isCached = true; }
+      else if(tf == PERIOD_CURRENT) { emaHandle = m_handle_ema100; isCached = true; }
+   }
+   else if(ema_period == 200)
+   {
+      if(tf == PERIOD_H1) { emaHandle = m_handle_h1_200; isCached = true; }
+      else if(tf == PERIOD_CURRENT) { emaHandle = m_handle_ema200; isCached = true; }
+   }
+   
+   // Create temporary handle if not cached
+   if(emaHandle == INVALID_HANDLE)
+   {
+      emaHandle = iMA(_Symbol, tf, ema_period, 0, MODE_EMA, PRICE_CLOSE);
+   }
+
    if(emaHandle == INVALID_HANDLE) return false;
 
    double emaBuffer[];
    ArraySetAsSeries(emaBuffer, true);
    if(CopyBuffer(emaHandle, 0, 0, 3, emaBuffer) < 3) {
-      IndicatorRelease(emaHandle);
+      if(!isCached) IndicatorRelease(emaHandle);
       return false;
    }
-   IndicatorRelease(emaHandle);
+   
+   if(!isCached) IndicatorRelease(emaHandle);
 
    double ema1 = emaBuffer[1];  // EMA for candle 1
    double ema2 = emaBuffer[2];  // EMA for candle 2
@@ -484,9 +540,41 @@ bool CSignalEngine::CheckEMATouch(ENUM_TIMEFRAMES tf, int ema_period)
 //+------------------------------------------------------------------+
 double CSignalEngine::GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift)
 {
-   int handle = iMA(_Symbol, tf, period, 0, MODE_EMA, PRICE_CLOSE);
-   if(handle == INVALID_HANDLE) return 0.0;
+   int handle = INVALID_HANDLE;
+   
+   // Select cached handle
+   if(period == 100)
+   {
+      if(tf == PERIOD_D1) handle = m_handle_d1_100;
+      else if(tf == PERIOD_H4) handle = m_handle_h4_100;
+      else if(tf == PERIOD_H1) handle = m_handle_h1_100;
+      else if(tf == PERIOD_M15) handle = m_handle_m15_100;
+      else if(tf == PERIOD_CURRENT) handle = m_handle_ema100;
+   }
+   else if(period == 200)
+   {
+      if(tf == PERIOD_D1) handle = m_handle_d1_200;
+      else if(tf == PERIOD_H4) handle = m_handle_h4_200;
+      else if(tf == PERIOD_H1) handle = m_handle_h1_200;
+      else if(tf == PERIOD_M15) handle = m_handle_m15_200;
+      else if(tf == PERIOD_CURRENT) handle = m_handle_ema200;
+   }
+   
+   // Fallback for non-cached params (e.g. 720 or other TFs if added later)
+   if(handle == INVALID_HANDLE)
+   {
+       handle = iMA(_Symbol, tf, period, 0, MODE_EMA, PRICE_CLOSE);
+       if(handle == INVALID_HANDLE) return 0.0;
+       
+       double buf[];
+       ArraySetAsSeries(buf, true);
+       double result = 0.0;
+       if(CopyBuffer(handle, 0, shift, 1, buf) > 0) result = buf[0];
+       IndicatorRelease(handle);
+       return result;
+   }
 
+   // Use cached handle
    double buf[];
    ArraySetAsSeries(buf, true);
    double result = 0.0;
@@ -494,7 +582,6 @@ double CSignalEngine::GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift)
    if(CopyBuffer(handle, 0, shift, 1, buf) > 0)
       result = buf[0];
 
-   IndicatorRelease(handle);
    return result;
 }
 

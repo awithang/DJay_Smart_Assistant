@@ -220,6 +220,8 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   ulong start = GetMicrosecondCount();
+
    // 1. Session & Run Time Logic
    MqlDateTime dt;
    TimeToStruct(TimeCurrent(), dt);
@@ -379,6 +381,13 @@ void OnTimer()
 
    // 5. Update Chart Zones
    chartZones.Update(d1Open, currentPrice);
+
+   // Final Redraw to update all changes
+   dashboardPanel.Redraw();
+   
+   ulong duration = GetMicrosecondCount() - start;
+   if(duration > 10000) // Print if > 10ms
+      Print("WARNING: OnTimer took ", duration, " us");
 }
 
 //+------------------------------------------------------------------+
@@ -462,6 +471,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
          }
       }
+      ChartRedraw(0);
    }
 }
 

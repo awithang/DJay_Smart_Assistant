@@ -1,9 +1,11 @@
-1. Space between Panel name and total port value. Port value should be same padding from panel edge as Panel name.
-2. Focus at Strategy Signal section:
-- move PA Signal to under Trend:
-- Remove EMA value display (M15 and H1) with Reversal Alert: [display reversal entry point] and Breakout Alert: [display breakout entry point]
-3. Change all button to flat style for quicker response.
-4. Move Active orders section to bottom of panel and cover both left and right panel for more space
-- increase text size for more readable.
-- add close button to each order for close individual order.
-- Remove placeholder "Label" when no data available.
+1. Neutral and Run Time beside Sessio: should be in different label and aggange them in different row.
+
+2. Remove blink effect.
+
+3. Make sure current price at top right and profit/lost in Active orders section are update real time.
+
+4. Remove Recommend SL/TP from Strategy Signal section
+
+5. Prevent auto mode to make duplicate order when condition meet more than 1 condition.
+
+6. Make sure auto mode will not make more order if the previous order from same condition not finish.
