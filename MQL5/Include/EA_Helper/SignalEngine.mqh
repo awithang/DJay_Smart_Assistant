@@ -1018,7 +1018,7 @@ EntryPoint CSignalEngine::GetReversalEntryPoint()
       result.price = zoneLevel;
       result.direction = "BUY";
       result.zone = zoneName;
-      result.description = StringFormat("BUY @ %.5f (Bounce %s)", zoneLevel, zoneName);
+      result.description = StringFormat("BUY @ %.2f (Bounce %s)", zoneLevel, zoneName);
    }
    else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_SELL)
    {
@@ -1026,7 +1026,7 @@ EntryPoint CSignalEngine::GetReversalEntryPoint()
       result.price = zoneLevel;
       result.direction = "SELL";
       result.zone = zoneName;
-      result.description = StringFormat("SELL @ %.5f (Reject %s)", zoneLevel, zoneName);
+      result.description = StringFormat("SELL @ %.2f (Reject %s)", zoneLevel, zoneName);
    }
 
    return result;
@@ -1086,7 +1086,7 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
       result.price = zoneLevel - breakOffset;
       result.direction = "SELL";
       result.zone = zoneName;
-      result.description = StringFormat("SELL @ %.5f (Break %s)", result.price, zoneName);
+      result.description = StringFormat("SELL @ %.2f (Break %s)", result.price, zoneName);
    }
    else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_BUY)
    {
@@ -1095,7 +1095,7 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
       result.price = zoneLevel + breakOffset;
       result.direction = "BUY";
       result.zone = zoneName;
-      result.description = StringFormat("BUY @ %.5f (Break %s)", result.price, zoneName);
+      result.description = StringFormat("BUY @ %.2f (Break %s)", result.price, zoneName);
    }
 
    return result;
