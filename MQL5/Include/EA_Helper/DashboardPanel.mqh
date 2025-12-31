@@ -98,7 +98,7 @@ CDashboardPanel::CDashboardPanel()
    m_base_x = 10;
    m_base_y = 10;
    m_panel_width = 500;  // Wider for two-panel layout (50/50 split)
-   m_panel_height = 540;  // Increased height for full-width Active Orders section
+   m_panel_height = 580;  // Increased height for new Pending section rows
    m_blink_state = false;
 
    m_bg_color = C'35,35,45';      // Dark Grey Background
@@ -171,84 +171,86 @@ void CDashboardPanel::CreatePanel()
       CreateLabel("L_D_" + id, left_x + 150, ry, "0 pts", clrGray, 9);
    }
 
-   // 4. Strategy Signal (Left Panel - Bottom)
-   CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 10, "Arial Bold");
-   CreateRect("InfoBG", left_x, 230, half_width, 140, C'5,5,15');
-
-   CreateLabel("Trend_T", left_x + 10, 242, "Trend:", clrGold, 9);
-   CreateLabel("Trend_V", left_x + 50, 242, "--", clrGray, 9, "Arial Bold");
-
-   // PA Signal (moved under Trend)
-   CreateLabel("PA_T", left_x + 10, 258, "PA Signal:", clrGold, 9);
-   CreateLabel("PA_V", left_x + 75, 258, "NONE", clrGray, 9);
-
-   // Reversal Alert (replaces EMA M15)
-   CreateLabel("Rev_T", left_x + 10, 274, "Reversal Alert:", clrGold, 9);
-   CreateLabel("Rev_V", left_x + 95, 274, "--", clrGray, 9);
-   CreateButton("BtnRev", left_x + half_width - 45, 272, 35, 16, "SET", clrGray, clrWhite, 8);
-
-   // Breakout Alert (replaces EMA H1)
-   CreateLabel("Break_T", left_x + 10, 294, "Breakout Alert:", clrGold, 9);
-   CreateLabel("Break_V", left_x + 95, 294, "--", clrGray, 9);
-   CreateButton("BtnBrk", left_x + half_width - 45, 292, 35, 16, "SET", clrGray, clrWhite, 8);
-
-   // Separator line before Advisor
-   CreateRect("Sep1", left_x + 8, 312, half_width - 16, 1, C'60,60,70');
-
-   // Advisor: Natural language recommendation
-   CreateLabel("Adv_T", left_x + 10, 322, "Advisor:", m_accent_color, 10, "Arial Bold");
-   CreateLabel("Adv_V", left_x + 10, 337, "Scanning market...", clrCyan, 9);
-   CreateLabel("Adv_V2", left_x + 10, 352, "", clrCyan, 9);
-
-   // REMOVED Risk_T and Risk_V labels
-
-   CreateLabel("Ver", left_x + half_width - pad, 372, "v4.0", clrGray, 8);
-
-   // ============================================
-   // RIGHT PANEL (50%)
-   // ============================================
-
-   // 5. Execution Section (Right Panel - Top)
-   CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 10, "Arial Bold");
-   CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 10, "Arial Bold", "right");
-
-   CreateLabel("LblRisk", right_x + pad, 38, "Risk %", clrGray, 9);
-   CreateEdit("EditRisk", right_x + half_width - pad - 25, 35, 30, 18, "1.0");
-
-   CreateButton("BtnBuy", right_x + pad, 62, (half_width - 30) / 2, 38, "BUY", m_buy_color, clrWhite, 9);
-   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 62, (half_width - 30) / 2, 38, "SELL", m_sell_color, clrWhite, 9);
-
-   // Confirm Button (Pending recommendation)
-   CreateButton("BtnConfirm", right_x + pad, 110, half_width - 20, 28, "NO SIGNAL", C'50,50,60', C'100,100,100', 9);
-
-   // 6. Auto Strategy Options (Right Panel - Below Confirm)
-   int stratY = 152;
-   CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 10, "Arial Bold");
-
-   // Auto Mode Toggle (Next to title)
-   CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite, 9);
-
-   // Section Box
-   CreateRect("StratBG", right_x, stratY + 25, half_width, 90, C'5,5,15', true, C'45,45,60');
-
-   CreateButton("BtnStratArrow", right_x + 10, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Arrow", right_x + 30, stratY + 38, "Arrow", clrCyan, 9, "Arial Bold");
-
-   CreateButton("BtnStratRev", right_x + 80, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Rev", right_x + 100, stratY + 38, "Rev", clrCyan, 9, "Arial Bold");
-
-   CreateButton("BtnStratBreak", right_x + 150, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Break", right_x + 170, stratY + 38, "Break", clrCyan, 9, "Arial Bold");
-
-   // Last Trade Label
-   CreateLabel("LblLastAuto", right_x + 10, stratY + 70, "Last: ---", C'80,80,80', 8);
-
-   // 7. Active Orders Section (moved to bottom, full width)
-   // Position below all other content, covers both left and right panels
-   int orderY = 385;  // Bottom of panel, full width
-   CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 10, "Arial Bold");
+      // 4. Strategy Signal (Left Panel - Bottom)
+      CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 10, "Arial Bold");
+      CreateRect("InfoBG", left_x, 230, half_width, 105, C'5,5,15');
    
-   // New Balance and Profit Labels
+      CreateLabel("Trend_T", left_x + 10, 242, "Trend:", clrGold, 9);
+      CreateLabel("Trend_V", left_x + 50, 242, "--", clrGray, 9, "Arial Bold");
+   
+      // PA Signal (moved under Trend)
+      CreateLabel("PA_T", left_x + 10, 258, "PA Signal:", clrGold, 9);
+      CreateLabel("PA_V", left_x + 75, 258, "NONE", clrGray, 9);
+   
+      // Separator line before Advisor
+      CreateRect("Sep1", left_x + 8, 275, half_width - 16, 1, C'60,60,70');
+   
+      // Advisor: Natural language recommendation
+      CreateLabel("Adv_T", left_x + 10, 280, "Advisor:", m_accent_color, 10, "Arial Bold");
+      CreateLabel("Adv_V", left_x + 10, 295, "Scanning market...", clrCyan, 9);
+      CreateLabel("Adv_V2", left_x + 10, 310, "", clrCyan, 9);
+   
+      CreateLabel("Ver", left_x + half_width - pad, 320, "v4.1", clrGray, 8);
+   
+      // ============================================
+      // RIGHT PANEL (50%)
+      // ============================================
+   
+      // 5. Execution Section (Right Panel - Top)
+      CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 10, "Arial Bold");
+      CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 10, "Arial Bold", "right");
+   
+      CreateLabel("LblRisk", right_x + pad, 38, "Risk %", clrGray, 9);
+      CreateEdit("EditRisk", right_x + half_width - pad - 25, 35, 30, 18, "1.0");
+   
+      CreateButton("BtnBuy", right_x + pad, 62, (half_width - 30) / 2, 38, "BUY", m_buy_color, clrWhite, 9);
+      CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 62, (half_width - 30) / 2, 38, "SELL", m_sell_color, clrWhite, 9);
+   
+      // Confirm Button (Pending recommendation)
+      CreateButton("BtnConfirm", right_x + pad, 110, half_width - 20, 28, "NO SIGNAL", C'50,50,60', C'100,100,100', 9);
+   
+      // 6. Auto Strategy Options (Right Panel - Below Confirm)
+      int stratY = 152;
+      CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 10, "Arial Bold");
+   
+      // Auto Mode Toggle (Next to title)
+      CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite, 9);
+   
+      // Section Box (Reduced Height)
+      CreateRect("StratBG", right_x, stratY + 25, half_width, 65, C'5,5,15', true, C'45,45,60');
+   
+      CreateButton("BtnStratArrow", right_x + 10, stratY + 38, 15, 15, "", clrGray);
+      CreateLabel("L_Arrow", right_x + 30, stratY + 38, "Arrow", clrCyan, 9, "Arial Bold");
+   
+      CreateButton("BtnStratRev", right_x + 80, stratY + 38, 15, 15, "", clrGray);
+      CreateLabel("L_Rev", right_x + 100, stratY + 38, "Rev", clrCyan, 9, "Arial Bold");
+   
+      CreateButton("BtnStratBreak", right_x + 150, stratY + 38, 15, 15, "", clrGray);
+      CreateLabel("L_Break", right_x + 170, stratY + 38, "Break", clrCyan, 9, "Arial Bold");
+   
+      // Last Trade Label
+      CreateLabel("LblLastAuto", right_x + 10, stratY + 70, "Last: ---", C'80,80,80', 8);
+      
+         // 7. NEW SECTION: PENDING ALERTS (Full Width)
+         int pendingY = 330;
+         CreateLabel("LblPending", x + pad, pendingY, "PENDING ALERTS", clrLime, 10, "Arial Bold");
+         CreateRect("PendingBG", x, pendingY + 20, m_panel_width - 20, 75, C'5,5,15', true, C'45,45,60');
+         
+         // Row 1: Reversal Alert
+         CreateLabel("Rev_T", x + 10, pendingY + 30, "Reversal:", clrGold, 9);
+         CreateLabel("Rev_V", x + 70, pendingY + 30, "--", clrGray, 9);
+         CreateButton("BtnRev", x + m_panel_width - 60, pendingY + 28, 35, 16, "SET", clrGray, clrWhite, 8);
+      
+         // Row 2: Breakout Alert (Now in its own row)
+         CreateLabel("Break_T", x + 10, pendingY + 55, "Breakout:", clrGold, 9);
+         CreateLabel("Break_V", x + 75, pendingY + 55, "--", clrGray, 9);
+         CreateButton("BtnBrk", x + m_panel_width - 60, pendingY + 53, 35, 16, "SET", clrGray, clrWhite, 8);
+      
+      
+         // 8. Active Orders Section (moved to bottom, full width)
+         // Position below all other content
+         int orderY = 435;  // Pushed down for taller Pending section
+         CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 10, "Arial Bold");   // New Balance and Profit Labels
    CreateLabel("LblBalance", x + 150, orderY, "Balance: $--", clrWhite, 9, "Arial Bold");
    CreateLabel("LblTotalProfit", x + 280, orderY, "Profit: $0.00", clrGray, 9, "Arial Bold");
    
