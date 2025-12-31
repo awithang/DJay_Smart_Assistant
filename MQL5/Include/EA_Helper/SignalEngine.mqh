@@ -117,6 +117,10 @@ public:
 
     //--- Natural Language Advisor
     string GetAdvisorMessage();
+    bool   IsDataReady();
+
+    //--- Pending Order Recommendation
+    bool GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outPrice, double &outSL, double &outTP, int sl_points);
 
     //--- Getters for Zone Levels
     double GetD1Open()       { return m_d1_open; }
@@ -664,6 +668,31 @@ ENUM_ZONE_STATUS CSignalEngine::GetCurrentZoneStatus()
 }
 
 //+------------------------------------------------------------------+
+//| Check if all necessary data is loaded and synchronized           |
+//+------------------------------------------------------------------+
+bool CSignalEngine::IsDataReady()
+{
+   // 1. Check if terminal is connected
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED)) return false;
+
+   // 2. Check if main indicator handles are calculated
+   if(m_handle_ema100 != INVALID_HANDLE && BarsCalculated(m_handle_ema100) < 1) return false;
+   if(m_handle_ema200 != INVALID_HANDLE && BarsCalculated(m_handle_ema200) < 1) return false;
+
+   // 3. Check history synchronization for multi-timeframe analysis
+   ENUM_TIMEFRAMES tfs[] = {PERIOD_D1, PERIOD_H4, PERIOD_H1};
+   for(int i=0; i<ArraySize(tfs); i++)
+   {
+      if(!SeriesInfoInteger(_Symbol, tfs[i], SERIES_SYNCHRONIZED)) return false;
+      
+      // Ensure there's at least some history available
+      if(iBars(_Symbol, tfs[i]) < 200) return false; 
+   }
+
+   return true;
+}
+
+//+------------------------------------------------------------------+
 //| Get Advisor Message (Natural Language Trade Recommendation)       |
 //+------------------------------------------------------------------+
 string CSignalEngine::GetAdvisorMessage()
@@ -740,6 +769,54 @@ string CSignalEngine::GetAdvisorMessage()
    }
 
    return "Market is choppy. Best to stay out.";
+}
+
+//+------------------------------------------------------------------+
+//| Get Recommended Pending Order                                    |
+//+------------------------------------------------------------------+
+bool CSignalEngine::GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outPrice, double &outSL, double &outTP, int sl_points)
+{
+   // 1. Get Trend Direction (using H1 for main trend)
+   ENUM_TREND_DIRECTION trend = GetTrendDirection(PERIOD_H1);
+   
+   // 2. Get EMA Levels for Pullback Targets
+   double h1_ema100 = GetEMAValue(PERIOD_H1, 100, 0);
+   
+   if(h1_ema100 == 0) return false; // Data not ready
+
+   double currentPrice = m_current_price;
+   double pt = _Point;
+   double min_dist = 20 * pt; // Reduced from 50 to 20 points for more signals
+
+   // 3. Logic for Buy Limit (Uptrend or Flat/High)
+   if(trend == TREND_UP || (trend == TREND_FLAT && currentPrice > h1_ema100))
+   {
+      // Suggest Buy Limit if price is safely ABOVE the EMA
+      if(currentPrice > h1_ema100 + min_dist) 
+      {
+         outType = ORDER_TYPE_BUY_LIMIT;
+         outPrice = h1_ema100; // Entry at EMA 100
+         outSL = outPrice - (sl_points * pt);
+         outTP = outPrice + (sl_points * 2 * pt);
+         return true;
+      }
+   }
+   
+   // 4. Logic for Sell Limit (Downtrend or Flat/Low)
+   if(trend == TREND_DOWN || (trend == TREND_FLAT && currentPrice < h1_ema100))
+   {
+      // Suggest Sell Limit if price is safely BELOW the EMA
+      if(currentPrice < h1_ema100 - min_dist)
+      {
+         outType = ORDER_TYPE_SELL_LIMIT;
+         outPrice = h1_ema100; // Entry at EMA 100
+         outSL = outPrice + (sl_points * pt);
+         outTP = outPrice - (sl_points * 2 * pt);
+         return true;
+      }
+   }
+
+   return false;
 }
 
 //+------------------------------------------------------------------+

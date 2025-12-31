@@ -20,6 +20,15 @@ enum ENUM_MARKET_SESSION
 };
 
 //+------------------------------------------------------------------+
+//| Trading Mode Enumeration                                         |
+//+------------------------------------------------------------------+
+enum ENUM_TRADING_MODE
+{
+    MODE_MANUAL,    // User places trades manually
+    MODE_AUTO       // EA places trades automatically
+};
+
+//+------------------------------------------------------------------+
 //| Signal Type Enumeration                                         |
 //+------------------------------------------------------------------+
 enum ENUM_SIGNAL_TYPE

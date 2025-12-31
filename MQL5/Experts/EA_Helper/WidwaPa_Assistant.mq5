@@ -21,6 +21,12 @@ input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
+//--- Smart Trailing Settings
+input group "=== Smart Trailing Settings ==="
+input bool   Input_Use_Smart_Trail     = true;   // Enable Smart Profit Lock
+input double Input_Trail_Trigger_Pct   = 50.0;   // Trigger % of TP Distance (e.g. 50%)
+input double Input_Trail_Lock_Pct      = 30.0;   // Lock % of TP Distance (e.g. 30%)
+
 //--- Chart Zones Settings
 input group "=== Chart Zones Settings ==="
 input bool   Input_Show_Zones_On_Chart   = true;   // Show zones on chart
@@ -105,7 +111,11 @@ void OnTick()
       prevProfit = totalProfit;
    }
 
-   tradeManager.TrailingStop(Input_SL_Points);
+   // Smart Trailing Logic (Profit Lock)
+   if(Input_Use_Smart_Trail)
+   {
+      tradeManager.SmartProfitLock(Input_Trail_Trigger_Pct, Input_Trail_Lock_Pct);
+   }
 
    // Check for PA signals (only on new bar)
    static datetime lastBarTime = 0;
@@ -126,14 +136,20 @@ void OnTick()
          CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrBlue, "PA_Buy");
          // AUTO MODE: Execute buy trade automatically
          if(g_tradingMode == MODE_AUTO)
+         {
+            Print("DEBUG: PA_BUY signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
             ExecuteBuyTrade();
+         }
       }
       else if(paSignal == SIGNAL_PA_SELL)
       {
          CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrOrange, "PA_Sell");
          // AUTO MODE: Execute sell trade automatically
          if(g_tradingMode == MODE_AUTO)
+         {
+            Print("DEBUG: PA_SELL signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
             ExecuteSellTrade();
+         }
       }
 
       // --- 2. EMA Touch Signals ---
@@ -156,14 +172,20 @@ void OnTick()
              CreateSignalArrow(currentBarTime, iLow(_Symbol, PERIOD_H1, 1) - 50*_Point, 233, clrBlue, "EMA_Touch_Buy");
              // AUTO MODE: Execute buy trade automatically
              if(g_tradingMode == MODE_AUTO)
+             {
+                Print("DEBUG: EMA_Touch_BUY signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
                 ExecuteBuyTrade();
+             }
          }
          else
          {
              CreateSignalArrow(currentBarTime, iHigh(_Symbol, PERIOD_H1, 1) + 50*_Point, 234, clrOrange, "EMA_Touch_Sell");
              // AUTO MODE: Execute sell trade automatically
              if(g_tradingMode == MODE_AUTO)
+             {
+                Print("DEBUG: EMA_Touch_SELL signal detected, g_tradingMode=", (int)g_tradingMode, " (AUTO=1)");
                 ExecuteSellTrade();
+             }
          }
       }
 
@@ -290,11 +312,13 @@ void OnTimer()
    // 4. Panel Updates
    dashboardPanel.UpdateAccountInfo();
 
+   double currentPrice = signalEngine.GetCurrentPrice();
+   dashboardPanel.UpdatePrice(currentPrice);
+
    double d1Open = signalEngine.GetD1Open();
    dashboardPanel.UpdateWidwaZones(d1Open);
 
    // 5. Update Chart Zones
-   double currentPrice = signalEngine.GetCurrentPrice();
    chartZones.Update(d1Open, currentPrice);
 }
 
@@ -305,14 +329,25 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
-      if(dashboardPanel.IsBuyButtonClicked(sparam)) ExecuteBuyTrade();
-      else if(dashboardPanel.IsSellButtonClicked(sparam)) ExecuteSellTrade();
+      if(dashboardPanel.IsBuyButtonClicked(sparam)) 
+      {
+         ExecuteBuyTrade();
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+      }
+      else if(dashboardPanel.IsSellButtonClicked(sparam)) 
+      {
+         ExecuteSellTrade();
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+      }
       else if(dashboardPanel.IsModeButtonClicked(sparam))
       {
-         // Toggle Mode
+         // Toggle AUTO mode (ON/OFF) - Manual always available
+         Print("DEBUG: Auto button clicked! Before toggle: g_tradingMode=", (int)g_tradingMode, " (0=OFF, 1=ON)");
          g_tradingMode = (g_tradingMode == MODE_MANUAL) ? MODE_AUTO : MODE_MANUAL;
          dashboardPanel.UpdateTradingMode((int)g_tradingMode);
-         Print("Trading Mode switched to: ", EnumToString(g_tradingMode));
+         string modeStr = (g_tradingMode == MODE_AUTO) ? "AUTO ON (Manual + Auto trading)" : "AUTO OFF (Manual only)";
+         Print("Trading Mode: ", modeStr);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
       }
       else if(dashboardPanel.IsConfirmButtonClicked(sparam))
       {

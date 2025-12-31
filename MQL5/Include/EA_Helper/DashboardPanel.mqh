@@ -20,6 +20,7 @@ private:
    int               m_panel_height;
    int               m_base_x;
    int               m_base_y;
+   bool              m_blink_state;
 
    color             m_bg_color;       
    color             m_header_color;
@@ -48,12 +49,19 @@ public:
    void CreatePanel();
    
    void UpdateAccountInfo();
+   void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
    void UpdateWidwaZones(double d1_open);
    void UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec);
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
+   
+   // New Methods
+   void UpdateTradingMode(int mode);
+   void UpdateConfirmButton(string text, bool enable);
+   bool IsModeButtonClicked(string sparam) { return (sparam == m_prefix+"BtnMode"); }
+   bool IsConfirmButtonClicked(string sparam) { return (sparam == m_prefix+"BtnConfirm"); }
 
    double GetRiskPercent();              
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
@@ -71,15 +79,16 @@ CDashboardPanel::CDashboardPanel()
    m_base_y = 10;
    m_panel_width = 500;  // Wider for two-panel layout (50/50 split)
    m_panel_height = 520;
+   m_blink_state = false;
 
-   m_bg_color = C'26,26,46';      // Dark navy background
-   m_header_color = C'255,215,0'; // Gold
+   m_bg_color = C'35,35,45';      // Dark Grey Background
+   m_header_color = C'255,223,0'; // Bright Gold
    m_text_color = clrWhite;
-   m_label_color = C'180,180,180';
-   m_buy_color = C'46,204,113';
-   m_sell_color = C'231,76,60';
-   m_supply_color = clrPeachPuff;
-   m_accent_color = C'52,152,219';
+   m_label_color = C'200,200,200'; // Light Grey
+   m_buy_color = C'34,139,34';    // ForestGreen (Darker)
+   m_sell_color = C'139,0,0';     // DarkRed (Darker)
+   m_supply_color = C'255,140,0'; // Dark Orange
+   m_accent_color = C'0,191,255'; // Deep Sky Blue
 }
 
 void CDashboardPanel::Init(long chart_id)
@@ -101,7 +110,7 @@ void CDashboardPanel::CreatePanel()
    // ============================================
    // MAIN BACKGROUND - Single unified panel
    // ============================================
-   CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, C'60,60,80');
+   CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, clrWhite);
 
    // ============================================
    // LEFT PANEL (50%)
@@ -117,8 +126,8 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblStat", left_x + half_width - pad, 42, "SIDEWAY", clrGray, 9, "Arial Bold", "right");
 
    // 3. Daily Zones Table (Left Panel)
-   CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", C'100,149,237', 9, "Arial Bold");
-   CreateRect("TableBG", left_x, 90, half_width, 110, C'20,20,35', true, C'60,60,80');
+   CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
+   CreateRect("TableBG", left_x, 90, half_width, 110, C'5,5,15', true, C'45,45,60');
 
    // Table Headers
    CreateLabel("H_Z", left_x + 10, 100, "ZONE", clrGray, 7);
@@ -137,21 +146,25 @@ void CDashboardPanel::CreatePanel()
 
    // 4. Strategy Signal (Left Panel - Bottom)
    CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
-   CreateRect("InfoBG", left_x, 230, half_width, 140, C'20,20,35');
+   CreateRect("InfoBG", left_x, 230, half_width, 140, C'5,5,15');
 
    CreateLabel("Trend_T", left_x + 10, 240, "Trend:", clrGold, 8);
    CreateLabel("Trend_V", left_x + 50, 240, "--", clrGray, 8, "Arial Bold");
 
+   // EMA Distance Labels (M15 and H1)
+   CreateLabel("EMA_M15", left_x + 10, 255, "M15: --/--", m_label_color, 8);
+   CreateLabel("EMA_H1", left_x + 10, 270, "H1: --/--", m_label_color, 8);
+
    // Advisor: Natural language recommendation
-   CreateLabel("Adv_T", left_x + 10, 260, "Advisor:", m_accent_color, 9, "Arial Bold");
-   CreateLabel("Adv_V", left_x + 10, 278, "Scanning market...", clrCyan, 8);
-   CreateLabel("Adv_V2", left_x + 10, 293, "", clrCyan, 8);
+   CreateLabel("Adv_T", left_x + 10, 285, "Advisor:", m_accent_color, 9, "Arial Bold");
+   CreateLabel("Adv_V", left_x + 10, 300, "Scanning market...", clrCyan, 8);
+   CreateLabel("Adv_V2", left_x + 10, 315, "", clrCyan, 8);
 
-   CreateLabel("PA_T", left_x + 10, 313, "PA Signal:", clrGold, 8);
-   CreateLabel("PA_V", left_x + 75, 313, "NONE", clrGray, 8);
+   CreateLabel("PA_T", left_x + 10, 335, "PA Signal:", clrGold, 8);
+   CreateLabel("PA_V", left_x + 75, 335, "NONE", clrGray, 8);
 
-   CreateLabel("Risk_T", left_x + 10, 333, "Rec. SL/TP:", clrGold, 8);
-   CreateLabel("Risk_V", left_x + 75, 333, "-- / --", clrWhite, 8);
+   CreateLabel("Risk_T", left_x + 10, 355, "Rec. SL/TP:", clrGold, 8);
+   CreateLabel("Risk_V", left_x + 75, 355, "-- / --", clrWhite, 8);
 
    CreateLabel("Ver", left_x + half_width - pad, 360, "v4.0", clrGray, 7);
 
@@ -161,15 +174,74 @@ void CDashboardPanel::CreatePanel()
 
    // 5. Execution Section (Right Panel - Top)
    CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 9, "Arial Bold");
+   CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 9, "Arial Bold", "right");
    CreateLabel("LblRisk", right_x + pad, 35, "Risk %", clrGray, 8);
    CreateEdit("EditRisk", right_x + half_width - pad - 25, 32, 30, 18, "1.0");
 
    CreateButton("BtnBuy", right_x + pad, 60, (half_width - 30) / 2, 35, "BUY", m_buy_color);
    CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 60, (half_width - 30) / 2, 35, "SELL", m_sell_color);
 
+   // Mode Button (Auto ON/OFF)
+   CreateButton("BtnMode", right_x + pad, 105, half_width - 20, 25, "AUTO: OFF", clrGray, clrWhite);
+
+   // Confirm Button (Hidden by default)
+   CreateButton("BtnConfirm", right_x + pad, 140, half_width - 20, 30, "", m_bg_color, m_bg_color); // Hidden initially
+
    // Note: Space below Execution section reserved for future features
 
    UpdateAccountInfo();
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Trading Mode                                              |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateTradingMode(int mode)
+{
+   // mode 0 = AUTO OFF (manual only), mode 1 = AUTO ON (manual + auto)
+   string text = (mode == 0) ? "AUTO: OFF" : "AUTO: ON";
+   color bg = (mode == 0) ? clrGray : m_buy_color;   // Gray when OFF, Green when ON
+   color txt = clrWhite; // Always White for better contrast
+   
+   ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
+   Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text);
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Confirm Button (One-Click Execution)                      |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateConfirmButton(string text, bool enable)
+{
+   color bg;
+   color txt;
+
+   if(enable)
+   {
+      // Dynamic color based on order type
+      if(StringFind(text, "BUY") >= 0)
+         bg = m_buy_color;
+      else if(StringFind(text, "SELL") >= 0)
+         bg = m_sell_color;
+      else
+         bg = m_header_color;
+         
+      txt = clrWhite; // Always white text for contrast on colored buttons
+   }
+   else
+   {
+      // Disabled State - Show "NO SIGNAL" placeholder
+      text = "NO SIGNAL";
+      bg = C'50,50,60'; // Dark Grey (slightly lighter than BG)
+      txt = C'100,100,100'; // Dim Grey Text
+   }
+   
+   ObjectSetString(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_COLOR, txt);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnConfirm", OBJPROP_STATE, false); // Ensure unpressed
    ChartRedraw(m_chart_id);
 }
 
@@ -248,12 +320,21 @@ void CDashboardPanel::UpdateStrategyInfo(string ema_m15, string ema_h1, string p
       // Attempt to force recreate if missing? No, just log for now.
    }
    
+   // Toggle blink state
+   m_blink_state = !m_blink_state;
+   
    // Correctly update the labels with the calculated strategy info
    ObjectSetString(m_chart_id, nameM15, OBJPROP_TEXT, "M15 (100/200): " + ema_m15);
    ObjectSetString(m_chart_id, m_prefix+"EMA_H1", OBJPROP_TEXT, "H1 (100/200): " + ema_h1);
    
    ObjectSetString(m_chart_id, m_prefix+"PA_V", OBJPROP_TEXT, pa_sig);
-   color pc = (StringFind(pa_sig, "BUY")>=0) ? clrLime : (StringFind(pa_sig, "SELL")>=0 ? clrRed : clrGray);
+   
+   color pc = clrGray;
+   if(StringFind(pa_sig, "BUY") >= 0)
+      pc = m_blink_state ? clrLime : m_bg_color; // Blink Green
+   else if(StringFind(pa_sig, "SELL") >= 0)
+      pc = m_blink_state ? clrRed : m_bg_color; // Blink Red
+      
    ObjectSetInteger(m_chart_id, m_prefix+"PA_V", OBJPROP_COLOR, pc);
    
    ObjectSetString(m_chart_id, m_prefix+"Risk_V", OBJPROP_TEXT, risk_rec);
@@ -264,6 +345,11 @@ void CDashboardPanel::UpdateStrategyInfo(string ema_m15, string ema_h1, string p
 void CDashboardPanel::UpdateAccountInfo()
 {
    ObjectSetString(m_chart_id, m_prefix+"Balance", OBJPROP_TEXT, StringFormat("$%.2f", AccountInfoDouble(ACCOUNT_BALANCE)));
+}
+
+void CDashboardPanel::UpdatePrice(double price)
+{
+   ObjectSetString(m_chart_id, m_prefix+"LblPrice", OBJPROP_TEXT, DoubleToString(price, _Digits));
 }
 
 double CDashboardPanel::GetRiskPercent()
@@ -283,8 +369,24 @@ void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h,
    ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, h);
    ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
-   ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, border ? BORDER_FLAT : BORDER_SUNKEN);
-   if(border) ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_COLOR, border_color);
+   
+   if(border)
+   {
+      ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+      ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_COLOR, border_color);
+      
+      // Make the Main Panel border thicker
+      if(StringFind(name, "MainBG") >= 0)
+         ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 2); 
+      else
+         ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 1);
+   }
+   else
+   {
+      ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, BORDER_SUNKEN);
+      ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 0);
+   }
+   
    ObjectSetInteger(m_chart_id, n, OBJPROP_SELECTABLE, false);
 }
 
@@ -315,6 +417,7 @@ void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, 
    ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, clr);
    ObjectSetInteger(m_chart_id, n, OBJPROP_COLOR, txt_clr);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ZORDER, 10); // Ensure button is on top
 }
 
 void CDashboardPanel::CreateEdit(const string name, int x, int ry, int width, int height, const string text)
@@ -327,6 +430,9 @@ void CDashboardPanel::CreateEdit(const string name, int x, int ry, int width, in
    ObjectSetInteger(m_chart_id, n, OBJPROP_XSIZE, width);
    ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, height);
    ObjectSetString(m_chart_id, n, OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, C'5,5,15');
+   ObjectSetInteger(m_chart_id, n, OBJPROP_COLOR, clrWhite);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ALIGN, ALIGN_CENTER);
 }
 
 void CDashboardPanel::AddLevel(double &arr[], string &lbls[], double price, string label)

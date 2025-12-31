@@ -35,11 +35,13 @@ public:
    bool ExecuteOrder(TradeRequest &req);
    bool ExecuteBuy(double price, double sl, double tp, double lot, string comment);
    bool ExecuteSell(double price, double sl, double tp, double lot, string comment);
+   bool ExecutePending(ENUM_ORDER_TYPE type, double price, double sl, double tp, double risk_percent, string comment);
 
    //--- Position Management
    void CloseAllOrders();
    void ClosePositionsBySymbol(ENUM_POSITION_TYPE pos_type);
    void TrailingStop(double trailing_points);
+   void SmartProfitLock(double trigger_percent, double lock_percent);
 
    //--- Utility Functions
    double GetPositionProfit();
@@ -321,6 +323,51 @@ bool CTradeManager::ExecuteSell(double price, double sl, double tp, double lot, 
 }
 
 //+------------------------------------------------------------------+
+//| Execute Pending Order                                            |
+//+------------------------------------------------------------------+
+bool CTradeManager::ExecutePending(ENUM_ORDER_TYPE type, double price, double sl, double tp, double risk_percent, string comment)
+{
+   // Validate inputs
+   if(price <= 0 || sl <= 0 || tp <= 0)
+   {
+      Print("Error: Invalid price parameters for Pending Order.");
+      return false;
+   }
+
+   // Calculate lot size based on risk
+   double lot = CalculateLotSize(price, sl, risk_percent);
+   if(lot <= 0)
+   {
+      Print("Error: Invalid lot size calculated for Pending Order.");
+      return false;
+   }
+
+   // Normalize values
+   price = NormalizeDouble(price, _Digits);
+   sl = NormalizeDouble(sl, _Digits);
+   tp = NormalizeDouble(tp, _Digits);
+   lot = NormalizeDouble(lot, 2);
+
+   // Execute pending order
+   if(m_trade.OrderOpen(_Symbol, type, lot, price, price, sl, tp, ORDER_TIME_GTC, 0, comment))
+   {
+      Print("Pending order placed: Type=", EnumToString(type), " Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
+      return true;
+   }
+   else
+   {
+      int retcode = (int)m_trade.ResultRetcode();
+      string retcodeDesc = m_trade.ResultRetcodeDescription();
+      
+      Print("CRITICAL ERROR: Pending Order Failed!");
+      Print("Return Code: ", retcode, " (", retcodeDesc, ")");
+      Print("Request Args: Type=", EnumToString(type), " Price=", price, " SL=", sl, " TP=", tp, " Lot=", lot);
+            
+      return false;
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Close all pending orders                                         |
 //+------------------------------------------------------------------+
 void CTradeManager::CloseAllOrders()
@@ -446,6 +493,74 @@ int CTradeManager::GetOpenPositionsCount()
    }
 
    return count;
+}
+
+//+------------------------------------------------------------------+
+//| Smart Profit Lock (Step Trailing based on % of TP)               |
+//+------------------------------------------------------------------+
+void CTradeManager::SmartProfitLock(double trigger_percent, double lock_percent)
+{
+   if(trigger_percent <= 0 || lock_percent < 0) return;
+
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == m_magic_number)
+         {
+            ulong ticket = PositionGetTicket(i);
+            double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+            double tp = PositionGetDouble(POSITION_TP);
+            double sl = PositionGetDouble(POSITION_SL);
+            
+            // Requires TP to calculate percentage
+            if(tp == 0) continue; 
+            
+            ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+            double currentPrice = SymbolInfoDouble(_Symbol, (type == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
+            
+            double totalDist = MathAbs(tp - openPrice);
+            if(totalDist == 0) continue;
+            
+            double currentDist = MathAbs(currentPrice - openPrice);
+            double progress = (currentDist / totalDist) * 100.0;
+            
+            // Check if price moved in the right direction
+            bool isProfit = false;
+            if(type == POSITION_TYPE_BUY && currentPrice > openPrice) isProfit = true;
+            if(type == POSITION_TYPE_SELL && currentPrice < openPrice) isProfit = true;
+            
+            if(isProfit && progress >= trigger_percent)
+            {
+               // Calculate Lock Price (e.g. 30% of way to TP)
+               double lockDist = totalDist * (lock_percent / 100.0);
+               double newSL = 0.0;
+               
+               if(type == POSITION_TYPE_BUY)
+               {
+                  newSL = openPrice + lockDist;
+                  // Only modify if new SL is higher (better) than current
+                  if(newSL > sl)
+                  {
+                     m_trade.PositionModify(ticket, newSL, tp);
+                     Print("Smart Lock Triggered (Buy): Progress=", DoubleToString(progress, 1), "%, NewSL=", newSL);
+                  }
+               }
+               else if(type == POSITION_TYPE_SELL)
+               {
+                  newSL = openPrice - lockDist;
+                  // Only modify if new SL is lower (better) than current (or SL is 0)
+                  if(sl == 0 || newSL < sl)
+                  {
+                     m_trade.PositionModify(ticket, newSL, tp);
+                     Print("Smart Lock Triggered (Sell): Progress=", DoubleToString(progress, 1), "%, NewSL=", newSL);
+                  }
+               }
+            }
+         }
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
