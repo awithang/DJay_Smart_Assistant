@@ -126,7 +126,7 @@ void OnTick()
    double totalProfit = tradeManager.GetPositionProfit();
    if(MathAbs(totalProfit - prevProfit) > 0.01 || PositionsTotal() > 0)
    {
-      dashboardPanel.UpdateAccountInfo();
+      // dashboardPanel.UpdateAccountInfo(); // Removed
       prevProfit = totalProfit;
    }
 
@@ -172,7 +172,7 @@ void OnTick()
             }
          }
       }
-      dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes);
+      dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes, totalProfit);
       lastTotalProfit = totalProfit;
       lastPositionsCount = currentPositionsCount;
    }
@@ -346,7 +346,7 @@ void OnTimer()
    }
 
    // 4. Panel Updates
-   dashboardPanel.UpdateAccountInfo();
+   // dashboardPanel.UpdateAccountInfo(); // Removed
 
    // Price and Orders are now updated in OnTick for real-time responsiveness
 
@@ -505,7 +505,7 @@ void ExecuteBuyTrade(string strategy="MANUAL")
    if(tradeManager.ExecuteOrder(req))
    {
       Print("Buy trade executed at ", currentPrice);
-      dashboardPanel.UpdateAccountInfo();
+      // dashboardPanel.UpdateAccountInfo(); // Removed
       dashboardPanel.UpdateLastAutoTrade(strategy, "BUY", currentPrice);
    }
    else
@@ -542,7 +542,7 @@ void ExecuteSellTrade(string strategy="MANUAL")
    if(tradeManager.ExecuteOrder(req))
    {
       Print("Sell trade executed at ", currentPrice);
-      dashboardPanel.UpdateAccountInfo();
+      // dashboardPanel.UpdateAccountInfo(); // Removed
       dashboardPanel.UpdateLastAutoTrade(strategy, "SELL", currentPrice);
    }
    else

@@ -51,7 +51,6 @@ public:
    void Init(long chart_id);
    void CreatePanel();
    
-   void UpdateAccountInfo();
    void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
    void UpdateWidwaZones(double d1_open);
@@ -60,7 +59,7 @@ public:
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
    void UpdateLastAutoTrade(string strategy, string direction, double price);
-   void UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[]);
+   void UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[], double total_profit);
 
    // New Methods
    void UpdateTradingMode(int mode);
@@ -138,9 +137,10 @@ void CDashboardPanel::CreatePanel()
    // ============================================
 
    // 1. Header Section (Left Panel)
-   // Title with left padding, Balance with same right padding (mirrored)
+   // Title with left padding
    CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 11, "Arial Bold");
-   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", clrWhite, 11, "Arial Bold", "right");
+   
+   // Balance moved to bottom section
 
    // 2. Market Status (Left Panel)
    CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 9);
@@ -244,6 +244,11 @@ void CDashboardPanel::CreatePanel()
    // Position below all other content, covers both left and right panels
    int orderY = 385;  // Bottom of panel, full width
    CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 10, "Arial Bold");
+   
+   // New Balance and Profit Labels
+   CreateLabel("LblBalance", x + 150, orderY, "Balance: $--", clrWhite, 9, "Arial Bold");
+   CreateLabel("LblTotalProfit", x + 280, orderY, "Profit: $0.00", clrGray, 9, "Arial Bold");
+   
    CreateButton("BtnCloseAll", x + m_panel_width - 70, orderY - 2, 60, 18, "CLOSE ALL", m_sell_color, clrWhite, 8);
 
    // Full-width order list with individual close buttons
@@ -431,11 +436,6 @@ void CDashboardPanel::UpdateStrategyInfo(string reversal_alert, string breakout_
       pc = m_sell_color;
 
    ObjectSetInteger(m_chart_id, m_prefix+"PA_V", OBJPROP_COLOR, pc);
-}
-
-void CDashboardPanel::UpdateAccountInfo()
-{
-   ObjectSetString(m_chart_id, m_prefix+"Balance", OBJPROP_TEXT, StringFormat("$%.2f", AccountInfoDouble(ACCOUNT_BALANCE)));
 }
 
 void CDashboardPanel::UpdatePrice(double price)
@@ -645,10 +645,26 @@ void CDashboardPanel::UpdateLastAutoTrade(string strategy, string direction, dou
 //+------------------------------------------------------------------+
 //| Update Active Orders List                                        |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[])
+void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[], double total_profit)
 {
    // Update count label
    ObjectSetString(m_chart_id, m_prefix+"LblAct", OBJPROP_TEXT, StringFormat("ACTIVE ORDERS (%d)", count));
+
+   // Update Balance
+   ObjectSetString(m_chart_id, m_prefix+"LblBalance", OBJPROP_TEXT, StringFormat("Balance: $%.2f", AccountInfoDouble(ACCOUNT_BALANCE)));
+
+   // Update Total Profit
+   if(count > 0)
+   {
+      ObjectSetString(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_TEXT, StringFormat("Profit: $%.2f", total_profit));
+      color profitColor = (total_profit >= 0) ? clrLime : m_sell_color;
+      ObjectSetInteger(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_COLOR, profitColor);
+   }
+   else
+   {
+      ObjectSetString(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_TEXT, "Profit: $0.00");
+      ObjectSetInteger(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_COLOR, clrGray);
+   }
 
    // Calculate button positions (same as in CreatePanel)
    int x = m_base_x;
