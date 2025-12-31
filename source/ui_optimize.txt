@@ -1,13 +1,1 @@
-1. Neutral and Run Time beside Sessio: should be in different label and aggange them in different row.
-
-2. Remove blink effect.
-
-3. Make sure current price at top right and profit/lost in Active orders section are update real time.
-
-4. Remove Recommend SL/TP from Strategy Signal section
-
-5. Prevent auto mode to make duplicate order when condition meet more than 1 condition.
-
-6. Make sure auto mode will not make more order if the previous order from same condition not finish.
-
-7. Rearrange Reversal and Breakout Alert in Strategy Signal section. Add button for each one and make pending order at reversal or breakout price when button click.
+1. Advisor part "Strong Uptrend hitting resistance" should update to "Strong Uptrend hitting resistance @[resistance price]"

@@ -835,9 +835,10 @@ string CSignalEngine::GetAdvisorMessage()
       }
       if(isSellZone)
       {
+         double resPrice = (zone == ZONE_STATUS_IN_SELL2) ? GetZoneLevel(ZONE_SELL2) : GetZoneLevel(ZONE_SELL1);
          if(signal == SIGNAL_PA_SELL)
-            return "Counter-trend Sell at resistance. Scalp with caution.";
-         return "Strong Uptrend hitting resistance. Wait for breakout or pullback.";
+            return StringFormat("Counter-trend Sell at resistance @%.5f. Scalp with caution.", resPrice);
+         return StringFormat("Strong Uptrend hitting resistance @%.5f. Wait for breakout or pullback.", resPrice);
       }
       // Middle zone
       return "Trend is Up. Wait for pullback to better price.";
@@ -853,9 +854,10 @@ string CSignalEngine::GetAdvisorMessage()
       }
       if(isBuyZone)
       {
+         double supPrice = (zone == ZONE_STATUS_IN_BUY2) ? GetZoneLevel(ZONE_BUY2) : GetZoneLevel(ZONE_BUY1);
          if(signal == SIGNAL_PA_BUY)
-            return "Counter-trend Buy at support. Scalp with caution.";
-         return "Strong Downtrend hitting support. Wait for breakdown or bounce.";
+            return StringFormat("Counter-trend Buy at support @%.5f. Scalp with caution.", supPrice);
+         return StringFormat("Strong Downtrend hitting support @%.5f. Wait for breakdown or bounce.", supPrice);
       }
       // Middle zone
       return "Trend is Down. Wait for rally to better price.";
