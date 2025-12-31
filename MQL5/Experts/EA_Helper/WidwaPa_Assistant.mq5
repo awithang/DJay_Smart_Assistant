@@ -163,9 +163,14 @@ void OnTick()
                ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
                double lot = PositionGetDouble(POSITION_VOLUME);
                double profit = PositionGetDouble(POSITION_PROFIT);
+               double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+               double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+               double profitPct = (balance > 0) ? (profit / balance) * 100.0 : 0;
                string typeStr = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
 
-               orderDetails[activeCount] = StringFormat("#%d %s %.2f  $%.2f", (int)ticket, typeStr, lot, profit);
+               orderDetails[activeCount] = StringFormat("#%d @%.5f %s Lots:%.2f $%.2f (%.2f%%)",
+                                                   (int)ticket, openPrice,
+                                                   typeStr, lot, profit, profitPct);
                orderTickets[activeCount] = (long)ticket;
                orderTypes[activeCount] = (int)type;
                activeCount++;

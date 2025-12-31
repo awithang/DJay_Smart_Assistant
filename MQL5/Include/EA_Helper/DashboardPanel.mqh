@@ -144,10 +144,13 @@ void CDashboardPanel::CreatePanel()
 
    // 2. Market Status (Left Panel)
    CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 9);
-   CreateLabel("LblTime", left_x + pad + 100, 35, "M5: --:--", clrGray, 9); 
+   CreateLabel("LblTime", left_x + half_width - pad, 35, "M5: --:--", clrGray, 9, "Arial", "right"); // Right aligned
    
-   CreateLabel("LblRunTime", left_x + pad, 48, "SIDEWAY", clrGray, 9, "Arial Bold");
-   CreateLabel("LblZoneStat", left_x + pad, 61, "NEUTRAL", clrGray, 9, "Arial Bold");
+   CreateLabel("LblRunTimeTitle", left_x + pad, 48, "Status:", clrGold, 9);
+   CreateLabel("LblRunTime", left_x + pad + 55, 48, "SIDEWAY", clrGray, 9, "Arial Bold");
+   
+   CreateLabel("LblZoneStatTitle", left_x + pad, 61, "Zone:", clrGold, 9);
+   CreateLabel("LblZoneStat", left_x + pad + 55, 61, "NEUTRAL", clrGray, 9, "Arial Bold");
 
    // 3. Daily Zones Table (Left Panel)
    CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 10, "Arial Bold");
@@ -694,8 +697,7 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &ord
       {
          // Empty slot - clear details, hide close button, reset ticket
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_TEXT, "");
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, clrGray); // Reset color to gray
-         m_order_tickets[i] = 0;
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, m_bg_color); // Match background
 
          // Hide individual close button by moving it off-screen
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, -100);
