@@ -1,7 +1,2 @@
-Change design of Active Orders section 's order details:
-Split active orders to 3 labels.
-1. [ticket id] @[order entry price (only 2 digit)] [Buy/Sell] with cyan color text.
-2. $[profit/lost] with Colored Details
-3. [% of profit/lost]% with Colored Details
-
-
+1. Make new dashboard section name "Pending" and move Reversal Alert and Breakout Alert to this new section. This section shold be over Active Oders section and cover both A and B panel.
+2. Reduce section height of Auto Strategy section to optimal of their information.

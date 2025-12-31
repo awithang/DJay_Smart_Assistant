@@ -188,21 +188,21 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnRev", left_x + half_width - 45, 272, 35, 16, "SET", clrGray, clrWhite, 8);
 
    // Breakout Alert (replaces EMA H1)
-   CreateLabel("Break_T", left_x + 10, 290, "Breakout Alert:", clrGold, 9);
-   CreateLabel("Break_V", left_x + 95, 290, "--", clrGray, 9);
-   CreateButton("BtnBrk", left_x + half_width - 45, 288, 35, 16, "SET", clrGray, clrWhite, 8);
+   CreateLabel("Break_T", left_x + 10, 294, "Breakout Alert:", clrGold, 9);
+   CreateLabel("Break_V", left_x + 95, 294, "--", clrGray, 9);
+   CreateButton("BtnBrk", left_x + half_width - 45, 292, 35, 16, "SET", clrGray, clrWhite, 8);
 
    // Separator line before Advisor
-   CreateRect("Sep1", left_x + 8, 302, half_width - 16, 1, C'60,60,70');
+   CreateRect("Sep1", left_x + 8, 312, half_width - 16, 1, C'60,60,70');
 
    // Advisor: Natural language recommendation
-   CreateLabel("Adv_T", left_x + 10, 312, "Advisor:", m_accent_color, 10, "Arial Bold");
-   CreateLabel("Adv_V", left_x + 10, 327, "Scanning market...", clrCyan, 9);
-   CreateLabel("Adv_V2", left_x + 10, 342, "", clrCyan, 9);
+   CreateLabel("Adv_T", left_x + 10, 322, "Advisor:", m_accent_color, 10, "Arial Bold");
+   CreateLabel("Adv_V", left_x + 10, 337, "Scanning market...", clrCyan, 9);
+   CreateLabel("Adv_V2", left_x + 10, 352, "", clrCyan, 9);
 
    // REMOVED Risk_T and Risk_V labels
 
-   CreateLabel("Ver", left_x + half_width - pad, 363, "v4.0", clrGray, 8);
+   CreateLabel("Ver", left_x + half_width - pad, 372, "v4.0", clrGray, 8);
 
    // ============================================
    // RIGHT PANEL (50%)
@@ -261,13 +261,13 @@ void CDashboardPanel::CreatePanel()
       string sid = IntegerToString(i);
       int rowY = orderY + 38 + (i * 26);
       
-      // Split into 3 labels for multi-color support
-      CreateLabel("ActOrder_L_"+sid, x + 10, rowY, "", clrCyan, 9);  // Ticket, Price, Type
-      CreateLabel("ActOrder_M_"+sid, x + 200, rowY, "", clrWhite, 9); // Profit $
-      CreateLabel("ActOrder_R_"+sid, x + 300, rowY, "", clrWhite, 9); // Profit %
+      // Split into 3 labels for multi-color support - Initially Hidden
+      CreateLabel("ActOrder_L_"+sid, -200, rowY, "", clrCyan, 9);  // Ticket, Price, Type
+      CreateLabel("ActOrder_M_"+sid, -200, rowY, "", clrWhite, 9); // Profit $
+      CreateLabel("ActOrder_R_"+sid, -200, rowY, "", clrWhite, 9); // Profit %
 
-      // Individual close button for each order (small X button)
-      CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
+      // Individual close button for each order (small X button) - Initially Hidden
+      CreateButton("BtnCloseOrder_"+sid, -100, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
    }
 
    ChartRedraw(m_chart_id);
@@ -664,7 +664,7 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
    if(count > 0)
    {
       ObjectSetString(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_TEXT, StringFormat("Profit: $%.2f", total_profit));
-      color profitColor = (total_profit >= 0) ? clrLime : m_sell_color;
+      color profitColor = (total_profit >= 0) ? clrLime : clrOrange;
       ObjectSetInteger(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_COLOR, profitColor);
    }
    else
@@ -687,20 +687,23 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
          
          string typeStr = (types[i] == 0) ? "BUY" : "SELL"; // 0=Buy
          double profitPct = (balance > 0) ? (profits[i] / balance) * 100.0 : 0;
-         color pColor = (profits[i] >= 0) ? clrLime : m_sell_color;
+         color pColor = (profits[i] >= 0) ? clrLime : clrOrange;
 
-         // 1. Info Label (Cyan)
-         string infoText = StringFormat("#%d @%.2f %s", tickets[i], prices[i], typeStr);
+         // 1. Info Label (Cyan) - Increased spacing
+         string infoText = StringFormat("#%d      %s      Lots %.2f      @%.2f", tickets[i], typeStr, lots[i], prices[i]);
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, infoText);
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_COLOR, clrCyan);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, x + 10);
 
          // 2. Profit Label ($)
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, StringFormat("$%.2f", profits[i]));
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_COLOR, pColor);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_XDISTANCE, x + 290);
 
          // 3. Percent Label (%)
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, StringFormat("(%.2f%%)", profitPct));
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_COLOR, pColor);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_XDISTANCE, x + 380);
 
          // Show close button
          int btnX = x + m_panel_width - 45;
@@ -709,10 +712,15 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
       }
       else
       {
-         // Clear slots
+         // Clear slots and HIDE objects
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, "");
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, -200);
+
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, "");
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_XDISTANCE, -200);
+
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, "");
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_XDISTANCE, -200);
          
          m_order_tickets[i] = 0;
 
