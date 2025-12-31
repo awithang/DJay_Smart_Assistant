@@ -263,7 +263,6 @@ void CDashboardPanel::CreatePanel()
       CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
    }
 
-   UpdateAccountInfo();
    ChartRedraw(m_chart_id);
 }
 

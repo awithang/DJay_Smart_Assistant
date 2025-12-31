@@ -1,2 +1,2 @@
-variable already defined	WidwaPa_Assistant.mq5	145	11
-   see declaration of variable '"void OnTick()"::totalProfit'	WidwaPa_Assistant.mq5	126	11
+undeclared identifier	DashboardPanel.mqh	266	4
+')' - expression expected	DashboardPanel.mqh	266	22
