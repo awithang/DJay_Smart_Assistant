@@ -140,7 +140,6 @@ void OnTick()
    {
       // --- 1. Price Action Signals ---
       ENUM_SIGNAL_TYPE paSignal = signalEngine.GetActiveSignal();
-      string newSignalText = "";
       
       // Get High/Low of previous bar for arrow placement
       double prevHigh = iHigh(_Symbol, PERIOD_CURRENT, 1);
@@ -149,10 +148,16 @@ void OnTick()
       if(paSignal == SIGNAL_PA_BUY)
       {
          CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrBlue, "PA_Buy");
+         // AUTO MODE (Legacy Arrow logic)
+         if(g_tradingMode == MODE_AUTO && g_strat_arrow)
+            ExecuteBuyTrade("ARROW");
       }
       else if(paSignal == SIGNAL_PA_SELL)
       {
          CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrOrange, "PA_Sell");
+         // AUTO MODE (Legacy Arrow logic)
+         if(g_tradingMode == MODE_AUTO && g_strat_arrow)
+            ExecuteSellTrade("ARROW");
       }
 
       // --- 2. EMA Touch Signals ---
@@ -181,74 +186,28 @@ void OnTick()
          }
       }
       
-      // --- AUTO TRADING EXECUTION ---
+      // --- AUTO TRADING EXECUTION (Selective) ---
       if(g_tradingMode == MODE_AUTO)
       {
-         bool doBuy = false;
-         bool doSell = false;
-         string triggeredStrategies = "";
-
-         // 1. Arrow Strategy (Any Signal)
+         // 1. Arrow Strategy (EMA specifically)
          if(g_strat_arrow)
          {
-            if(paSignal == SIGNAL_PA_BUY || emaSignalBuy)
-            {
-               doBuy = true;
-               triggeredStrategies = (triggeredStrategies == "") ? "ARROW" : triggeredStrategies + "+ARROW";
-            }
-            if(paSignal == SIGNAL_PA_SELL || emaSignalSell)
-            {
-               doSell = true;
-               triggeredStrategies = (triggeredStrategies == "") ? "ARROW" : triggeredStrategies + "+ARROW";
-            }
+            if(emaSignalBuy) ExecuteBuyTrade("EMA");
+            if(emaSignalSell) ExecuteSellTrade("EMA");
          }
-
+         
          // 2. Reversal Strategy (Zone Bounce)
-         if(g_strat_rev)
+         if(g_strat_rev && signalEngine.IsReversalSetup())
          {
-            if(signalEngine.IsReversalSetup())
-            {
-               if(paSignal == SIGNAL_PA_BUY)
-               {
-                  doBuy = true;
-                  triggeredStrategies = (triggeredStrategies == "") ? "REV" : triggeredStrategies + "+REV";
-               }
-               if(paSignal == SIGNAL_PA_SELL)
-               {
-                  doSell = true;
-                  triggeredStrategies = (triggeredStrategies == "") ? "REV" : triggeredStrategies + "+REV";
-               }
-            }
+            if(paSignal == SIGNAL_PA_BUY) ExecuteBuyTrade("REV");
+            if(paSignal == SIGNAL_PA_SELL) ExecuteSellTrade("REV");
          }
-
+         
          // 3. Breakout Strategy (Zone Flip)
-         if(g_strat_break)
+         if(g_strat_break && signalEngine.IsBreakoutSetup())
          {
-            if(signalEngine.IsBreakoutSetup())
-            {
-               if(paSignal == SIGNAL_PA_BUY)
-               {
-                  doBuy = true;
-                  triggeredStrategies = (triggeredStrategies == "") ? "BREAK" : triggeredStrategies + "+BREAK";
-               }
-               if(paSignal == SIGNAL_PA_SELL)
-               {
-                  doSell = true;
-                  triggeredStrategies = (triggeredStrategies == "") ? "BREAK" : triggeredStrategies + "+BREAK";
-               }
-            }
-         }
-
-         // Execute and track which strategy triggered
-         if(doBuy)
-         {
-            ExecuteBuyTrade();
-            dashboardPanel.UpdateLastAutoTrade(triggeredStrategies, "BUY", SymbolInfoDouble(_Symbol, SYMBOL_ASK));
-         }
-         if(doSell)
-         {
-            ExecuteSellTrade();
-            dashboardPanel.UpdateLastAutoTrade(triggeredStrategies, "SELL", SymbolInfoDouble(_Symbol, SYMBOL_BID));
+            if(paSignal == SIGNAL_PA_BUY) ExecuteBuyTrade("BREAK");
+            if(paSignal == SIGNAL_PA_SELL) ExecuteSellTrade("BREAK");
          }
       }
 
@@ -284,6 +243,36 @@ void OnTimer()
    string timeStr = StringFormat("M5: %02d:%02d", timeLeft/60, timeLeft%60);
 
    dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
+
+   // Update Active Orders List
+   string orderDetails[4];
+   long orderTickets[4];
+   int orderTypes[4];  // Store order types for color theming
+   int activeCount = 0;
+   int magic = Input_MagicNumber;
+
+   for(int i=0; i<PositionsTotal() && activeCount < 4; i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(PositionSelectByTicket(ticket))
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == magic)
+         {
+            ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+            double lot = PositionGetDouble(POSITION_VOLUME);
+            double profit = PositionGetDouble(POSITION_PROFIT);
+            string typeStr = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+
+            orderDetails[activeCount] = StringFormat("#%d %s %.2f  $%.2f",
+                                                   (int)ticket,
+                                                   typeStr, lot, profit);
+            orderTickets[activeCount] = (long)ticket;
+            orderTypes[activeCount] = (int)type;  // Store position type (0=BUY, 1=SELL)
+            activeCount++;
+         }
+      }
+   }
+   dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes);
 
    // 3. NEW: Update Strategy Signals using SignalEngine methods
    signalEngine.RefreshData();
@@ -340,8 +329,15 @@ void OnTimer()
       riskRec = StringFormat("%d/%d pts", Input_SL_Points, Input_SL_Points * 2);
    }
 
-   // Update strategy panel
-   dashboardPanel.UpdateStrategyInfo(emaM15Text, emaH1Text, paText, riskRec);
+   // Update strategy panel (new signature: reversal_alert, breakout_alert, pa_signal, risk_rec)
+   // Get reversal and breakout entry points
+   EntryPoint reversalEntry = signalEngine.GetReversalEntryPoint();
+   EntryPoint breakoutEntry = signalEngine.GetBreakoutEntryPoint();
+
+   string reversalAlert = reversalEntry.description;
+   string breakoutAlert = breakoutEntry.description;
+
+   dashboardPanel.UpdateStrategyInfo(reversalAlert, breakoutAlert, paText, riskRec);
 
    // 3e. Zone Status
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
@@ -440,13 +436,39 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
+      else if(dashboardPanel.IsCloseAllButtonClicked(sparam))
+      {
+         tradeManager.CloseAllSymbolPositions();
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      // Individual order close buttons
+      else
+      {
+         int orderIndex = -1;
+         if(dashboardPanel.IsCloseOrderButtonClicked(sparam, orderIndex))
+         {
+            long ticket = dashboardPanel.GetOrderTicket(orderIndex);
+            if(ticket > 0)
+            {
+               if(tradeManager.ClosePositionByTicket(ticket))
+               {
+                  Print("Closed order #", ticket);
+               }
+               else
+               {
+                  Print("Failed to close order #", ticket);
+               }
+            }
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         }
+      }
    }
 }
 
 //+------------------------------------------------------------------+
 //| Execute Buy Trade                                                 |
 //+------------------------------------------------------------------+
-void ExecuteBuyTrade()
+void ExecuteBuyTrade(string strategy="MANUAL")
 {
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double riskPercent = dashboardPanel.GetRiskPercent();
@@ -459,12 +481,13 @@ void ExecuteBuyTrade()
    req.sl = sl;
    req.tp = tp;
    req.risk_percent = riskPercent;
-   req.comment = "WidwaPa Buy";
+   req.comment = "WidwaPa Buy " + strategy;
 
    if(tradeManager.ExecuteOrder(req))
    {
       Print("Buy trade executed at ", currentPrice);
       dashboardPanel.UpdateAccountInfo();
+      dashboardPanel.UpdateLastAutoTrade(strategy, "BUY", currentPrice);
    }
    else
    {
@@ -475,7 +498,7 @@ void ExecuteBuyTrade()
 //+------------------------------------------------------------------+
 //| Execute Sell Trade                                                |
 //+------------------------------------------------------------------+
-void ExecuteSellTrade()
+void ExecuteSellTrade(string strategy="MANUAL")
 {
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double riskPercent = dashboardPanel.GetRiskPercent();
@@ -488,12 +511,13 @@ void ExecuteSellTrade()
    req.sl = sl;
    req.tp = tp;
    req.risk_percent = riskPercent;
-   req.comment = "WidwaPa Sell";
+   req.comment = "WidwaPa Sell " + strategy;
 
    if(tradeManager.ExecuteOrder(req))
    {
       Print("Sell trade executed at ", currentPrice);
       dashboardPanel.UpdateAccountInfo();
+      dashboardPanel.UpdateLastAutoTrade(strategy, "SELL", currentPrice);
    }
    else
    {

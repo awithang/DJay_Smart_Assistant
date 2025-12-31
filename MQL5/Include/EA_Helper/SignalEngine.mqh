@@ -44,6 +44,18 @@ struct EMADistance
 };
 
 //+------------------------------------------------------------------+
+//| Entry Point Structure (for Reversal/Breakout)                      |
+//+------------------------------------------------------------------+
+struct EntryPoint
+{
+    bool   isValid;       // Whether entry point is valid
+    double price;         // Entry price level
+    string direction;     // "BUY" or "SELL"
+    string zone;          // Zone name (e.g., "Buy1", "Sell2")
+    string description;   // Human-readable description
+};
+
+//+------------------------------------------------------------------+
 //| Zone Status Enumeration                                           |
 //+------------------------------------------------------------------+
 enum ENUM_ZONE_STATUS
@@ -122,6 +134,10 @@ public:
     //--- Strategy Helpers
     bool   IsReversalSetup();
     bool   IsBreakoutSetup();
+
+    //--- Entry Point Detection (for UI display)
+    EntryPoint GetReversalEntryPoint();   // Get reversal entry price
+    EntryPoint GetBreakoutEntryPoint();   // Get breakout entry price
 
     //--- Pending Order Recommendation
     bool GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outPrice, double &outSL, double &outTP, int sl_points);
@@ -857,8 +873,143 @@ bool CSignalEngine::IsBreakoutSetup()
    // Sell Zone + Buy Signal (Breaking Resistance)
    if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_BUY)
       return true;
-      
+
    return false;
+}
+
+//+------------------------------------------------------------------+
+//| Get Reversal Entry Point (Zone Bounce)                            |
+//+------------------------------------------------------------------+
+EntryPoint CSignalEngine::GetReversalEntryPoint()
+{
+   EntryPoint result;
+   result.isValid = false;
+   result.price = 0.0;
+   result.direction = "--";
+   result.zone = "--";
+   result.description = "--";
+
+   // Check if reversal setup exists
+   if(!IsReversalSetup())
+      return result;
+
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   double zoneLevel = 0.0;
+   string zoneName = "";
+
+   // Determine zone level and name
+   switch(zone)
+   {
+      case ZONE_STATUS_IN_BUY1:
+         zoneLevel = GetZoneLevel(ZONE_BUY1);
+         zoneName = "Buy1";
+         break;
+      case ZONE_STATUS_IN_BUY2:
+         zoneLevel = GetZoneLevel(ZONE_BUY2);
+         zoneName = "Buy2";
+         break;
+      case ZONE_STATUS_IN_SELL1:
+         zoneLevel = GetZoneLevel(ZONE_SELL1);
+         zoneName = "Sell1";
+         break;
+      case ZONE_STATUS_IN_SELL2:
+         zoneLevel = GetZoneLevel(ZONE_SELL2);
+         zoneName = "Sell2";
+         break;
+      default:
+         return result;
+   }
+
+   // For reversal: Enter AT the zone level (bounce from support/resistance)
+   ENUM_SIGNAL_TYPE sig = GetActiveSignal();
+
+   if((zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2) && sig == SIGNAL_PA_BUY)
+   {
+      result.isValid = true;
+      result.price = zoneLevel;
+      result.direction = "BUY";
+      result.zone = zoneName;
+      result.description = StringFormat("BUY @ %.5f (Bounce %s)", zoneLevel, zoneName);
+   }
+   else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_SELL)
+   {
+      result.isValid = true;
+      result.price = zoneLevel;
+      result.direction = "SELL";
+      result.zone = zoneName;
+      result.description = StringFormat("SELL @ %.5f (Reject %s)", zoneLevel, zoneName);
+   }
+
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get Breakout Entry Point (Zone Flip)                              |
+//+------------------------------------------------------------------+
+EntryPoint CSignalEngine::GetBreakoutEntryPoint()
+{
+   EntryPoint result;
+   result.isValid = false;
+   result.price = 0.0;
+   result.direction = "--";
+   result.zone = "--";
+   result.description = "--";
+
+   // Check if breakout setup exists
+   if(!IsBreakoutSetup())
+      return result;
+
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   double zoneLevel = 0.0;
+   string zoneName = "";
+   ENUM_SIGNAL_TYPE sig = GetActiveSignal();
+
+   // Determine zone level and name
+   switch(zone)
+   {
+      case ZONE_STATUS_IN_BUY1:
+         zoneLevel = GetZoneLevel(ZONE_BUY1);
+         zoneName = "Buy1";
+         break;
+      case ZONE_STATUS_IN_BUY2:
+         zoneLevel = GetZoneLevel(ZONE_BUY2);
+         zoneName = "Buy2";
+         break;
+      case ZONE_STATUS_IN_SELL1:
+         zoneLevel = GetZoneLevel(ZONE_SELL1);
+         zoneName = "Sell1";
+         break;
+      case ZONE_STATUS_IN_SELL2:
+         zoneLevel = GetZoneLevel(ZONE_SELL2);
+         zoneName = "Sell2";
+         break;
+      default:
+         return result;
+   }
+
+   double breakOffset = m_zone_offset1 * _Point * 0.5; // Entry beyond zone (half offset)
+
+   // For breakout: Enter BEYOND the zone level (break through support/resistance)
+   if((zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2) && sig == SIGNAL_PA_SELL)
+   {
+      // Breaking support below Buy Zone - Enter SELL below zone
+      result.isValid = true;
+      result.price = zoneLevel - breakOffset;
+      result.direction = "SELL";
+      result.zone = zoneName;
+      result.description = StringFormat("SELL @ %.5f (Break %s)", result.price, zoneName);
+   }
+   else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_BUY)
+   {
+      // Breaking resistance above Sell Zone - Enter BUY above zone
+      result.isValid = true;
+      result.price = zoneLevel + breakOffset;
+      result.direction = "BUY";
+      result.zone = zoneName;
+      result.description = StringFormat("BUY @ %.5f (Break %s)", result.price, zoneName);
+   }
+
+   return result;
 }
 
 //+------------------------------------------------------------------+

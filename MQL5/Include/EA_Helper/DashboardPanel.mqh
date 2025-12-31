@@ -31,13 +31,16 @@ private:
    color             m_supply_color;
    color             m_accent_color;
 
+   // Store active order tickets for individual close buttons
+   long              m_order_tickets[4];
+
    // Helper: Convert relative Y (0 at top of panel) to absolute Y (distance from anchor)
    int Y(int relative_y) { return (m_base_y + m_panel_height) - relative_y; }
 
    void CreateRect(const string name, int x, int ry, int w, int h, color bg, bool border=false, color border_color=clrNONE);
    void CreateLabel(const string name, int x, int ry, const string text, color clr, int font_size, const string font="Arial", string align="left");
    void CreateEdit(const string name, int x, int ry, int width, int height, const string text);
-   void CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr=clrWhite);
+   void CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr=clrWhite, int font_size=8);
    void CreateHLine(const string name, double price, color clr, ENUM_LINE_STYLE style, int width, const string desc);
    void AddLevel(double &arr[], string &lbls[], double price, string label);
 
@@ -52,11 +55,12 @@ public:
    void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
    void UpdateWidwaZones(double d1_open);
-   void UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec);
+   void UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig, string risk_rec);
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
    void UpdateLastAutoTrade(string strategy, string direction, double price);
+   void UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[]);
 
    // New Methods
    void UpdateTradingMode(int mode);
@@ -65,7 +69,12 @@ public:
    
    bool IsModeButtonClicked(string sparam) { return (sparam == m_prefix+"BtnMode"); }
    bool IsConfirmButtonClicked(string sparam) { return (sparam == m_prefix+"BtnConfirm"); }
-   
+   bool IsCloseAllButtonClicked(string sparam) { return (sparam == m_prefix+"BtnCloseAll"); }
+
+   // Individual order close button handlers
+   bool IsCloseOrderButtonClicked(string sparam, int &index);
+   long GetOrderTicket(int index) { return (index >= 0 && index < 4) ? m_order_tickets[index] : 0; }
+
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
@@ -85,7 +94,7 @@ CDashboardPanel::CDashboardPanel()
    m_base_x = 10;
    m_base_y = 10;
    m_panel_width = 500;  // Wider for two-panel layout (50/50 split)
-   m_panel_height = 520;
+   m_panel_height = 540;  // Increased height for full-width Active Orders section
    m_blink_state = false;
 
    m_bg_color = C'35,35,45';      // Dark Grey Background
@@ -124,8 +133,9 @@ void CDashboardPanel::CreatePanel()
    // ============================================
 
    // 1. Header Section (Left Panel)
+   // Title with left padding, Balance with same right padding (mirrored)
    CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 10, "Arial Bold");
-   CreateLabel("Balance", left_x + pad + 130, 15, "$--", clrWhite, 10, "Arial Bold");
+   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", clrWhite, 10, "Arial Bold", "right");
 
    // 2. Market Status (Left Panel)
    CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 8);
@@ -155,25 +165,33 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
    CreateRect("InfoBG", left_x, 230, half_width, 140, C'5,5,15');
 
-   CreateLabel("Trend_T", left_x + 10, 240, "Trend:", clrGold, 8);
-   CreateLabel("Trend_V", left_x + 50, 240, "--", clrGray, 8, "Arial Bold");
+   CreateLabel("Trend_T", left_x + 10, 242, "Trend:", clrGold, 8);
+   CreateLabel("Trend_V", left_x + 50, 242, "--", clrGray, 8, "Arial Bold");
 
-   // EMA Distance Labels (M15 and H1)
-   CreateLabel("EMA_M15", left_x + 10, 255, "M15: --/--", m_label_color, 8);
-   CreateLabel("EMA_H1", left_x + 10, 270, "H1: --/--", m_label_color, 8);
+   // PA Signal (moved under Trend)
+   CreateLabel("PA_T", left_x + 10, 258, "PA Signal:", clrGold, 8);
+   CreateLabel("PA_V", left_x + 75, 258, "NONE", clrGray, 8);
+
+   // Reversal Alert (replaces EMA M15)
+   CreateLabel("Rev_T", left_x + 10, 274, "Reversal Alert:", clrGold, 8);
+   CreateLabel("Rev_V", left_x + 95, 274, "--", clrGray, 8);
+
+   // Breakout Alert (replaces EMA H1)
+   CreateLabel("Break_T", left_x + 10, 290, "Breakout Alert:", clrGold, 8);
+   CreateLabel("Break_V", left_x + 95, 290, "--", clrGray, 8);
+
+   // Separator line before Advisor
+   CreateRect("Sep1", left_x + 8, 302, half_width - 16, 1, C'60,60,70');
 
    // Advisor: Natural language recommendation
-   CreateLabel("Adv_T", left_x + 10, 285, "Advisor:", m_accent_color, 9, "Arial Bold");
-   CreateLabel("Adv_V", left_x + 10, 300, "Scanning market...", clrCyan, 8);
-   CreateLabel("Adv_V2", left_x + 10, 315, "", clrCyan, 8);
+   CreateLabel("Adv_T", left_x + 10, 312, "Advisor:", m_accent_color, 9, "Arial Bold");
+   CreateLabel("Adv_V", left_x + 10, 327, "Scanning market...", clrCyan, 8);
+   CreateLabel("Adv_V2", left_x + 10, 342, "", clrCyan, 8);
 
-   CreateLabel("PA_T", left_x + 10, 335, "PA Signal:", clrGold, 8);
-   CreateLabel("PA_V", left_x + 75, 335, "NONE", clrGray, 8);
+   CreateLabel("Risk_T", left_x + 10, 358, "Rec. SL/TP:", clrGold, 8);
+   CreateLabel("Risk_V", left_x + 75, 358, "-- / --", clrWhite, 8);
 
-   CreateLabel("Risk_T", left_x + 10, 355, "Rec. SL/TP:", clrGold, 8);
-   CreateLabel("Risk_V", left_x + 75, 355, "-- / --", clrWhite, 8);
-
-   CreateLabel("Ver", left_x + half_width - pad, 360, "v4.0", clrGray, 7);
+   CreateLabel("Ver", left_x + half_width - pad, 363, "v4.0", clrGray, 7);
 
    // ============================================
    // RIGHT PANEL (50%)
@@ -182,46 +200,55 @@ void CDashboardPanel::CreatePanel()
    // 5. Execution Section (Right Panel - Top)
    CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 9, "Arial Bold");
    CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 9, "Arial Bold", "right");
-   
-   CreateLabel("LblRisk", right_x + pad, 35, "Risk %", clrGray, 8);
-   CreateEdit("EditRisk", right_x + half_width - pad - 25, 32, 30, 18, "1.0");
 
-   CreateButton("BtnBuy", right_x + pad, 60, (half_width - 30) / 2, 35, "BUY", m_buy_color);
-   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 60, (half_width - 30) / 2, 35, "SELL", m_sell_color);
+   CreateLabel("LblRisk", right_x + pad, 38, "Risk %", clrGray, 8);
+   CreateEdit("EditRisk", right_x + half_width - pad - 25, 35, 30, 18, "1.0");
+
+   CreateButton("BtnBuy", right_x + pad, 62, (half_width - 30) / 2, 38, "BUY", m_buy_color);
+   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 62, (half_width - 30) / 2, 38, "SELL", m_sell_color);
 
    // Confirm Button (Pending recommendation)
-   CreateButton("BtnConfirm", right_x + pad, 105, half_width - 20, 30, "NO SIGNAL", C'50,50,60', C'100,100,100');
+   CreateButton("BtnConfirm", right_x + pad, 110, half_width - 20, 28, "NO SIGNAL", C'50,50,60', C'100,100,100');
 
    // 6. Auto Strategy Options (Right Panel - Below Confirm)
-   int stratY = 150;
+   int stratY = 152;
    CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 9, "Arial Bold");
-   
+
    // Auto Mode Toggle (Next to title)
    CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite);
 
    // Section Box
-   CreateRect("StratBG", right_x, stratY + 25, half_width, 85, C'5,5,15', true, C'45,45,60');
-   
-   int chkW = 60;
-   CreateButton("BtnStratArrow", right_x + 10, stratY + 35, 15, 15, "", clrGray);
-   CreateLabel("L_Arrow", right_x + 30, stratY + 35, "Arrow", clrCyan, 8, "Arial Bold");
-   
-   CreateButton("BtnStratRev", right_x + 80, stratY + 35, 15, 15, "", clrGray);
-   CreateLabel("L_Rev", right_x + 100, stratY + 35, "Rev", clrCyan, 8, "Arial Bold");
-   
-   CreateButton("BtnStratBreak", right_x + 150, stratY + 35, 15, 15, "", clrGray);
-   CreateLabel("L_Break", right_x + 170, stratY + 35, "Break", clrCyan, 8, "Arial Bold");
+   CreateRect("StratBG", right_x, stratY + 25, half_width, 90, C'5,5,15', true, C'45,45,60');
+
+   CreateButton("BtnStratArrow", right_x + 10, stratY + 38, 15, 15, "", clrGray);
+   CreateLabel("L_Arrow", right_x + 30, stratY + 38, "Arrow", clrCyan, 8, "Arial Bold");
+
+   CreateButton("BtnStratRev", right_x + 80, stratY + 38, 15, 15, "", clrGray);
+   CreateLabel("L_Rev", right_x + 100, stratY + 38, "Rev", clrCyan, 8, "Arial Bold");
+
+   CreateButton("BtnStratBreak", right_x + 150, stratY + 38, 15, 15, "", clrGray);
+   CreateLabel("L_Break", right_x + 170, stratY + 38, "Break", clrCyan, 8, "Arial Bold");
 
    // Last Trade Label
-   CreateLabel("LblLastTrade", right_x + 10, stratY + 65, "Last: ---", C'80,80,80', 7);
+   CreateLabel("LblLastAuto", right_x + 10, stratY + 70, "Last: ---", C'80,80,80', 7);
 
-   // 7. Active Orders Section
-   int orderY = 250;
-   CreateLabel("LblAct", right_x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 9, "Arial Bold");
-   CreateButton("BtnCloseAll", right_x + half_width - 75, orderY - 2, 65, 18, "CLOSE ALL", m_sell_color, clrWhite);
-   
-   // Empty list placeholder or area
-   CreateRect("OrderListBG", right_x, orderY + 20, half_width, 100, C'5,5,15');
+   // 7. Active Orders Section (moved to bottom, full width)
+   // Position below all other content, covers both left and right panels
+   int orderY = 385;  // Bottom of panel, full width
+   CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 9, "Arial Bold");
+   CreateButton("BtnCloseAll", x + m_panel_width - 70, orderY - 2, 60, 18, "CLOSE ALL", m_sell_color, clrWhite, 7);
+
+   // Full-width order list with individual close buttons
+   CreateRect("OrderListBG", x, orderY + 20, m_panel_width - 20, 115, C'5,5,15', true, C'45,45,60');
+   for(int i=0; i<4; i++)
+   {
+      string sid = IntegerToString(i);
+      int rowY = orderY + 38 + (i * 26);
+      // Order info label (increased text size to 9)
+      CreateLabel("ActOrder_"+sid, x + 10, rowY, "", clrWhite, 9);
+      // Individual close button for each order (small X button)
+      CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 8);
+   }
 
    UpdateAccountInfo();
    ChartRedraw(m_chart_id);
@@ -233,7 +260,7 @@ void CDashboardPanel::CreatePanel()
 void CDashboardPanel::UpdateTradingMode(int mode)
 {
    // mode 0 = AUTO OFF (manual only), mode 1 = AUTO ON (manual + auto)
-   string text = (mode == 0) ? "AUTO: OFF" : "AUTO: ON";
+   string text = (mode == 0) ? "OFF" : "ON";
    color bg = (mode == 0) ? clrGray : m_buy_color;   // Gray when OFF, Green when ON
    color txt = clrWhite; // Always White for better contrast
    
@@ -362,33 +389,31 @@ void CDashboardPanel::UpdateSessionInfo(string session_name, string countdown, b
    }
 }
 
-void CDashboardPanel::UpdateStrategyInfo(string ema_m15, string ema_h1, string pa_sig, string risk_rec)
+void CDashboardPanel::UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig, string risk_rec)
 {
-   string nameM15 = m_prefix+"EMA_M15";
-   if(ObjectFind(m_chart_id, nameM15) < 0) {
-      Print("ERROR: Object ", nameM15, " not found!");
-      // Attempt to force recreate if missing? No, just log for now.
-   }
-   
    // Toggle blink state
    m_blink_state = !m_blink_state;
-   
-   // Correctly update the labels with the calculated strategy info
-   ObjectSetString(m_chart_id, nameM15, OBJPROP_TEXT, "M15 (100/200): " + ema_m15);
-   ObjectSetString(m_chart_id, m_prefix+"EMA_H1", OBJPROP_TEXT, "H1 (100/200): " + ema_h1);
-   
+
+   // Update Reversal Alert
+   ObjectSetString(m_chart_id, m_prefix+"Rev_V", OBJPROP_TEXT, reversal_alert);
+
+   // Update Breakout Alert
+   ObjectSetString(m_chart_id, m_prefix+"Break_V", OBJPROP_TEXT, breakout_alert);
+
+   // Update PA Signal
    ObjectSetString(m_chart_id, m_prefix+"PA_V", OBJPROP_TEXT, pa_sig);
-   
+
    color pc = clrGray;
    if(StringFind(pa_sig, "BUY") >= 0)
       pc = m_blink_state ? clrLime : m_bg_color; // Blink Green
    else if(StringFind(pa_sig, "SELL") >= 0)
       pc = m_blink_state ? clrRed : m_bg_color; // Blink Red
-      
+
    ObjectSetInteger(m_chart_id, m_prefix+"PA_V", OBJPROP_COLOR, pc);
-   
+
+   // Update Risk Recommendation
    ObjectSetString(m_chart_id, m_prefix+"Risk_V", OBJPROP_TEXT, risk_rec);
-   
+
    ChartRedraw(m_chart_id); // Force redraw
 }
 
@@ -454,7 +479,7 @@ void CDashboardPanel::CreateLabel(const string name, int x, int ry, const string
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, (align=="right" ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER));
 }
 
-void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr)
+void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr, int font_size)
 {
    string n = m_prefix + name;
    ObjectCreate(m_chart_id, n, OBJ_BUTTON, 0, 0, 0);
@@ -466,8 +491,14 @@ void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, 
    ObjectSetString(m_chart_id, n, OBJPROP_TEXT, text);
    ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, clr);
    ObjectSetInteger(m_chart_id, n, OBJPROP_COLOR, txt_clr);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_FONTSIZE, font_size);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ZORDER, 10); // Ensure button is on top
+
+   // TRUE FLAT STYLE - Removes all 3D effects for instant response
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_COLOR, clr); // Border same as bg for seamless look
+   ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 1); // Minimal border width
 }
 
 void CDashboardPanel::CreateEdit(const string name, int x, int ry, int width, int height, const string text)
@@ -598,4 +629,68 @@ void CDashboardPanel::UpdateLastAutoTrade(string strategy, string direction, dou
 
    ObjectSetInteger(m_chart_id, m_prefix+"LblLastAuto", OBJPROP_COLOR, clr);
    ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Active Orders List                                        |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[])
+{
+   // Update count label
+   ObjectSetString(m_chart_id, m_prefix+"LblAct", OBJPROP_TEXT, StringFormat("ACTIVE ORDERS (%d)", count));
+
+   // Calculate button positions (same as in CreatePanel)
+   int x = m_base_x;
+   int orderY = 385;
+
+   // Update slots and store tickets
+   for(int i = 0; i < 4; i++)
+   {
+      string sid = IntegerToString(i);
+
+      if(i < count)
+      {
+         // Active order - show details with color theme
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_TEXT, order_details[i]);
+         m_order_tickets[i] = tickets[i];
+
+         // Apply color theme based on order type
+         // POSITION_TYPE_BUY = 0, POSITION_TYPE_SELL = 1
+         color orderColor = (order_types[i] == 0) ? clrLime : m_sell_color; // Green for BUY, Red for SELL
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, orderColor);
+
+         // Show individual close button by restoring its original position
+         int btnX = x + m_panel_width - 45;
+         ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, btnX);
+         ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_STATE, false);
+      }
+      else
+      {
+         // Empty slot - clear details, hide close button, reset ticket
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_TEXT, "");
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, clrGray); // Reset color to gray
+         m_order_tickets[i] = 0;
+
+         // Hide individual close button by moving it off-screen
+         ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, -100);
+      }
+   }
+
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Check if individual order close button was clicked               |
+//+------------------------------------------------------------------+
+bool CDashboardPanel::IsCloseOrderButtonClicked(string sparam, int &index)
+{
+   for(int i = 0; i < 4; i++)
+   {
+      if(sparam == m_prefix + "BtnCloseOrder_" + IntegerToString(i))
+      {
+         index = i;
+         return true;
+      }
+   }
+   return false;
 }

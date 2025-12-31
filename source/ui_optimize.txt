@@ -1,0 +1,9 @@
+1. Space between Panel name and total port value. Port value should be same padding from panel edge as Panel name.
+2. Focus at Strategy Signal section:
+- move PA Signal to under Trend:
+- Remove EMA value display (M15 and H1) with Reversal Alert: [display reversal entry point] and Breakout Alert: [display breakout entry point]
+3. Change all button to flat style for quicker response.
+4. Move Active orders section to bottom of panel and cover both left and right panel for more space
+- increase text size for more readable.
+- add close button to each order for close individual order.
+- Remove placeholder "Label" when no data available.

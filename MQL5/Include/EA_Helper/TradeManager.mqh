@@ -40,6 +40,8 @@ public:
    //--- Position Management
    void CloseAllOrders();
    void ClosePositionsBySymbol(ENUM_POSITION_TYPE pos_type);
+   void CloseAllSymbolPositions();
+   bool ClosePositionByTicket(long ticket);  // Close individual position by ticket
    void TrailingStop(double trailing_points);
    void SmartProfitLock(double trigger_percent, double lock_percent);
 
@@ -401,6 +403,65 @@ void CTradeManager::ClosePositionsBySymbol(ENUM_POSITION_TYPE pos_type)
             m_trade.PositionClose(PositionGetTicket(i));
          }
       }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Close all positions for current symbol and magic number          |
+//+------------------------------------------------------------------+
+void CTradeManager::CloseAllSymbolPositions()
+{
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == m_magic_number)
+         {
+            m_trade.PositionClose(PositionGetTicket(i));
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Close individual position by ticket                              |
+//+------------------------------------------------------------------+
+bool CTradeManager::ClosePositionByTicket(long ticket)
+{
+   if(ticket <= 0)
+   {
+      Print("Error: Invalid ticket number");
+      return false;
+   }
+
+   if(PositionSelectByTicket(ticket))
+   {
+      // Verify it's our position
+      if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+         PositionGetInteger(POSITION_MAGIC) == m_magic_number)
+      {
+         if(m_trade.PositionClose(ticket))
+         {
+            Print("Position #", ticket, " closed successfully");
+            return true;
+         }
+         else
+         {
+            Print("Failed to close position #", ticket);
+            return false;
+         }
+      }
+      else
+      {
+         Print("Error: Position #", ticket, " does not belong to this EA");
+         return false;
+      }
+   }
+   else
+   {
+      Print("Error: Position #", ticket, " not found");
+      return false;
    }
 }
 
