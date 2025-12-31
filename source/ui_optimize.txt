@@ -1,7 +1,7 @@
-1. Adjust M5: countdown to right align og panel A with padding.
-2. Add label for Runtime and Neutral for user to understand what is this value.
-3. Change "Label" placeholder in Active Orders section text color to use the same color of background when no order.
-4. Order details in Active Orders section, should be like this:
- #[ticket id] @[order entry price] [Buy/Sell] Lots[lots] $[profit/lost] [% of profit/lost]%
-- [profit/lost] colour depend on Profit or Lost, Green or Red, also [profit/lost %] and [Buy/Sell]
-- [ticket id] and [order entry price] text color should be cyan
+Change design of Active Orders section 's order details:
+Split active orders to 3 labels.
+1. [ticket id] @[order entry price (only 2 digit)] [Buy/Sell] with cyan color text.
+2. $[profit/lost] with Colored Details
+3. [% of profit/lost]% with Colored Details
+
+

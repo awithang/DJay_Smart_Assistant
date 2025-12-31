@@ -147,9 +147,12 @@ void OnTick()
 
    if(MathAbs(totalProfit - lastTotalProfit) > 0.01 || currentPositionsCount != lastPositionsCount)
    {
-      string orderDetails[4];
       long orderTickets[4];
+      double orderPrices[4];
+      double orderProfits[4];
+      double orderLots[4];
       int orderTypes[4];
+      
       int activeCount = 0;
       int magic = Input_MagicNumber;
 
@@ -160,24 +163,17 @@ void OnTick()
          {
             if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == magic)
             {
-               ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-               double lot = PositionGetDouble(POSITION_VOLUME);
-               double profit = PositionGetDouble(POSITION_PROFIT);
-               double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-               double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-               double profitPct = (balance > 0) ? (profit / balance) * 100.0 : 0;
-               string typeStr = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
-
-               orderDetails[activeCount] = StringFormat("#%d @%.5f %s Lots:%.2f $%.2f (%.2f%%)",
-                                                   (int)ticket, openPrice,
-                                                   typeStr, lot, profit, profitPct);
                orderTickets[activeCount] = (long)ticket;
-               orderTypes[activeCount] = (int)type;
+               orderPrices[activeCount]  = PositionGetDouble(POSITION_PRICE_OPEN);
+               orderProfits[activeCount] = PositionGetDouble(POSITION_PROFIT);
+               orderLots[activeCount]    = PositionGetDouble(POSITION_VOLUME);
+               orderTypes[activeCount]   = (int)PositionGetInteger(POSITION_TYPE);
+               
                activeCount++;
             }
          }
       }
-      dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes, totalProfit);
+      dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderPrices, orderProfits, orderLots, orderTypes, totalProfit);
       lastTotalProfit = totalProfit;
       lastPositionsCount = currentPositionsCount;
    }

@@ -59,7 +59,7 @@ public:
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
    void UpdateLastAutoTrade(string strategy, string direction, double price);
-   void UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[], double total_profit);
+   void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
 
    // New Methods
    void UpdateTradingMode(int mode);
@@ -260,8 +260,12 @@ void CDashboardPanel::CreatePanel()
    {
       string sid = IntegerToString(i);
       int rowY = orderY + 38 + (i * 26);
-      // Order info label (increased text size to 9)
-      CreateLabel("ActOrder_"+sid, x + 10, rowY, "", clrWhite, 10);
+      
+      // Split into 3 labels for multi-color support
+      CreateLabel("ActOrder_L_"+sid, x + 10, rowY, "", clrCyan, 9);  // Ticket, Price, Type
+      CreateLabel("ActOrder_M_"+sid, x + 200, rowY, "", clrWhite, 9); // Profit $
+      CreateLabel("ActOrder_R_"+sid, x + 300, rowY, "", clrWhite, 9); // Profit %
+
       // Individual close button for each order (small X button)
       CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
    }
@@ -647,13 +651,14 @@ void CDashboardPanel::UpdateLastAutoTrade(string strategy, string direction, dou
 //+------------------------------------------------------------------+
 //| Update Active Orders List                                        |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &order_details[], int &order_types[], double total_profit)
+void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit)
 {
    // Update count label
    ObjectSetString(m_chart_id, m_prefix+"LblAct", OBJPROP_TEXT, StringFormat("ACTIVE ORDERS (%d)", count));
 
    // Update Balance
-   ObjectSetString(m_chart_id, m_prefix+"LblBalance", OBJPROP_TEXT, StringFormat("Balance: $%.2f", AccountInfoDouble(ACCOUNT_BALANCE)));
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   ObjectSetString(m_chart_id, m_prefix+"LblBalance", OBJPROP_TEXT, StringFormat("Balance: $%.2f", balance));
 
    // Update Total Profit
    if(count > 0)
@@ -668,9 +673,8 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &ord
       ObjectSetInteger(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_COLOR, clrGray);
    }
 
-   // Calculate button positions (same as in CreatePanel)
+   // Calculate button positions
    int x = m_base_x;
-   int orderY = 385;
 
    // Update slots and store tickets
    for(int i = 0; i < 4; i++)
@@ -679,27 +683,40 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], string &ord
 
       if(i < count)
       {
-         // Active order - show details with color theme
-         ObjectSetString(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_TEXT, order_details[i]);
          m_order_tickets[i] = tickets[i];
+         
+         string typeStr = (types[i] == 0) ? "BUY" : "SELL"; // 0=Buy
+         double profitPct = (balance > 0) ? (profits[i] / balance) * 100.0 : 0;
+         color pColor = (profits[i] >= 0) ? clrLime : m_sell_color;
 
-         // Apply color theme based on order type
-         // POSITION_TYPE_BUY = 0, POSITION_TYPE_SELL = 1
-         color orderColor = (order_types[i] == 0) ? clrLime : m_sell_color; // Green for BUY, Red for SELL
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, orderColor);
+         // 1. Info Label (Cyan)
+         string infoText = StringFormat("#%d @%.2f %s", tickets[i], prices[i], typeStr);
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, infoText);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_COLOR, clrCyan);
 
-         // Show individual close button by restoring its original position
+         // 2. Profit Label ($)
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, StringFormat("$%.2f", profits[i]));
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_COLOR, pColor);
+
+         // 3. Percent Label (%)
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, StringFormat("(%.2f%%)", profitPct));
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_COLOR, pColor);
+
+         // Show close button
          int btnX = x + m_panel_width - 45;
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, btnX);
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_STATE, false);
       }
       else
       {
-         // Empty slot - clear details, hide close button, reset ticket
-         ObjectSetString(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_TEXT, "");
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_"+sid, OBJPROP_COLOR, m_bg_color); // Match background
+         // Clear slots
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, "");
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, "");
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, "");
+         
+         m_order_tickets[i] = 0;
 
-         // Hide individual close button by moving it off-screen
+         // Hide close button
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, -100);
       }
    }
