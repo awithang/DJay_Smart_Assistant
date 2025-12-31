@@ -311,11 +311,11 @@ void OnTimer()
    CombinedSignal paSignal = signalEngine.GetCombinedPASignal();
    string paText = paSignal.description;
 
-   // Update strategy panel (new signature: reversal_alert, breakout_alert, pa_signal)
+   // Update strategy panel (new signature: reversal_alert, rev_valid, breakout_alert, brk_valid, pa_signal)
    g_last_rev_entry = signalEngine.GetReversalEntryPoint();
    g_last_brk_entry = signalEngine.GetBreakoutEntryPoint();
 
-   dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_brk_entry.description, paText);
+   dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_rev_entry.isValid, g_last_brk_entry.description, g_last_brk_entry.isValid, paText);
 
    // 3e. Zone Status
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();

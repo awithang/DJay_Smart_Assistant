@@ -1,57 +1,54 @@
-# DJAY Smart Assistant - Implementation Summary (Dec 30, 2025)
+# Implementation Plan: UI Optimization & Layout Restructuring
 
-## 1. UI Style & Aesthetic Overhaul
-The dashboard panel has been completely redesigned to match the high-contrast "Dark Mode" aesthetic.
+## Objective
+1.  **Fix UI Responsiveness**: Resolve "unclickable" button issues and optimize EA performance.
+2.  **Restructure Dashboard**: Move the "Strategy Signal" section to Panel B (Right Side) for better logical grouping.
 
-*   **Color Palette:**
-    *   **Background:** Deep Dark Grey (`C'35,35,45'`).
-    *   **Border:** Solid White (`clrWhite`) with thickness `2` for maximum visibility.
-    *   **Buy/Sell Buttons:** Darker, professional tones (Forest Green / Dark Red) to reduce glare.
-    *   **Strategy Info:** Bright Gold headers, Cyan advisor text, and White numerical data.
-*   **Button Behavior:** 
-    *   Converted BUY/SELL from toggle-style to "Momentary" buttons (they reset immediately after click).
-    *   **Fixed Clickability:** Increased Z-Order of all buttons to ensure they are clickable and not blocked by background panels.
-    *   Updated "AUTO: ON" text to White for better readability.
-*   **Active Signal Blinking:**
-    *   Implemented a blink effect for the **PA Signal** value (M5 ENTRY BUY/SELL). It flashes On/Off every second when a valid signal is active.
+## Part 1: Performance & Responsiveness (Critical)
 
-## 2. Trading Logic & Strategy Refinements
+### Root Cause Analysis
+-   **Unclickable Buttons**: Visual "Active" state (Green/Red) does not match logical `isValid` state. Users click a green button, but the code rejects it because the internal signal isn't ready.
+-   **UI Lag**: `OnTimer` blindly updates all objects every second, flooding the terminal with redundant commands.
 
-*   **Fixed SL Location:**
-    *   Disabled the automatic **Trailing Stop** in `OnTick` to keep SL fixed at the initial risk level.
-*   **Smart Profit Lock (Step Trailing):**
-    *   Implemented a "Smart Lock" feature: When profit reaches **50%** (user configurable) of the Take Profit distance, the Stop Loss is moved to **30%** (user configurable) of the distance to lock in gains.
-    *   Settings: `Input_Use_Smart_Trail`, `Input_Trail_Trigger_Pct`, `Input_Trail_Lock_Pct`.
-    *   *Note: Further discussion on Trailing Stop optimization is planned for tomorrow.*
-*   **Smart SL/TP Price Targets:**
-    *   The "Rec. SL/TP" field on the panel now displays exact price levels instead of point distances when a trend is detected.
-*   **Pending Order Recommendations (One-Click):**
-    *   **Logic Loosened:** The "Recommended Order" button now triggers more frequently. It allows recommendations in **FLAT** markets (based on price position relative to EMA 100) and requires a smaller distance buffer (20 points instead of 50).
-    *   **UI Placeholder:** When no recommendation is active, the button displays a dim **"NO SIGNAL"** placeholder rather than appearing as an empty dark box.
-    *   **Dynamic Coloring:** The button turns Green for Buy Limit recommendations and Red for Sell Limit recommendations.
+### Implementation Steps
+1.  **Sync Visuals with Logic**:
+    -   Update `DashboardPanel::UpdateStrategyInfo` to accept `isValid` flags.
+    -   **Rule**: Button only turns Green/Red if `isValid == true`. Otherwise, it stays Gray (Active Wait) or Hidden.
+2.  **"Dirty Checking" (Smart Updates)**:
+    -   Refactor all `Update...` methods in `DashboardPanel.mqh`.
+    -   Read current property value (`ObjectGetString`/`Integer`) before writing.
+    -   **Only write if different**. This reduces API calls by ~90%.
+3.  **Event Handling**:
+    -   Add "Action Blocked" debug prints in `OnChartEvent` if a user clicks an apparently active button that fails.
+    -   Ensure immediate `OBJPROP_STATE` reset after clicks.
 
-## 3. Bug Fixes & Code Quality
+## Part 2: Layout Restructuring (UI Move)
 
-*   **Compilation Error Fixes:**
-    *   Resolved "undeclared identifier" errors by ensuring all new methods and variables (like `m_blink_state`) are properly declared.
-    *   Fixed a syntax error in `TradeManager.mqh` (restored missing closing brace).
-*   **Object Naming Alignment:**
-    *   Corrected mismatched object names in `UpdateStrategyInfo` to ensure live data updates correctly on the chart.
-*   **Signal Engine Optimization:**
-    *   Added `IsDataReady()` check to ensure the EA waits for market history synchronization before displaying advice.
+### Objective
+Move "Strategy Signal" section from **Panel A (Left)** to **Panel B (Right)**, positioning it between "Auto Strategy" and "Pending Alerts".
 
-## 4. Current File State
-| File | Role | Status |
-| :--- | :--- | :--- |
-| `WidwaPa_Assistant.mq5` | Main EA Logic | Updated (Smart Trail Enabled, Auto-Trading Fix) |
-| `DashboardPanel.mqh` | UI Framework | Updated (Dark Mode, Blink, Z-Order Fix) |
-| `SignalEngine.mqh` | Market Analysis | Updated (Permissive Pending Logic) |
-| `TradeManager.mqh` | Execution Engine | Updated (SmartProfitLock Added) |
-| `Definitions.mqh` | Shared Constants | Stable |
+### Execution Details
+1.  **Target Coordinates**:
+    -   **Previous Location**: Left Panel, Y=230.
+    -   **New Location**: Right Panel, below "Auto Strategy" (approx Y=215).
+    -   **Vertical Space**: Available space in Right Panel is Y=200 to Y=370. The section height is ~115px, fitting perfectly.
 
----
-**Next Steps:**
-*   Decide on the best configuration/strategy for Trailing Stop (TP Tailing).
-*   Continue monitoring live performance.
+2.  **Code Migration (`DashboardPanel::CreatePanel`)**:
+    -   **Move Code Block**: Cut the "3. Strategy Signal" block.
+    -   **Insert**: Paste it after the "5. Auto Strategy Options" block.
+    -   **Update Variables**: Change `left_x` to `right_x` for all moved elements (`LblSig`, `InfoBG`, `Trend_T`, `PA_T`, `Adv_T`, `Ver`, etc.).
+    -   **Recalculate Y-Offsets**:
+        -   Header (`LblSig`): **Y = 215**
+        -   Background (`InfoBG`): **Y = 235**
+        -   Inner Elements: Maintain relative spacing from new background top.
 
-**Status:** All requested UI and logic changes are deployed and verified for compilation.
+3.  **Panel A (Left) Cleanup**:
+    -   The move leaves a large void in Panel A (Left).
+    -   **Action**: Extend the "Daily Zones Table" (Smart Grid) to show more zones (e.g., increase from 5 to 10 zones) to utilize the newly available vertical space effectively.
+
+## Verification Checklist
+-   [ ] **Responsiveness**: Buttons react instantly.
+-   [ ] **Clickability**: Buttons only active when trade is valid.
+-   [ ] **Layout**: "Strategy Signal" sits neatly in Right Panel without overlapping "Pending Alerts".
+-   [ ] **Left Panel**: Empty space is utilized (extended grid).
+-   [ ] **Performance**: `OnTimer` execution is < 1ms on average.
