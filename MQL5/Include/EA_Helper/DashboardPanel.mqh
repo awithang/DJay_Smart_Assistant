@@ -139,112 +139,112 @@ void CDashboardPanel::CreatePanel()
 
    // 1. Header Section (Left Panel)
    // Title with left padding, Balance with same right padding (mirrored)
-   CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 10, "Arial Bold");
-   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", clrWhite, 10, "Arial Bold", "right");
+   CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", m_header_color, 11, "Arial Bold");
+   CreateLabel("Balance", left_x + half_width - pad, 15, "$--", clrWhite, 11, "Arial Bold", "right");
 
    // 2. Market Status (Left Panel)
-   CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 8);
-   CreateLabel("LblTime", left_x + pad + 100, 35, "M5: --:--", clrGray, 8); // Moved to top row
+   CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 9);
+   CreateLabel("LblTime", left_x + pad + 100, 35, "M5: --:--", clrGray, 9); 
    
-   CreateLabel("LblRunTime", left_x + pad, 48, "SIDEWAY", clrGray, 8, "Arial Bold"); // New RunTime label
-   CreateLabel("LblZoneStat", left_x + pad, 61, "NEUTRAL", clrGray, 8, "Arial Bold"); // Renamed LblStat -> ZoneStat
+   CreateLabel("LblRunTime", left_x + pad, 48, "SIDEWAY", clrGray, 9, "Arial Bold");
+   CreateLabel("LblZoneStat", left_x + pad, 61, "NEUTRAL", clrGray, 9, "Arial Bold");
 
    // 3. Daily Zones Table (Left Panel)
-   CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
+   CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 10, "Arial Bold");
    CreateRect("TableBG", left_x, 90, half_width, 110, C'5,5,15', true, C'45,45,60');
 
    // Table Headers
-   CreateLabel("H_Z", left_x + 10, 100, "ZONE", clrGray, 7);
-   CreateLabel("H_P", left_x + 85, 100, "PRICE", clrGray, 7);
-   CreateLabel("H_D", left_x + 150, 100, "DIST", clrGray, 7);
+   CreateLabel("H_Z", left_x + 10, 100, "ZONE", clrGray, 8);
+   CreateLabel("H_P", left_x + 85, 100, "PRICE", clrGray, 8);
+   CreateLabel("H_D", left_x + 150, 100, "DIST", clrGray, 8);
 
    // Table Rows (5 rows)
    for(int i = 0; i < 5; i++)
    {
       string id = IntegerToString(i);
       int ry = 115 + (i * 18);
-      CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 8);
-      CreateLabel("L_P_" + id, left_x + 85, ry, "0.00", m_text_color, 8);
-      CreateLabel("L_D_" + id, left_x + 150, ry, "0 pts", clrGray, 8);
+      CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
+      CreateLabel("L_P_" + id, left_x + 85, ry, "0.00", m_text_color, 9);
+      CreateLabel("L_D_" + id, left_x + 150, ry, "0 pts", clrGray, 9);
    }
 
    // 4. Strategy Signal (Left Panel - Bottom)
-   CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 9, "Arial Bold");
+   CreateLabel("LblSig", left_x + pad, 215, "STRATEGY SIGNAL", m_text_color, 10, "Arial Bold");
    CreateRect("InfoBG", left_x, 230, half_width, 140, C'5,5,15');
 
-   CreateLabel("Trend_T", left_x + 10, 242, "Trend:", clrGold, 8);
-   CreateLabel("Trend_V", left_x + 50, 242, "--", clrGray, 8, "Arial Bold");
+   CreateLabel("Trend_T", left_x + 10, 242, "Trend:", clrGold, 9);
+   CreateLabel("Trend_V", left_x + 50, 242, "--", clrGray, 9, "Arial Bold");
 
    // PA Signal (moved under Trend)
-   CreateLabel("PA_T", left_x + 10, 258, "PA Signal:", clrGold, 8);
-   CreateLabel("PA_V", left_x + 75, 258, "NONE", clrGray, 8);
+   CreateLabel("PA_T", left_x + 10, 258, "PA Signal:", clrGold, 9);
+   CreateLabel("PA_V", left_x + 75, 258, "NONE", clrGray, 9);
 
    // Reversal Alert (replaces EMA M15)
-   CreateLabel("Rev_T", left_x + 10, 274, "Reversal Alert:", clrGold, 8);
-   CreateLabel("Rev_V", left_x + 95, 274, "--", clrGray, 8);
-   CreateButton("BtnRev", left_x + half_width - 45, 272, 35, 16, "SET", clrGray, clrWhite, 7);
+   CreateLabel("Rev_T", left_x + 10, 274, "Reversal Alert:", clrGold, 9);
+   CreateLabel("Rev_V", left_x + 95, 274, "--", clrGray, 9);
+   CreateButton("BtnRev", left_x + half_width - 45, 272, 35, 16, "SET", clrGray, clrWhite, 8);
 
    // Breakout Alert (replaces EMA H1)
-   CreateLabel("Break_T", left_x + 10, 290, "Breakout Alert:", clrGold, 8);
-   CreateLabel("Break_V", left_x + 95, 290, "--", clrGray, 8);
-   CreateButton("BtnBrk", left_x + half_width - 45, 288, 35, 16, "SET", clrGray, clrWhite, 7);
+   CreateLabel("Break_T", left_x + 10, 290, "Breakout Alert:", clrGold, 9);
+   CreateLabel("Break_V", left_x + 95, 290, "--", clrGray, 9);
+   CreateButton("BtnBrk", left_x + half_width - 45, 288, 35, 16, "SET", clrGray, clrWhite, 8);
 
    // Separator line before Advisor
    CreateRect("Sep1", left_x + 8, 302, half_width - 16, 1, C'60,60,70');
 
    // Advisor: Natural language recommendation
-   CreateLabel("Adv_T", left_x + 10, 312, "Advisor:", m_accent_color, 9, "Arial Bold");
-   CreateLabel("Adv_V", left_x + 10, 327, "Scanning market...", clrCyan, 8);
-   CreateLabel("Adv_V2", left_x + 10, 342, "", clrCyan, 8);
+   CreateLabel("Adv_T", left_x + 10, 312, "Advisor:", m_accent_color, 10, "Arial Bold");
+   CreateLabel("Adv_V", left_x + 10, 327, "Scanning market...", clrCyan, 9);
+   CreateLabel("Adv_V2", left_x + 10, 342, "", clrCyan, 9);
 
    // REMOVED Risk_T and Risk_V labels
 
-   CreateLabel("Ver", left_x + half_width - pad, 363, "v4.0", clrGray, 7);
+   CreateLabel("Ver", left_x + half_width - pad, 363, "v4.0", clrGray, 8);
 
    // ============================================
    // RIGHT PANEL (50%)
    // ============================================
 
    // 5. Execution Section (Right Panel - Top)
-   CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 9, "Arial Bold");
-   CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 9, "Arial Bold", "right");
+   CreateLabel("LblCtrl", right_x + pad, 15, "EXECUTION", m_text_color, 10, "Arial Bold");
+   CreateLabel("LblPrice", right_x + half_width - pad, 15, "0.00000", m_header_color, 10, "Arial Bold", "right");
 
-   CreateLabel("LblRisk", right_x + pad, 38, "Risk %", clrGray, 8);
+   CreateLabel("LblRisk", right_x + pad, 38, "Risk %", clrGray, 9);
    CreateEdit("EditRisk", right_x + half_width - pad - 25, 35, 30, 18, "1.0");
 
-   CreateButton("BtnBuy", right_x + pad, 62, (half_width - 30) / 2, 38, "BUY", m_buy_color);
-   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 62, (half_width - 30) / 2, 38, "SELL", m_sell_color);
+   CreateButton("BtnBuy", right_x + pad, 62, (half_width - 30) / 2, 38, "BUY", m_buy_color, clrWhite, 9);
+   CreateButton("BtnSell", right_x + pad + (half_width - 30) / 2 + 10, 62, (half_width - 30) / 2, 38, "SELL", m_sell_color, clrWhite, 9);
 
    // Confirm Button (Pending recommendation)
-   CreateButton("BtnConfirm", right_x + pad, 110, half_width - 20, 28, "NO SIGNAL", C'50,50,60', C'100,100,100');
+   CreateButton("BtnConfirm", right_x + pad, 110, half_width - 20, 28, "NO SIGNAL", C'50,50,60', C'100,100,100', 9);
 
    // 6. Auto Strategy Options (Right Panel - Below Confirm)
    int stratY = 152;
-   CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 9, "Arial Bold");
+   CreateLabel("LblStratTitle", right_x + pad, stratY, "AUTO STRATEGY", m_text_color, 10, "Arial Bold");
 
    // Auto Mode Toggle (Next to title)
-   CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite);
+   CreateButton("BtnMode", right_x + half_width - 55, stratY - 5, 45, 22, "OFF", clrGray, clrWhite, 9);
 
    // Section Box
    CreateRect("StratBG", right_x, stratY + 25, half_width, 90, C'5,5,15', true, C'45,45,60');
 
    CreateButton("BtnStratArrow", right_x + 10, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Arrow", right_x + 30, stratY + 38, "Arrow", clrCyan, 8, "Arial Bold");
+   CreateLabel("L_Arrow", right_x + 30, stratY + 38, "Arrow", clrCyan, 9, "Arial Bold");
 
    CreateButton("BtnStratRev", right_x + 80, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Rev", right_x + 100, stratY + 38, "Rev", clrCyan, 8, "Arial Bold");
+   CreateLabel("L_Rev", right_x + 100, stratY + 38, "Rev", clrCyan, 9, "Arial Bold");
 
    CreateButton("BtnStratBreak", right_x + 150, stratY + 38, 15, 15, "", clrGray);
-   CreateLabel("L_Break", right_x + 170, stratY + 38, "Break", clrCyan, 8, "Arial Bold");
+   CreateLabel("L_Break", right_x + 170, stratY + 38, "Break", clrCyan, 9, "Arial Bold");
 
    // Last Trade Label
-   CreateLabel("LblLastAuto", right_x + 10, stratY + 70, "Last: ---", C'80,80,80', 7);
+   CreateLabel("LblLastAuto", right_x + 10, stratY + 70, "Last: ---", C'80,80,80', 8);
 
    // 7. Active Orders Section (moved to bottom, full width)
    // Position below all other content, covers both left and right panels
    int orderY = 385;  // Bottom of panel, full width
-   CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 9, "Arial Bold");
-   CreateButton("BtnCloseAll", x + m_panel_width - 70, orderY - 2, 60, 18, "CLOSE ALL", m_sell_color, clrWhite, 7);
+   CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", clrLime, 10, "Arial Bold");
+   CreateButton("BtnCloseAll", x + m_panel_width - 70, orderY - 2, 60, 18, "CLOSE ALL", m_sell_color, clrWhite, 8);
 
    // Full-width order list with individual close buttons
    CreateRect("OrderListBG", x, orderY + 20, m_panel_width - 20, 115, C'5,5,15', true, C'45,45,60');
@@ -253,9 +253,9 @@ void CDashboardPanel::CreatePanel()
       string sid = IntegerToString(i);
       int rowY = orderY + 38 + (i * 26);
       // Order info label (increased text size to 9)
-      CreateLabel("ActOrder_"+sid, x + 10, rowY, "", clrWhite, 9);
+      CreateLabel("ActOrder_"+sid, x + 10, rowY, "", clrWhite, 10);
       // Individual close button for each order (small X button)
-      CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 8);
+      CreateButton("BtnCloseOrder_"+sid, x + m_panel_width - 45, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
    }
 
    UpdateAccountInfo();
