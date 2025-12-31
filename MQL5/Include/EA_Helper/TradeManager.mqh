@@ -48,6 +48,7 @@ public:
    //--- Utility Functions
    double GetPositionProfit();
    int    GetOpenPositionsCount();
+   bool   HasOpenPosition(string comment_filter);
 };
 
 //+------------------------------------------------------------------+
@@ -554,6 +555,27 @@ int CTradeManager::GetOpenPositionsCount()
    }
 
    return count;
+}
+
+//+------------------------------------------------------------------+
+//| Check if open position exists with specific comment substring    |
+//+------------------------------------------------------------------+
+bool CTradeManager::HasOpenPosition(string comment_filter)
+{
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == m_magic_number)
+         {
+            string comment = PositionGetString(POSITION_COMMENT);
+            if(StringFind(comment, comment_filter) >= 0)
+               return true;
+         }
+      }
+   }
+   return false;
 }
 
 //+------------------------------------------------------------------+

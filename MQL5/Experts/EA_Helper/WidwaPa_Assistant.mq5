@@ -52,6 +52,10 @@ bool g_strat_arrow;
 bool g_strat_rev;
 bool g_strat_break;
 
+//--- Strategy Entry State (for Manual Execution buttons)
+EntryPoint g_last_rev_entry;
+EntryPoint g_last_brk_entry;
+
 //--- Recommendation State (for One-Click Execution)
 ENUM_ORDER_TYPE g_rec_type = ORDER_TYPE_BUY_LIMIT; // Default placeholder
 double          g_rec_price = 0.0;
@@ -130,6 +134,47 @@ void OnTick()
    if(Input_Use_Smart_Trail)
    {
       tradeManager.SmartProfitLock(Input_Trail_Trigger_Pct, Input_Trail_Lock_Pct);
+   }
+
+   // --- Real-time Dashboard Updates (Safe Implementation) ---
+   dashboardPanel.UpdatePrice(currentPrice);
+
+   // Only update order list if profit changes or count changes to avoid UI lag
+   static double lastTotalProfit = -9999;
+   static int lastPositionsCount = -1;
+   // totalProfit already calculated above
+   int currentPositionsCount = PositionsTotal();
+
+   if(MathAbs(totalProfit - lastTotalProfit) > 0.01 || currentPositionsCount != lastPositionsCount)
+   {
+      string orderDetails[4];
+      long orderTickets[4];
+      int orderTypes[4];
+      int activeCount = 0;
+      int magic = Input_MagicNumber;
+
+      for(int i=0; i<PositionsTotal() && activeCount < 4; i++)
+      {
+         ulong ticket = PositionGetTicket(i);
+         if(PositionSelectByTicket(ticket))
+         {
+            if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == magic)
+            {
+               ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+               double lot = PositionGetDouble(POSITION_VOLUME);
+               double profit = PositionGetDouble(POSITION_PROFIT);
+               string typeStr = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+
+               orderDetails[activeCount] = StringFormat("#%d %s %.2f  $%.2f", (int)ticket, typeStr, lot, profit);
+               orderTickets[activeCount] = (long)ticket;
+               orderTypes[activeCount] = (int)type;
+               activeCount++;
+            }
+         }
+      }
+      dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes);
+      lastTotalProfit = totalProfit;
+      lastPositionsCount = currentPositionsCount;
    }
 
    // Check for PA signals (only on new bar)
@@ -246,37 +291,7 @@ void OnTimer()
 
    dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
 
-   // Update Active Orders List
-   string orderDetails[4];
-   long orderTickets[4];
-   int orderTypes[4];  // Store order types for color theming
-   int activeCount = 0;
-   int magic = Input_MagicNumber;
-
-   for(int i=0; i<PositionsTotal() && activeCount < 4; i++)
-   {
-      ulong ticket = PositionGetTicket(i);
-      if(PositionSelectByTicket(ticket))
-      {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == magic)
-         {
-            ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-            double lot = PositionGetDouble(POSITION_VOLUME);
-            double profit = PositionGetDouble(POSITION_PROFIT);
-            string typeStr = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
-
-            orderDetails[activeCount] = StringFormat("#%d %s %.2f  $%.2f",
-                                                   (int)ticket,
-                                                   typeStr, lot, profit);
-            orderTickets[activeCount] = (long)ticket;
-            orderTypes[activeCount] = (int)type;  // Store position type (0=BUY, 1=SELL)
-            activeCount++;
-         }
-      }
-   }
-   dashboardPanel.UpdateActiveOrders(activeCount, orderTickets, orderDetails, orderTypes);
-
-   // 3. NEW: Update Strategy Signals using SignalEngine methods
+   // 3. Update Strategy Signals using SignalEngine methods
    signalEngine.RefreshData();
 
    if(!signalEngine.IsDataReady())
@@ -295,57 +310,17 @@ void OnTimer()
    CombinedSignal paSignal = signalEngine.GetCombinedPASignal();
    string paText = paSignal.description;
 
-   // 3c. EMA Distance (M15 and H1)
-   EMADistance emaDist = signalEngine.GetEMADistance();
-   string emaM15Text = StringFormat("%.0f / %.0f", emaDist.m15_ema100, emaDist.m15_ema200);
-   string emaH1Text = StringFormat("%.0f / %.0f", emaDist.h1_ema100, emaDist.h1_ema200);
+   // Update strategy panel (new signature: reversal_alert, breakout_alert, pa_signal)
+   g_last_rev_entry = signalEngine.GetReversalEntryPoint();
+   g_last_brk_entry = signalEngine.GetBreakoutEntryPoint();
 
-   // 3d. Smart SL/TP Price Targets (based on trend direction)
-   string riskRec = "";
-
-   // Get current price and H1 trend direction for SL/TP calculation
-   double price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   ENUM_TREND_DIRECTION h1Trend = signalEngine.GetTrendDirection(PERIOD_H1);
-
-   if(h1Trend == TREND_UP)
-   {
-      // Uptrend: Buy setup - SL below, TP above
-      double slPrice = price - (Input_SL_Points * _Point);
-      double tpPrice = price + (Input_SL_Points * 2 * _Point);
-      riskRec = StringFormat("SL:%s TP:%s",
-                             DoubleToString(slPrice, _Digits),
-                             DoubleToString(tpPrice, _Digits));
-   }
-   else if(h1Trend == TREND_DOWN)
-   {
-      // Downtrend: Sell setup - SL above, TP below
-      double slPrice = price + (Input_SL_Points * _Point);
-      double tpPrice = price - (Input_SL_Points * 2 * _Point);
-      riskRec = StringFormat("SL:%s TP:%s",
-                             DoubleToString(slPrice, _Digits),
-                             DoubleToString(tpPrice, _Digits));
-   }
-   else
-   {
-      // Flat/Sideways: Show point distances as fallback
-      riskRec = StringFormat("%d/%d pts", Input_SL_Points, Input_SL_Points * 2);
-   }
-
-   // Update strategy panel (new signature: reversal_alert, breakout_alert, pa_signal, risk_rec)
-   // Get reversal and breakout entry points
-   EntryPoint reversalEntry = signalEngine.GetReversalEntryPoint();
-   EntryPoint breakoutEntry = signalEngine.GetBreakoutEntryPoint();
-
-   string reversalAlert = reversalEntry.description;
-   string breakoutAlert = breakoutEntry.description;
-
-   dashboardPanel.UpdateStrategyInfo(reversalAlert, breakoutAlert, paText, riskRec);
+   dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_brk_entry.description, paText);
 
    // 3e. Zone Status
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
-   // 3f. Advisor Message (Natural Language Trade Recommendation)
+   // 3f. Advisor Message
    string advisorMessage = signalEngine.GetAdvisorMessage();
    dashboardPanel.UpdateAdvisor(advisorMessage);
 
@@ -373,11 +348,11 @@ void OnTimer()
    // 4. Panel Updates
    dashboardPanel.UpdateAccountInfo();
 
-   double currentPrice = signalEngine.GetCurrentPrice();
-   dashboardPanel.UpdatePrice(currentPrice);
+   // Price and Orders are now updated in OnTick for real-time responsiveness
 
    double d1Open = signalEngine.GetD1Open();
    dashboardPanel.UpdateWidwaZones(d1Open);
+   double currentPrice = signalEngine.GetCurrentPrice();
 
    // 5. Update Chart Zones
    chartZones.Update(d1Open, currentPrice);
@@ -425,6 +400,33 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "WidwaPa Pending");
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
+      }
+      // Reversal/Breakout Action Buttons
+      else if(dashboardPanel.IsRevActionClicked(sparam))
+      {
+         if(g_last_rev_entry.isValid)
+         {
+            double risk = dashboardPanel.GetRiskPercent();
+            ENUM_ORDER_TYPE type = (g_last_rev_entry.direction == "BUY") ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
+            double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price - (Input_SL_Points * _Point) : g_last_rev_entry.price + (Input_SL_Points * _Point);
+            double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price + (Input_SL_Points * 2 * _Point) : g_last_rev_entry.price - (Input_SL_Points * 2 * _Point);
+            
+            tradeManager.ExecutePending(type, g_last_rev_entry.price, sl, tp, risk, "WidwaPa Rev Button");
+         }
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      else if(dashboardPanel.IsBrkActionClicked(sparam))
+      {
+         if(g_last_brk_entry.isValid)
+         {
+            double risk = dashboardPanel.GetRiskPercent();
+            ENUM_ORDER_TYPE type = (g_last_brk_entry.direction == "BUY") ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
+            double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price - (Input_SL_Points * _Point) : g_last_brk_entry.price + (Input_SL_Points * _Point);
+            double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price + (Input_SL_Points * 2 * _Point) : g_last_brk_entry.price - (Input_SL_Points * 2 * _Point);
+            
+            tradeManager.ExecutePending(type, g_last_brk_entry.price, sl, tp, risk, "WidwaPa Brk Button");
+         }
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       // Strategy Toggles
       else if(dashboardPanel.IsStratArrowClicked(sparam))
@@ -480,6 +482,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 //+------------------------------------------------------------------+
 void ExecuteBuyTrade(string strategy="MANUAL")
 {
+   // Duplicate Prevention: Check if position with same strategy comment already exists
+   if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
+   {
+      Print("Duplicate Trade Blocked: strategy ", strategy, " already has an open position.");
+      return;
+   }
+
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double riskPercent = dashboardPanel.GetRiskPercent();
    double sl = currentPrice - (Input_SL_Points * _Point);
@@ -510,6 +519,13 @@ void ExecuteBuyTrade(string strategy="MANUAL")
 //+------------------------------------------------------------------+
 void ExecuteSellTrade(string strategy="MANUAL")
 {
+   // Duplicate Prevention: Check if position with same strategy comment already exists
+   if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
+   {
+      Print("Duplicate Trade Blocked: strategy ", strategy, " already has an open position.");
+      return;
+   }
+
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double riskPercent = dashboardPanel.GetRiskPercent();
    double sl = currentPrice + (Input_SL_Points * _Point);

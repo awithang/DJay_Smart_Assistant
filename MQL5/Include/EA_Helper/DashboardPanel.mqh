@@ -55,7 +55,7 @@ public:
    void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
    void UpdateWidwaZones(double d1_open);
-   void UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig, string risk_rec);
+   void UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig);
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
@@ -80,6 +80,9 @@ public:
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
+
+   bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
+   bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
 
    double GetRiskPercent();              
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
@@ -141,8 +144,10 @@ void CDashboardPanel::CreatePanel()
 
    // 2. Market Status (Left Panel)
    CreateLabel("LblSes", left_x + pad, 35, "SESSION: --", m_text_color, 8);
-   CreateLabel("LblTime", left_x + pad, 50, "M5: --:--", clrGray, 8);
-   CreateLabel("LblStat", left_x + pad + 130, 42, "SIDEWAY", clrGray, 9, "Arial Bold");
+   CreateLabel("LblTime", left_x + pad + 100, 35, "M5: --:--", clrGray, 8); // Moved to top row
+   
+   CreateLabel("LblRunTime", left_x + pad, 48, "SIDEWAY", clrGray, 8, "Arial Bold"); // New RunTime label
+   CreateLabel("LblZoneStat", left_x + pad, 61, "NEUTRAL", clrGray, 8, "Arial Bold"); // Renamed LblStat -> ZoneStat
 
    // 3. Daily Zones Table (Left Panel)
    CreateLabel("LblZ", left_x + pad, 75, "DAILY ZONES (Smart Grid)", m_accent_color, 9, "Arial Bold");
@@ -177,10 +182,12 @@ void CDashboardPanel::CreatePanel()
    // Reversal Alert (replaces EMA M15)
    CreateLabel("Rev_T", left_x + 10, 274, "Reversal Alert:", clrGold, 8);
    CreateLabel("Rev_V", left_x + 95, 274, "--", clrGray, 8);
+   CreateButton("BtnRev", left_x + half_width - 45, 272, 35, 16, "SET", clrGray, clrWhite, 7);
 
    // Breakout Alert (replaces EMA H1)
    CreateLabel("Break_T", left_x + 10, 290, "Breakout Alert:", clrGold, 8);
    CreateLabel("Break_V", left_x + 95, 290, "--", clrGray, 8);
+   CreateButton("BtnBrk", left_x + half_width - 45, 288, 35, 16, "SET", clrGray, clrWhite, 7);
 
    // Separator line before Advisor
    CreateRect("Sep1", left_x + 8, 302, half_width - 16, 1, C'60,60,70');
@@ -190,8 +197,7 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Adv_V", left_x + 10, 327, "Scanning market...", clrCyan, 8);
    CreateLabel("Adv_V2", left_x + 10, 342, "", clrCyan, 8);
 
-   CreateLabel("Risk_T", left_x + 10, 358, "Rec. SL/TP:", clrGold, 8);
-   CreateLabel("Risk_V", left_x + 75, 358, "-- / --", clrWhite, 8);
+   // REMOVED Risk_T and Risk_V labels
 
    CreateLabel("Ver", left_x + half_width - pad, 363, "v4.0", clrGray, 7);
 
@@ -379,38 +385,52 @@ void CDashboardPanel::UpdateSessionInfo(string session_name, string countdown, b
    ObjectSetString(m_chart_id, m_prefix+"LblSes", OBJPROP_TEXT, "SESSION: " + session_name);
    ObjectSetString(m_chart_id, m_prefix+"LblTime", OBJPROP_TEXT, countdown);
    if(is_gold_time) {
-      ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, "RUN TIME");
-      ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, clrLime);
+      ObjectSetString(m_chart_id, m_prefix+"LblRunTime", OBJPROP_TEXT, "RUN TIME");
+      ObjectSetInteger(m_chart_id, m_prefix+"LblRunTime", OBJPROP_COLOR, clrLime);
    } else {
-      ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, "SIDEWAY");
-      ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, clrGray);
+      ObjectSetString(m_chart_id, m_prefix+"LblRunTime", OBJPROP_TEXT, "SIDEWAY");
+      ObjectSetInteger(m_chart_id, m_prefix+"LblRunTime", OBJPROP_COLOR, clrGray);
    }
 }
 
-void CDashboardPanel::UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig, string risk_rec)
+void CDashboardPanel::UpdateStrategyInfo(string reversal_alert, string breakout_alert, string pa_sig)
 {
-   // Toggle blink state
-   m_blink_state = !m_blink_state;
-
-   // Update Reversal Alert
+   // Update Reversal Alert & Button
    ObjectSetString(m_chart_id, m_prefix+"Rev_V", OBJPROP_TEXT, reversal_alert);
+   if(StringFind(reversal_alert, "BUY") >= 0) {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnRev", OBJPROP_BGCOLOR, m_buy_color);
+      ObjectSetString(m_chart_id, m_prefix+"BtnRev", OBJPROP_TEXT, "BUY");
+   } else if(StringFind(reversal_alert, "SELL") >= 0) {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnRev", OBJPROP_BGCOLOR, m_sell_color);
+      ObjectSetString(m_chart_id, m_prefix+"BtnRev", OBJPROP_TEXT, "SELL");
+   } else {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnRev", OBJPROP_BGCOLOR, clrGray);
+      ObjectSetString(m_chart_id, m_prefix+"BtnRev", OBJPROP_TEXT, "SET");
+   }
 
-   // Update Breakout Alert
+   // Update Breakout Alert & Button
    ObjectSetString(m_chart_id, m_prefix+"Break_V", OBJPROP_TEXT, breakout_alert);
+   if(StringFind(breakout_alert, "BUY") >= 0) {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnBrk", OBJPROP_BGCOLOR, m_buy_color);
+      ObjectSetString(m_chart_id, m_prefix+"BtnBrk", OBJPROP_TEXT, "BUY");
+   } else if(StringFind(breakout_alert, "SELL") >= 0) {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnBrk", OBJPROP_BGCOLOR, m_sell_color);
+      ObjectSetString(m_chart_id, m_prefix+"BtnBrk", OBJPROP_TEXT, "SELL");
+   } else {
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnBrk", OBJPROP_BGCOLOR, clrGray);
+      ObjectSetString(m_chart_id, m_prefix+"BtnBrk", OBJPROP_TEXT, "SET");
+   }
 
    // Update PA Signal
    ObjectSetString(m_chart_id, m_prefix+"PA_V", OBJPROP_TEXT, pa_sig);
 
    color pc = clrGray;
    if(StringFind(pa_sig, "BUY") >= 0)
-      pc = m_blink_state ? clrLime : m_bg_color; // Blink Green
+      pc = m_buy_color;
    else if(StringFind(pa_sig, "SELL") >= 0)
-      pc = m_blink_state ? clrRed : m_bg_color; // Blink Red
+      pc = m_sell_color;
 
    ObjectSetInteger(m_chart_id, m_prefix+"PA_V", OBJPROP_COLOR, pc);
-
-   // Update Risk Recommendation
-   ObjectSetString(m_chart_id, m_prefix+"Risk_V", OBJPROP_TEXT, risk_rec);
 }
 
 void CDashboardPanel::UpdateAccountInfo()
@@ -560,8 +580,8 @@ void CDashboardPanel::UpdateZoneStatus(int zoneStatus)
    }
 
    // Update the status label in the header area
-   ObjectSetString(m_chart_id, m_prefix+"LblStat", OBJPROP_TEXT, statusText);
-   ObjectSetInteger(m_chart_id, m_prefix+"LblStat", OBJPROP_COLOR, statusColor);
+   ObjectSetString(m_chart_id, m_prefix+"LblZoneStat", OBJPROP_TEXT, statusText);
+   ObjectSetInteger(m_chart_id, m_prefix+"LblZoneStat", OBJPROP_COLOR, statusColor);
 }
 
 //+------------------------------------------------------------------+

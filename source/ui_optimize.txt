@@ -9,3 +9,5 @@
 5. Prevent auto mode to make duplicate order when condition meet more than 1 condition.
 
 6. Make sure auto mode will not make more order if the previous order from same condition not finish.
+
+7. Rearrange Reversal and Breakout Alert in Strategy Signal section. Add button for each one and make pending order at reversal or breakout price when button click.
