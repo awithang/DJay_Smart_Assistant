@@ -87,6 +87,7 @@ int OnInit()
    dashboardPanel.UpdateWidwaZones(d1Open);
 
    EventSetTimer(1);
+   ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // Enable Mouse Events for Dragging
 
    Print("DJAY Smart Assistant initialized successfully.");
    return(INIT_SUCCEEDED);
@@ -371,6 +372,9 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
+   // Forward event to dashboard for handling (e.g. Dragging)
+   dashboardPanel.OnEvent(id, lparam, dparam, sparam);
+
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
       if(dashboardPanel.IsBuyButtonClicked(sparam)) 

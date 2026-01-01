@@ -1,54 +1,54 @@
-# Implementation Plan: UI Optimization & Layout Restructuring
+# Implementation Plan: Draggable Dashboard (Performance Optimized)
 
 ## Objective
-1.  **Fix UI Responsiveness**: Resolve "unclickable" button issues and optimize EA performance.
-2.  **Restructure Dashboard**: Move the "Strategy Signal" section to Panel B (Right Side) for better logical grouping.
+Allow the main dashboard panel to be dragged and dropped to any position on the chart, specifically optimizing for zero lag and minimal CPU usage.
 
-## Part 1: Performance & Responsiveness (Critical)
+## Performance Strategy
+**"Ghost/Lazy Dragging"**: Moving 50+ UI objects (buttons, labels, inputs) simultaneously on every mouse move event is computationally expensive and causes chart flickering.
+**Solution**:
+1.  **On Drag Start**: Identify the drag action.
+2.  **During Drag**: Move **only** the main background panel (or a lightweight outline). This is extremely fast (1 object update).
+3.  **On Drop**: Instantly snap all other UI elements (buttons, text) to the new position.
 
-### Root Cause Analysis
--   **Unclickable Buttons**: Visual "Active" state (Green/Red) does not match logical `isValid` state. Users click a green button, but the code rejects it because the internal signal isn't ready.
--   **UI Lag**: `OnTimer` blindly updates all objects every second, flooding the terminal with redundant commands.
+## Implementation Steps
 
-### Implementation Steps
-1.  **Sync Visuals with Logic**:
-    -   Update `DashboardPanel::UpdateStrategyInfo` to accept `isValid` flags.
-    -   **Rule**: Button only turns Green/Red if `isValid == true`. Otherwise, it stays Gray (Active Wait) or Hidden.
-2.  **"Dirty Checking" (Smart Updates)**:
-    -   Refactor all `Update...` methods in `DashboardPanel.mqh`.
-    -   Read current property value (`ObjectGetString`/`Integer`) before writing.
-    -   **Only write if different**. This reduces API calls by ~90%.
-3.  **Event Handling**:
-    -   Add "Action Blocked" debug prints in `OnChartEvent` if a user clicks an apparently active button that fails.
-    -   Ensure immediate `OBJPROP_STATE` reset after clicks.
+### 1. Enable Mouse Events
+*   **File**: `MQL5/Experts/EA_Helper/WidwaPa_Assistant.mq5`
+*   **Action**: Add `ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);` in `OnInit`.
 
-## Part 2: Layout Restructuring (UI Move)
+### 2. Update `CDashboardPanel` Class Structure
+*   **File**: `MQL5/Include/EA_Helper/DashboardPanel.mqh`
+*   **Data Structure**:
+    -   Define a struct `PanelObject` (`string name`, `int relative_x`, `int relative_y`) to cache object offsets.
+    -   Add an array `m_objects[]` to store this registry.
+    -   Add state variables: `m_is_dragging`, `m_drag_offset_x`, `m_drag_offset_y`.
 
-### Objective
-Move "Strategy Signal" section from **Panel A (Left)** to **Panel B (Right)**, positioning it between "Auto Strategy" and "Pending Alerts".
+### 3. Modify Object Creation Helpers
+*   **File**: `MQL5/Include/EA_Helper/DashboardPanel.mqh`
+*   **Action**: Update `CreateRect`, `CreateLabel`, `CreateButton`, etc.
+*   **Logic**: Every time an object is created, calculate its `relative_x = x - m_base_x` and `relative_y = ry - m_base_y` and add it to `m_objects[]`.
+    -   *Benefit*: This pre-calculates the geometry, making the "Drop" action an O(N) linear iteration with simple addition, avoiding complex recalculations.
 
-### Execution Details
-1.  **Target Coordinates**:
-    -   **Previous Location**: Left Panel, Y=230.
-    -   **New Location**: Right Panel, below "Auto Strategy" (approx Y=215).
-    -   **Vertical Space**: Available space in Right Panel is Y=200 to Y=370. The section height is ~115px, fitting perfectly.
+### 4. Implement Drag Logic
+*   **File**: `MQL5/Include/EA_Helper/DashboardPanel.mqh`
+*   **New Method**: `OnEvent(int id, long& lparam, double& dparam, string& sparam)`
+    -   **Mouse Down**: Check if cursor is over the "Header" area. If yes, set `m_is_dragging = true` and record starting offset.
+    -   **Mouse Move**:
+        -   If `m_is_dragging == true`:
+        -   Calculate `new_x`, `new_y`.
+        -   Update **only** the `MainBG` object's position (visual feedback).
+    -   **Mouse Up**:
+        -   Set `m_is_dragging = false`.
+        -   Call `MovePanel(new_x, new_y)`.
 
-2.  **Code Migration (`DashboardPanel::CreatePanel`)**:
-    -   **Move Code Block**: Cut the "3. Strategy Signal" block.
-    -   **Insert**: Paste it after the "5. Auto Strategy Options" block.
-    -   **Update Variables**: Change `left_x` to `right_x` for all moved elements (`LblSig`, `InfoBG`, `Trend_T`, `PA_T`, `Adv_T`, `Ver`, etc.).
-    -   **Recalculate Y-Offsets**:
-        -   Header (`LblSig`): **Y = 215**
-        -   Background (`InfoBG`): **Y = 235**
-        -   Inner Elements: Maintain relative spacing from new background top.
+### 5. Implement `MovePanel` Method
+*   **Logic**:
+    -   Update `m_base_x`, `m_base_y`.
+    -   Loop through `m_objects[]`.
+    -   For each object, set `OBJPROP_XDISTANCE = m_base_x + relative_x` (and Y equivalent).
+    -   Force `ChartRedraw()` once at the end.
 
-3.  **Panel A (Left) Cleanup**:
-    -   The move leaves a large void in Panel A (Left).
-    -   **Action**: Extend the "Daily Zones Table" (Smart Grid) to show more zones (e.g., increase from 5 to 10 zones) to utilize the newly available vertical space effectively.
-
-## Verification Checklist
--   [ ] **Responsiveness**: Buttons react instantly.
--   [ ] **Clickability**: Buttons only active when trade is valid.
--   [ ] **Layout**: "Strategy Signal" sits neatly in Right Panel without overlapping "Pending Alerts".
--   [ ] **Left Panel**: Empty space is utilized (extended grid).
--   [ ] **Performance**: `OnTimer` execution is < 1ms on average.
+## Verification
+-   [ ] **Smoothness**: Dragging the header should feel instant (moving only the background).
+-   [ ] **Precision**: On release, all buttons and labels should snap perfectly into place.
+-   [ ] **Performance**: No CPU spikes or chart freeze during dragging.

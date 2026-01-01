@@ -9,6 +9,13 @@
 
 #include <EA_Helper/Definitions.mqh>
 
+struct PanelObject
+{
+   string name;
+   int rel_x;
+   int rel_y;
+};
+
 class CDashboardPanel
 {
 private:
@@ -21,6 +28,12 @@ private:
    int               m_base_x;
    int               m_base_y;
    bool              m_blink_state;
+   
+   // Dragging State
+   PanelObject       m_objects[];
+   bool              m_is_dragging;
+   int               m_drag_offset_x;
+   int               m_drag_offset_y;
 
    color             m_bg_color;       
    color             m_header_color;
@@ -36,6 +49,9 @@ private:
 
    // Helper: Convert relative Y (0 at top of panel) to absolute Y (distance from anchor)
    int Y(int relative_y) { return (m_base_y + m_panel_height) - relative_y; }
+
+   void RegisterObject(const string name, int x, int ry);
+   void MovePanel(int x, int y);
 
    void CreateRect(const string name, int x, int ry, int w, int h, color bg, bool border=false, color border_color=clrNONE);
    void CreateLabel(const string name, int x, int ry, const string text, color clr, int font_size, const string font="Arial", string align="left");
@@ -55,6 +71,7 @@ public:
 
    void Init(long chart_id);
    void CreatePanel();
+   void OnEvent(const int id, const long &lparam, const double &dparam, const string &sparam);
    
    void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
@@ -127,6 +144,7 @@ void CDashboardPanel::CreatePanel()
 {
 
    Destroy();
+   ArrayResize(m_objects, 0); // Clear object registry
 
 
 
@@ -607,6 +625,7 @@ double CDashboardPanel::GetRiskPercent()
 // Helpers
 void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h, color bg, bool border, color border_color)
 {
+   RegisterObject(name, x, ry);
    string n = m_prefix + name;
    ObjectCreate(m_chart_id, n, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
@@ -639,6 +658,7 @@ void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h,
 
 void CDashboardPanel::CreateLabel(const string name, int x, int ry, const string text, color clr, int font_size, const string font, string align)
 {
+   RegisterObject(name, x, ry);
    string n = m_prefix + name;
    ObjectCreate(m_chart_id, n, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
@@ -653,6 +673,7 @@ void CDashboardPanel::CreateLabel(const string name, int x, int ry, const string
 
 void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr, int font_size)
 {
+   RegisterObject(name, x, ry);
    string n = m_prefix + name;
    ObjectCreate(m_chart_id, n, OBJ_BUTTON, 0, 0, 0);
    ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
@@ -675,6 +696,7 @@ void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, 
 
 void CDashboardPanel::CreateEdit(const string name, int x, int ry, int width, int height, const string text)
 {
+   RegisterObject(name, x, ry);
    string n = m_prefix + name;
    ObjectCreate(m_chart_id, n, OBJ_EDIT, 0, 0, 0);
    ObjectSetInteger(m_chart_id, n, OBJPROP_CORNER, m_corner);
@@ -894,4 +916,103 @@ bool CDashboardPanel::IsCloseOrderButtonClicked(string sparam, int &index)
       }
    }
    return false;
+}
+
+//+------------------------------------------------------------------+
+//| Register Object for Dragging                                     |
+//+------------------------------------------------------------------+
+void CDashboardPanel::RegisterObject(const string name, int x, int ry)
+{
+   int size = ArraySize(m_objects);
+   ArrayResize(m_objects, size + 1);
+   m_objects[size].name = m_prefix + name;
+   m_objects[size].rel_x = x - m_base_x;
+   m_objects[size].rel_y = Y(ry) - m_base_y;
+}
+
+//+------------------------------------------------------------------+
+//| Move Panel to New Coordinates                                    |
+//+------------------------------------------------------------------+
+void CDashboardPanel::MovePanel(int x, int y)
+{
+   m_base_x = x;
+   m_base_y = y;
+   
+   int total = ArraySize(m_objects);
+   for(int i = 0; i < total; i++)
+   {
+      ObjectSetInteger(m_chart_id, m_objects[i].name, OBJPROP_XDISTANCE, m_base_x + m_objects[i].rel_x);
+      ObjectSetInteger(m_chart_id, m_objects[i].name, OBJPROP_YDISTANCE, m_base_y + m_objects[i].rel_y);
+   }
+   
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Handle Chart Events (Dragging)                                   |
+//+------------------------------------------------------------------+
+void CDashboardPanel::OnEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   if(id == CHARTEVENT_MOUSE_MOVE)
+   {
+      int x = (int)lparam;
+      int y = (int)dparam;
+      int state = (int)StringToInteger(sparam); // Mouse state mask
+      
+      // Mouse Left Button Down (1)
+      if(state == 1)
+      {
+         if(!m_is_dragging)
+         {
+            // Check collision with Header area (Top 40 pixels of MainBG)
+            long bgX = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_XDISTANCE);
+            long bgY = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_YDISTANCE);
+            long bgW = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_XSIZE);
+            long bgH = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_YSIZE);
+            
+            long chartH = ChartGetInteger(m_chart_id, CHART_HEIGHT_IN_PIXELS);
+            long panelTopY = chartH - (bgY + bgH); // Screen Y of panel top
+            
+            // Check if mouse is within panel horizontal bounds
+            if(x >= bgX && x <= bgX + bgW)
+            {
+               // Check vertical - Header is top 40px
+               if(y >= panelTopY && y <= panelTopY + 40)
+               {
+                  m_is_dragging = true;
+                  m_drag_offset_x = x - (int)bgX;
+                  m_drag_offset_y = (int)(chartH - y - bgY);
+                  
+                  ChartSetInteger(m_chart_id, CHART_MOUSE_SCROLL, false);
+               }
+            }
+         }
+         else
+         {
+            // Dragging - Move MainBG
+            long chartH = ChartGetInteger(m_chart_id, CHART_HEIGHT_IN_PIXELS);
+            int newX = x - m_drag_offset_x;
+            int newY = (int)(chartH - y - m_drag_offset_y);
+            
+            // Safety limits
+            if(newX < 0) newX = 0;
+            if(newY < 0) newY = 0;
+            
+            ObjectSetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_XDISTANCE, newX);
+            ObjectSetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_YDISTANCE, newY);
+            
+            ChartRedraw(m_chart_id);
+         }
+      }
+      else if(state == 0 && m_is_dragging) // Mouse Up
+      {
+         m_is_dragging = false;
+         
+         long bgX = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_XDISTANCE);
+         long bgY = ObjectGetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_YDISTANCE);
+         
+         MovePanel((int)bgX, (int)bgY);
+         ChartSetInteger(m_chart_id, CHART_MOUSE_SCROLL, true);
+      }
+   }
 }
