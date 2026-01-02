@@ -21,11 +21,12 @@ input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
-//--- Smart Trailing Settings
-input group "=== Smart Trailing Settings ==="
-input bool   Input_Use_Smart_Trail     = true;   // Enable Smart Profit Lock
-input double Input_Trail_Trigger_Pct   = 50.0;   // Trigger % of TP Distance (e.g. 50%)
-input double Input_Trail_Lock_Pct      = 30.0;   // Lock % of TP Distance (e.g. 30%)
+//--- Trade Management Settings (Ladder Logic)
+input group "=== Trade Management (Ladder Logic) ==="
+input bool   Input_Use_TradeManagement = true;   // Enable Ladder Logic Profit Lock
+input int    Input_ProfitLock_Trigger_Pts = 200; // Profit Lock Trigger (points) - e.g., 200 = 20 pips
+input int    Input_ProfitLock_Amount_Pts  = 50;  // Initial Lock Amount (points) - e.g., 50 = 5 pips
+input int    Input_ProfitLock_Step_Pts    = 100; // Step Size (points) - e.g., 100 = 10 pips
 
 //--- Auto Mode Options
 input group "=== Auto Mode Options ==="
@@ -131,10 +132,11 @@ void OnTick()
       prevProfit = totalProfit;
    }
 
-   // Smart Trailing Logic (Profit Lock)
-   if(Input_Use_Smart_Trail)
+   // Trade Management: Ladder Logic Profit Lock
+   if(Input_Use_TradeManagement)
    {
-      tradeManager.SmartProfitLock(Input_Trail_Trigger_Pct, Input_Trail_Lock_Pct);
+      tradeManager.ManagePositions(Input_ProfitLock_Trigger_Pts, Input_ProfitLock_Amount_Pts,
+                                   Input_ProfitLock_Step_Pts);
    }
 
    // --- Real-time Dashboard Updates (Safe Implementation) ---

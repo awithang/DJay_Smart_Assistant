@@ -42,8 +42,7 @@ public:
    void ClosePositionsBySymbol(ENUM_POSITION_TYPE pos_type);
    void CloseAllSymbolPositions();
    bool ClosePositionByTicket(long ticket);  // Close individual position by ticket
-   void TrailingStop(double trailing_points);
-   void SmartProfitLock(double trigger_percent, double lock_percent);
+   void ManagePositions(double lock_trigger_pts, double lock_amount_pts, double step_pts);
 
    //--- Utility Functions
    double GetPositionProfit();
@@ -467,51 +466,129 @@ bool CTradeManager::ClosePositionByTicket(long ticket)
 }
 
 //+------------------------------------------------------------------+
-//| Apply trailing stop to open positions                            |
+//| Manage Positions - Ladder Logic (Stepped Profit Lock)           |
 //+------------------------------------------------------------------+
-void CTradeManager::TrailingStop(double trailing_points)
+//| Implements a "Ladder" or "Stepped" Profit Lock system.          |
+//| Instead of a standard trailing stop, this locks in specific     |
+//| profit levels based on milestones.                              |
+//|                                                                  |
+//| Parameters:                                                      |
+//|   lock_trigger_pts - Profit trigger in points (e.g., 200 = 20 pips)|
+//|   lock_amount_pts  - Initial lock amount in points (e.g., 50 = 5 pips)|
+//|   step_pts         - Step size in points (e.g., 100 = 10 pips)   |
+//|                                                                  |
+//| Logic:                                                           |
+//|   1. When profit >= trigger: Lock SL at OpenPrice + lock_amount  |
+//|   2. For each additional step beyond trigger: Move SL up by step |
+//|      Formula: NewSL = BaseLockSL + (StepsClimbed * step_pts)    |
+//|   3. This maintains a constant buffer from the trigger level    |
+//+------------------------------------------------------------------+
+void CTradeManager::ManagePositions(double lock_trigger_pts, double lock_amount_pts, double step_pts)
 {
-   if(trailing_points <= 0) return;
+   // Validate inputs
+   if(lock_trigger_pts <= 0 || lock_amount_pts <= 0 || step_pts <= 0)
+      return;
 
-   double trailingPoints = trailing_points * _Point;
+   // Convert points to price values
+   double lockTrigger = lock_trigger_pts * _Point;
+   double lockAmount = lock_amount_pts * _Point;
+   double stepSize = step_pts * _Point;
 
+   // Iterate through all positions (single pass for performance)
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(PositionSelectByTicket(PositionGetTicket(i)))
       {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
-            PositionGetInteger(POSITION_MAGIC) == m_magic_number)
+         // Filter: Only process positions for our symbol and magic number
+         if(PositionGetString(POSITION_SYMBOL) != _Symbol ||
+            PositionGetInteger(POSITION_MAGIC) != m_magic_number)
+            continue;
+
+         ulong ticket = PositionGetTicket(i);
+         double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+         double currentSL = PositionGetDouble(POSITION_SL);
+         double currentTP = PositionGetDouble(POSITION_TP);
+         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+         // Get current price based on position type
+         double currentPrice = SymbolInfoDouble(_Symbol,
+            (posType == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
+
+         // Calculate current profit in price units (positive = in profit)
+         double currentProfit = 0.0;
+         if(posType == POSITION_TYPE_BUY)
+            currentProfit = currentPrice - openPrice;  // BUY: Profit when price > open
+         else
+            currentProfit = openPrice - currentPrice;  // SELL: Profit when price < open
+
+         //============================================================
+         // LADDER LOGIC: Only activate if we've reached the trigger
+         //============================================================
+         if(currentProfit >= lockTrigger)
          {
-            ulong ticket = PositionGetTicket(i);
-            double posOpenPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-            double posSL = PositionGetDouble(POSITION_SL);
-            double posTP = PositionGetDouble(POSITION_TP);
-            ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-            double currentPrice = SymbolInfoDouble(_Symbol,
-               (posType == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
+            double newTargetSL = 0.0;
 
             if(posType == POSITION_TYPE_BUY)
             {
-               // Trailing for Buy positions
-               double newSL = currentPrice - trailingPoints;
-               if(newSL > posSL)
+               //=========================================================
+               // BUY LADDER LOGIC
+               //=========================================================
+               // 1. Calculate Base Lock SL (Foundation)
+               double baseLockSL = openPrice + lockAmount;
+
+               // 2. Calculate how many "Steps" we have climbed BEYOND the trigger
+               double profitBeyondTrigger = currentProfit - lockTrigger;
+               int stepsClimbed = (int)MathFloor(profitBeyondTrigger / stepSize);
+
+               // 3. Calculate New Target SL: BaseSL + (Steps * StepDistance)
+               double stepGain = stepsClimbed * stepSize;
+               newTargetSL = baseLockSL + stepGain;
+
+               // 4. Apply if better than current SL (or no SL exists)
+               if(newTargetSL > currentSL || currentSL == 0)
                {
-                  m_trade.PositionModify(ticket, newSL, posTP);
+                  newTargetSL = NormalizeDouble(newTargetSL, _Digits);
+                  if(m_trade.PositionModify(ticket, newTargetSL, currentTP))
+                  {
+                     // Optional: Debug logging
+                     // Print("Ladder BUY #", ticket, " Step ", stepsClimbed, " SL: ", currentSL, " -> ", newTargetSL);
+                  }
                }
             }
-            else if(posType == POSITION_TYPE_SELL)
+            else // POSITION_TYPE_SELL
             {
-               // Trailing for Sell positions
-               double newSL = currentPrice + trailingPoints;
-               if((posSL == 0 || newSL < posSL) && newSL != 0)
+               //=========================================================
+               // SELL LADDER LOGIC (Inverted)
+               //=========================================================
+               // 1. Calculate Base Lock SL (Foundation) - moves DOWN
+               double baseLockSL = openPrice - lockAmount;
+
+               // 2. Calculate how many "Steps" we have climbed BEYOND the trigger
+               double profitBeyondTrigger = currentProfit - lockTrigger;
+               int stepsClimbed = (int)MathFloor(profitBeyondTrigger / stepSize);
+
+               // 3. Calculate New Target SL: BaseSL - (Steps * StepDistance)
+               //    For SELL, SL moves DOWN as profit increases
+               double stepGain = stepsClimbed * stepSize;
+               newTargetSL = baseLockSL - stepGain;
+
+               // 4. Apply if better than current SL (or no SL exists)
+               //    For SELL, "better" means LOWER price
+               if(newTargetSL < currentSL || currentSL == 0)
                {
-                  m_trade.PositionModify(ticket, newSL, posTP);
+                  newTargetSL = NormalizeDouble(newTargetSL, _Digits);
+                  if(m_trade.PositionModify(ticket, newTargetSL, currentTP))
+                  {
+                     // Optional: Debug logging
+                     // Print("Ladder SELL #", ticket, " Step ", stepsClimbed, " SL: ", currentSL, " -> ", newTargetSL);
+                  }
                }
             }
          }
       }
    }
 }
+
 
 //+------------------------------------------------------------------+
 //| Get total profit from all open positions                         |
@@ -578,72 +655,3 @@ bool CTradeManager::HasOpenPosition(string comment_filter)
    return false;
 }
 
-//+------------------------------------------------------------------+
-//| Smart Profit Lock (Step Trailing based on % of TP)               |
-//+------------------------------------------------------------------+
-void CTradeManager::SmartProfitLock(double trigger_percent, double lock_percent)
-{
-   if(trigger_percent <= 0 || lock_percent < 0) return;
-
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-   {
-      if(PositionSelectByTicket(PositionGetTicket(i)))
-      {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
-            PositionGetInteger(POSITION_MAGIC) == m_magic_number)
-         {
-            ulong ticket = PositionGetTicket(i);
-            double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-            double tp = PositionGetDouble(POSITION_TP);
-            double sl = PositionGetDouble(POSITION_SL);
-            
-            // Requires TP to calculate percentage
-            if(tp == 0) continue; 
-            
-            ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-            double currentPrice = SymbolInfoDouble(_Symbol, (type == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
-            
-            double totalDist = MathAbs(tp - openPrice);
-            if(totalDist == 0) continue;
-            
-            double currentDist = MathAbs(currentPrice - openPrice);
-            double progress = (currentDist / totalDist) * 100.0;
-            
-            // Check if price moved in the right direction
-            bool isProfit = false;
-            if(type == POSITION_TYPE_BUY && currentPrice > openPrice) isProfit = true;
-            if(type == POSITION_TYPE_SELL && currentPrice < openPrice) isProfit = true;
-            
-            if(isProfit && progress >= trigger_percent)
-            {
-               // Calculate Lock Price (e.g. 30% of way to TP)
-               double lockDist = totalDist * (lock_percent / 100.0);
-               double newSL = 0.0;
-               
-               if(type == POSITION_TYPE_BUY)
-               {
-                  newSL = openPrice + lockDist;
-                  // Only modify if new SL is higher (better) than current
-                  if(newSL > sl)
-                  {
-                     m_trade.PositionModify(ticket, newSL, tp);
-                     Print("Smart Lock Triggered (Buy): Progress=", DoubleToString(progress, 1), "%, NewSL=", newSL);
-                  }
-               }
-               else if(type == POSITION_TYPE_SELL)
-               {
-                  newSL = openPrice - lockDist;
-                  // Only modify if new SL is lower (better) than current (or SL is 0)
-                  if(sl == 0 || newSL < sl)
-                  {
-                     m_trade.PositionModify(ticket, newSL, tp);
-                     Print("Smart Lock Triggered (Sell): Progress=", DoubleToString(progress, 1), "%, NewSL=", newSL);
-                  }
-               }
-            }
-         }
-      }
-   }
-}
-
-//+------------------------------------------------------------------+
