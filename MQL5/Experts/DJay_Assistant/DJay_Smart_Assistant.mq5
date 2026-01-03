@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                   WidwaPa_Assistant.mq5 |
+//|                                         DJay_Smart_Assistant.mq5 |
 //|                                    Copyright 2025, EA Helper Project |
 //|                                             https://ea-helper.com    |
 //+------------------------------------------------------------------+
@@ -8,18 +8,24 @@
 #property version   "1.00"
 #property description "DJAY Smart Assistant - Automated zones, signals, and one-click trading"
 
-#include <EA_Helper/Definitions.mqh>
-#include <EA_Helper/SignalEngine.mqh>
-#include <EA_Helper/TradeManager.mqh>
-#include <EA_Helper/DashboardPanel.mqh>
-#include <EA_Helper/ChartZones.mqh>
+#include <DJay_Assistant/Definitions.mqh>
+#include <DJay_Assistant/SignalEngine.mqh>
+#include <DJay_Assistant/TradeManager.mqh>
+#include <DJay_Assistant/DashboardPanel.mqh>
+#include <DJay_Assistant/ChartZones.mqh>
 
 //--- Input Parameters
 input double Input_RiskPercent = 1.0;       // Risk % per trade
-input int    Input_SL_Points = 300;         // Stop Loss distance
+input int    Input_SL_Points = 500;         // Stop Loss distance (updated from 300)
 input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
+
+//--- RR Ratio Settings (NEW)
+input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
+
+//--- Trailing Settings (NEW)
+input bool Input_Default_Trailing = true;  // Default Trailing State
 
 //--- Trade Management Settings (Ladder Logic)
 input group "=== Trade Management (Ladder Logic) ==="
@@ -77,6 +83,7 @@ int OnInit()
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
+   dashboardPanel.InitSettings(Input_Default_RR, Input_Default_Trailing);  // NEW: Initialize Settings
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
    dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
 
@@ -85,7 +92,7 @@ int OnInit()
    chartZones.Init(d1Open, Input_Zone_Offset1, Input_Zone_Offset2, Input_Zone_Range_Points);
    chartZones.SetSettings(Input_Show_Zones_On_Chart, Input_Show_Pivot_Line, Input_Max_Zones_Show);
 
-   dashboardPanel.UpdateWidwaZones(d1Open);
+   dashboardPanel.UpdateDJayZones(d1Open);
 
    EventSetTimer(1);
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // Enable Mouse Events for Dragging
@@ -119,7 +126,7 @@ void OnTick()
    static double prevD1Open = 0;
    if(d1Open != prevD1Open)
    {
-      dashboardPanel.UpdateWidwaZones(d1Open);
+      dashboardPanel.UpdateDJayZones(d1Open);
       prevD1Open = d1Open;
    }
 
@@ -133,10 +140,14 @@ void OnTick()
    }
 
    // Trade Management: Ladder Logic Profit Lock
-   if(Input_Use_TradeManagement)
+   // Only run if enabled in inputs AND the Profit Lock toggle is ON
+   if(Input_Use_TradeManagement && dashboardPanel.IsTrailingEnabled())
    {
-      tradeManager.ManagePositions(Input_ProfitLock_Trigger_Pts, Input_ProfitLock_Amount_Pts,
-                                   Input_ProfitLock_Step_Pts);
+      // Use dynamic Profit Lock values from dashboard (Trigger, Lock, Step)
+      int plTrigger = dashboardPanel.GetPL_Trigger();
+      int plAmount = dashboardPanel.GetPL_Amount();
+      int plStep = dashboardPanel.GetPL_Step();
+      tradeManager.ManagePositions(plTrigger, plAmount, plStep);
    }
 
    // --- Real-time Dashboard Updates (Safe Implementation) ---
@@ -355,7 +366,7 @@ void OnTimer()
    // Price and Orders are now updated in OnTick for real-time responsiveness
 
    double d1Open = signalEngine.GetD1Open();
-   dashboardPanel.UpdateWidwaZones(d1Open);
+   dashboardPanel.UpdateDJayZones(d1Open);
    double currentPrice = signalEngine.GetCurrentPrice();
 
    // 5. Update Chart Zones
@@ -399,12 +410,20 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          Print("Trading Mode: ", modeStr);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
       }
+      else if(dashboardPanel.IsOpenSettingsClicked(sparam))
+      {
+         // Open EA Properties window using F7 Hotkey simulation
+         long handle = (long)ChartGetInteger(0, CHART_WINDOW_HANDLE);
+         PostMessageW(handle, WM_KEYDOWN, VK_F7, 0);
+         PostMessageW(handle, WM_KEYUP, VK_F7, 0);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+      }
       else if(dashboardPanel.IsConfirmButtonClicked(sparam))
       {
          if(g_rec_active)
          {
             double risk = dashboardPanel.GetRiskPercent();
-            tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "WidwaPa Pending");
+            tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "DJay Pending");
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
       }
@@ -418,7 +437,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price - (Input_SL_Points * _Point) : g_last_rev_entry.price + (Input_SL_Points * _Point);
             double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price + (Input_SL_Points * 2 * _Point) : g_last_rev_entry.price - (Input_SL_Points * 2 * _Point);
             
-            tradeManager.ExecutePending(type, g_last_rev_entry.price, sl, tp, risk, "WidwaPa Rev Button");
+            tradeManager.ExecutePending(type, g_last_rev_entry.price, sl, tp, risk, "DJay Rev Button");
          }
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
@@ -431,7 +450,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price - (Input_SL_Points * _Point) : g_last_brk_entry.price + (Input_SL_Points * _Point);
             double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price + (Input_SL_Points * 2 * _Point) : g_last_brk_entry.price - (Input_SL_Points * 2 * _Point);
             
-            tradeManager.ExecutePending(type, g_last_brk_entry.price, sl, tp, risk, "WidwaPa Brk Button");
+            tradeManager.ExecutePending(type, g_last_brk_entry.price, sl, tp, risk, "DJay Brk Button");
          }
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
@@ -453,6 +472,16 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          g_strat_break = !g_strat_break;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      // Settings Buttons (handled in DashboardPanel - RR, Trailing, and Profit Lock)
+      else if(dashboardPanel.IsRR1Clicked(sparam) ||
+              dashboardPanel.IsRR15Clicked(sparam) ||
+              dashboardPanel.IsRR2Clicked(sparam) ||
+              dashboardPanel.IsTrailingToggleClicked(sparam))
+      {
+         // Handled in DashboardPanel.OnEvent() - instant update, no full redraw needed
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         return;  // Early return - skip ChartRedraw
       }
       else if(dashboardPanel.IsCloseAllButtonClicked(sparam))
       {
@@ -498,8 +527,9 @@ void ExecuteBuyTrade(string strategy="MANUAL")
 
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double riskPercent = dashboardPanel.GetRiskPercent();
+   double rrMultiplier = dashboardPanel.GetRRMultiplier();  // NEW: Dynamic RR
    double sl = currentPrice - (Input_SL_Points * _Point);
-   double tp = currentPrice + (Input_SL_Points * 2 * _Point);
+   double tp = currentPrice + (Input_SL_Points * rrMultiplier * _Point);  // NEW: Use dynamic RR
 
    TradeRequest req;
    req.type = ORDER_TYPE_BUY;
@@ -507,7 +537,7 @@ void ExecuteBuyTrade(string strategy="MANUAL")
    req.sl = sl;
    req.tp = tp;
    req.risk_percent = riskPercent;
-   req.comment = "WidwaPa Buy " + strategy;
+   req.comment = "DJay Buy " + strategy;
 
    if(tradeManager.ExecuteOrder(req))
    {
@@ -535,8 +565,9 @@ void ExecuteSellTrade(string strategy="MANUAL")
 
    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double riskPercent = dashboardPanel.GetRiskPercent();
+   double rrMultiplier = dashboardPanel.GetRRMultiplier();  // NEW: Dynamic RR
    double sl = currentPrice + (Input_SL_Points * _Point);
-   double tp = currentPrice - (Input_SL_Points * 2 * _Point);
+   double tp = currentPrice - (Input_SL_Points * rrMultiplier * _Point);  // NEW: Use dynamic RR
 
    TradeRequest req;
    req.type = ORDER_TYPE_SELL;
@@ -544,7 +575,7 @@ void ExecuteSellTrade(string strategy="MANUAL")
    req.sl = sl;
    req.tp = tp;
    req.risk_percent = riskPercent;
-   req.comment = "WidwaPa Sell " + strategy;
+   req.comment = "DJay Sell " + strategy;
 
    if(tradeManager.ExecuteOrder(req))
    {
@@ -563,7 +594,7 @@ void ExecuteSellTrade(string strategy="MANUAL")
 //+------------------------------------------------------------------+
 void CreateSignalArrow(datetime time, double price, int arrowCode, color clr, string type)
 {
-   string name = "WidwaArrow_" + type + "_" + TimeToString(time);
+   string name = "DJayArrow_" + type + "_" + TimeToString(time);
    if(ObjectFind(0, name) >= 0) return; // Already exists
 
    ObjectCreate(0, name, OBJ_ARROW, 0, time, price);

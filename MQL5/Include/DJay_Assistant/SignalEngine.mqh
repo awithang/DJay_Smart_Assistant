@@ -7,7 +7,7 @@
 #property link      "https://ea-helper.com"
 #property version   "1.00"
 
-#include <EA_Helper/Definitions.mqh>
+#include <DJay_Assistant/Definitions.mqh>
 
 //+------------------------------------------------------------------+
 //| Combined PA Signal Structure (H1 primary, M5 entry)               |

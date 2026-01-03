@@ -1,2 +1,2 @@
-undeclared identifier	DashboardPanel.mqh	266	4
-')' - expression expected	DashboardPanel.mqh	266	22
+'{' - unbalanced parentheses	DashboardPanel.mqh	180	1
+1 errors, 0 warnings		1	0

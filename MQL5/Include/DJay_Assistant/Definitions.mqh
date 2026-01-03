@@ -64,11 +64,37 @@ enum ENUM_ZONE_TYPE
 };
 
 //+------------------------------------------------------------------+
+//| Risk:Reward Ratio Enumeration                                     |
+//+------------------------------------------------------------------+
+enum ENUM_RR_RATIO
+{
+    RR_1_TO_1,      // Reward = 1.0x Risk
+    RR_1_TO_1_5,    // Reward = 1.5x Risk
+    RR_1_TO_2       // Reward = 2.0x Risk (Default)
+};
+
+//+------------------------------------------------------------------+
+//| Global Variable Names for State Persistence                       |
+//+------------------------------------------------------------------+
+#define GV_RR_RATIO         "DJay_RR_Ratio"
+#define GV_TRAILING_ENABLED "DJay_Trailing_Enabled"
+
+//+------------------------------------------------------------------+
 //| Constants                                                        |
 //+------------------------------------------------------------------+
 #define POINTS_TO_PIPS        10      // Conversion factor (10 points = 1 pip for 5-digit brokers)
 #define MQL5_POINT            _Point  // Current symbol point value
 #define REFRESH_SECONDS       1       // Timer refresh interval in seconds
+
+//--- Windows API Commands
+#define WM_COMMAND            0x0111
+#define WM_KEYDOWN            0x0100
+#define WM_KEYUP              0x0101
+#define VK_F7                 0x76
+
+#import "user32.dll"
+int PostMessageW(long hWnd, uint Msg, uint wParam, long lParam);
+#import
 
 //+------------------------------------------------------------------+
 //| Trade Request Structure                                         |

@@ -1,2 +1,9 @@
-1. Make new dashboard section name "Pending" and move Reversal Alert and Breakout Alert to this new section. This section shold be over Active Oders section and cover both A and B panel.
-2. Reduce section height of Auto Strategy section to optimal of their information.
+Request:
+
+- reduce manual buy and sell button height a bit to equal other buttons to make a bit space because stragety signal section still a bit overlap with Pending alerts button.
+
+- Button and RR toggle options still not smooth like button and options in Auto Strategy section. Please analyse and give me conclusions.
+
+
+*** Important***
+Please remember, you're architect agent please create implement plan only. No coding and all implement have to concentrate on EA performance and all buttons response performance. 
