@@ -32,7 +32,12 @@ private:
    color             m_accent_color;
 
    // Store active order tickets for individual close buttons
-   long              m_order_tickets[4];
+   long              m_order_tickets[20];
+
+   //--- Scroll State for Active Orders (NEW)
+   int               m_scroll_offset;        // Current scroll position (which row is at top)
+   int               m_visible_count;        // How many orders visible at once
+   int               m_total_orders;         // Total active orders
 
    //--- Settings State (NEW)
    int               m_current_rr;           // ENUM_RR_RATIO value
@@ -93,16 +98,24 @@ public:
    int  GetPL_Amount()         { return (int)StringToInteger(ObjectGetString(m_chart_id, m_prefix+"EditPL_Amount", OBJPROP_TEXT)); }
    int  GetPL_Step()           { return (int)StringToInteger(ObjectGetString(m_chart_id, m_prefix+"EditPL_Step", OBJPROP_TEXT)); }
 
+   //--- Scroll Support for Active Orders (NEW)
+   int  GetScrollOffset()      { return m_scroll_offset; }
+   int  GetTotalOrders()       { return m_total_orders; }
+   int  GetVisibleCount()      { return m_visible_count; }
+   void ScrollUp()             { if(m_scroll_offset > 0) m_scroll_offset--; }
+   void ScrollDown()           { int maxScroll = m_total_orders - m_visible_count; if(m_scroll_offset < maxScroll) m_scroll_offset++; }
+
    void Redraw() { ChartRedraw(m_chart_id); }
 
    bool IsModeButtonClicked(string sparam) { return (sparam == m_prefix+"BtnMode"); }
    bool IsOpenSettingsClicked(string sparam) { return (sparam == m_prefix+"BtnOpenSettings"); }
+   bool IsStatsButtonClicked(string sparam) { return (sparam == m_prefix+"BtnStats"); }
    bool IsConfirmButtonClicked(string sparam) { return (sparam == m_prefix+"BtnConfirm"); }
    bool IsCloseAllButtonClicked(string sparam) { return (sparam == m_prefix+"BtnCloseAll"); }
 
    // Individual order close button handlers
    bool IsCloseOrderButtonClicked(string sparam, int &index);
-   long GetOrderTicket(int index) { return (index >= 0 && index < 4) ? m_order_tickets[index] : 0; }
+   long GetOrderTicket(int index) { return (index >= 0 && index < 20) ? m_order_tickets[index] : 0; }
 
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
@@ -116,6 +129,10 @@ public:
    bool IsRR15Clicked(string sparam)   { return (sparam == m_prefix+"BtnRR15"); }
    bool IsRR2Clicked(string sparam)    { return (sparam == m_prefix+"BtnRR2"); }
    bool IsTrailingToggleClicked(string sparam) { return (sparam == m_prefix+"BtnTrailToggle"); }
+
+   //--- Scroll Button Click Handlers (NEW)
+   bool IsScrollUpClicked(string sparam) { return (sparam == m_prefix+"BtnScrollUp"); }
+   bool IsScrollDownClicked(string sparam) { return (sparam == m_prefix+"BtnScrollDown"); }
 
    double GetRiskPercent();              
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
@@ -147,6 +164,11 @@ CDashboardPanel::CDashboardPanel()
    // Initialize Settings State (will be overridden by InitSettings)
    m_current_rr = RR_1_TO_2;
    m_trailing_enabled = true;
+
+   // Initialize Scroll State for Active Orders
+   m_scroll_offset = 0;
+   m_visible_count = 4;
+   m_total_orders = 0;
 
    // RR Multiplier Lookup Table
    m_rr_multipliers[0] = 1.0;   // RR_1_TO_1
@@ -198,7 +220,8 @@ void CDashboardPanel::CreatePanel()
 
 
 
-      CreateLabel("Title", left_x + pad, 15, "DJAY Smart Assistant", C'255,223,0', 11, "Arial Bold");
+      // Center the title label in left panel (half_width = 235, text width ~130px)
+      CreateLabel("Title", left_x + (half_width / 2) - 65, 15, "DJAY Smart Assistant", C'255,223,0', 11, "Arial Bold");
 
 
 
@@ -464,7 +487,11 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                                                CreateButton("BtnOpenSettings", right_x + half_width - 105, right_y, 100, row_h, "Open Properties", clrGray, clrWhite, 8);
+                                                // Settings icon (gear) - left position
+                                                CreateButton("BtnOpenSettings", right_x + half_width - 50, right_y, 20, 20, "⚙", clrGray, clrWhite, 12);
+
+                                                // Statistics icon (clipboard) - to the right of Settings
+                                                CreateButton("BtnStats", right_x + half_width - 25, right_y, 20, 20, "📋", clrGray, clrWhite, 12);
 
 
 
@@ -1310,6 +1337,12 @@ void CDashboardPanel::CreatePanel()
 
          CreateRect("OrderListBG", x + 5, orderY + 20, m_panel_width - 20, 105, C'5,5,15', true, C'45,45,60');
 
+         // Scroll buttons for Active Orders (hidden when <= 4 orders)
+         // Created AFTER OrderListBG to appear on top (z-index)
+         // Positioned inside OrderListBG area (right side, within the dark background)
+         CreateButton("BtnScrollUp", x + m_panel_width - 30, orderY + 25, 15, 15, "▲", clrGray, clrWhite, 10);
+         CreateButton("BtnScrollDown", x + m_panel_width - 30, orderY + 45, 15, 15, "▼", clrGray, clrWhite, 10);
+
 
 
       
@@ -1912,10 +1945,13 @@ double CDashboardPanel::GetRRMultiplier()
 }
 
 //+------------------------------------------------------------------+
-//| Update Active Orders List                                        |
+//| Update Active Orders List (with Scroll Support)                   |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit)
 {
+   // Store total orders
+   m_total_orders = count;
+
    // Update count label
    ObjectSetString(m_chart_id, m_prefix+"LblAct", OBJPROP_TEXT, StringFormat("ACTIVE ORDERS (%d)", count));
 
@@ -1936,30 +1972,47 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
       ObjectSetInteger(m_chart_id, m_prefix+"LblTotalProfit", OBJPROP_COLOR, clrGray);
    }
 
+   // Show/hide scroll buttons based on order count
+   if(count <= 4)
+   {
+      // Hide scroll buttons when <= 4 orders
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnScrollUp", OBJPROP_XDISTANCE, -200);
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnScrollDown", OBJPROP_XDISTANCE, -200);
+   }
+   else
+   {
+      // Show scroll buttons (inside OrderListBG area)
+      int btnX = m_base_x + m_panel_width - 30;
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnScrollUp", OBJPROP_XDISTANCE, btnX);
+      ObjectSetInteger(m_chart_id, m_prefix+"BtnScrollDown", OBJPROP_XDISTANCE, btnX);
+   }
+
    // Calculate button positions
    int x = m_base_x;
 
-   // Update slots and store tickets
-   for(int i = 0; i < 4; i++)
+   // Update visible slots (with scroll offset support)
+   for(int displayIndex = 0; displayIndex < m_visible_count; displayIndex++)
    {
-      string sid = IntegerToString(i);
+      string sid = IntegerToString(displayIndex);
+      int actualOrderIndex = m_scroll_offset + displayIndex;
 
-      if(i < count)
+      if(actualOrderIndex < count && actualOrderIndex < 20)
       {
-         m_order_tickets[i] = tickets[i];
-         
-         string typeStr = (types[i] == 0) ? "BUY" : "SELL"; // 0=Buy
-         double profitPct = (balance > 0) ? (profits[i] / balance) * 100.0 : 0;
-         color pColor = (profits[i] >= 0) ? clrLime : clrOrange;
+         // Display this order
+         m_order_tickets[displayIndex] = tickets[actualOrderIndex];
 
-         // 1. Info Label (Cyan) - Increased spacing
-         string infoText = StringFormat("#%d      %s      Lots %.2f      @%.2f", tickets[i], typeStr, lots[i], prices[i]);
+         string typeStr = (types[actualOrderIndex] == 0) ? "BUY" : "SELL";
+         double profitPct = (balance > 0) ? (profits[actualOrderIndex] / balance) * 100.0 : 0;
+         color pColor = (profits[actualOrderIndex] >= 0) ? clrLime : clrOrange;
+
+         // 1. Info Label (Cyan)
+         string infoText = StringFormat("#%d      %s      Lots %.2f      @%.2f", tickets[actualOrderIndex], typeStr, lots[actualOrderIndex], prices[actualOrderIndex]);
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, infoText);
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_COLOR, clrCyan);
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, x + 10);
 
          // 2. Profit Label ($)
-         ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, StringFormat("$%.2f", profits[i]));
+         ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, StringFormat("$%.2f", profits[actualOrderIndex]));
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_COLOR, pColor);
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_XDISTANCE, x + 290);
 
@@ -1975,7 +2028,7 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
       }
       else
       {
-         // Clear slots and HIDE objects
+         // Clear and hide unused slots
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, "");
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, -200);
 
@@ -1984,8 +2037,8 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
 
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, "");
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_XDISTANCE, -200);
-         
-         m_order_tickets[i] = 0;
+
+         m_order_tickets[displayIndex] = 0;
 
          // Hide close button
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, -100);
@@ -1994,15 +2047,16 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
 }
 
 //+------------------------------------------------------------------+
-//| Check if individual order close button was clicked               |
+//| Check if individual order close button was clicked (with Scroll)   |
 //+------------------------------------------------------------------+
 bool CDashboardPanel::IsCloseOrderButtonClicked(string sparam, int &index)
 {
-   for(int i = 0; i < 4; i++)
+   for(int displayIndex = 0; displayIndex < m_visible_count; displayIndex++)
    {
-      if(sparam == m_prefix + "BtnCloseOrder_" + IntegerToString(i))
+      if(sparam == m_prefix + "BtnCloseOrder_" + IntegerToString(displayIndex))
       {
-         index = i;
+         // Return actual order index (display index + scroll offset)
+         index = m_scroll_offset + displayIndex;
          return true;
       }
    }

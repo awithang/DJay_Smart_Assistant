@@ -158,16 +158,16 @@ void OnTick()
 
    if(MathAbs(totalProfit - lastTotalProfit) > 0.01 || currentPositionsCount != lastPositionsCount)
    {
-      long orderTickets[4];
-      double orderPrices[4];
-      double orderProfits[4];
-      double orderLots[4];
-      int orderTypes[4];
-      
+      long orderTickets[20];
+      double orderPrices[20];
+      double orderProfits[20];
+      double orderLots[20];
+      int orderTypes[20];
+
       int activeCount = 0;
       int magic = Input_MagicNumber;
 
-      for(int i=0; i<PositionsTotal() && activeCount < 4; i++)
+      for(int i=0; i<PositionsTotal() && activeCount < 20; i++)
       {
          ulong ticket = PositionGetTicket(i);
          if(PositionSelectByTicket(ticket))
@@ -415,6 +415,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PostMessageW(handle, WM_KEYUP, VK_F7, 0);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
       }
+      else if(dashboardPanel.IsStatsButtonClicked(sparam))
+      {
+         // TODO: Open Trade Statistics panel (not implemented yet)
+         Print("Statistics button clicked - Feature coming soon!");
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+      }
       else if(dashboardPanel.IsConfirmButtonClicked(sparam))
       {
          if(g_rec_active)
@@ -483,6 +489,18 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(dashboardPanel.IsCloseAllButtonClicked(sparam))
       {
          tradeManager.CloseAllSymbolPositions();
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      else if(dashboardPanel.IsScrollUpClicked(sparam))
+      {
+         // Scroll up - decrease scroll offset
+         dashboardPanel.ScrollUp();
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+      }
+      else if(dashboardPanel.IsScrollDownClicked(sparam))
+      {
+         // Scroll down - increase scroll offset
+         dashboardPanel.ScrollDown();
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       // Individual order close buttons
