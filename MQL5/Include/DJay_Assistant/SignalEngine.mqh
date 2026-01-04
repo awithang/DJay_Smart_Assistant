@@ -881,48 +881,41 @@ string CSignalEngine::GetAdvisorMessage()
 }
 
 //+------------------------------------------------------------------+
-//| Get Recommended Pending Order                                    |
+//| Get Recommended Pending Order (Zone + PA Logic - Real-Time)       |
 //+------------------------------------------------------------------+
 bool CSignalEngine::GetRecommendedPending(ENUM_ORDER_TYPE &outType, double &outPrice, double &outSL, double &outTP, int sl_points)
 {
-   // 1. Get Trend Direction (using H1 for main trend)
-   ENUM_TREND_DIRECTION trend = GetTrendDirection(PERIOD_H1);
-   
-   // 2. Get EMA Levels for Pullback Targets
-   double h1_ema100 = GetEMAValue(PERIOD_H1, 100, 0);
-   
-   if(h1_ema100 == 0) return false; // Data not ready
+   // Get current zone and signal (REAL-TIME)
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   ENUM_SIGNAL_TYPE signal = GetActiveSignal();
 
-   double currentPrice = m_current_price;
    double pt = _Point;
-   double min_dist = 20 * pt; // Reduced from 50 to 20 points for more signals
+   double zoneLevel = 0;
 
-   // 3. Logic for Buy Limit (Uptrend or Flat/High)
-   if(trend == TREND_UP || (trend == TREND_FLAT && currentPrice > h1_ema100))
+   // Buy Limit: In Buy Zone + PA Buy Signal (Reversal at Support)
+   if((zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2) && signal == SIGNAL_PA_BUY)
    {
-      // Suggest Buy Limit if price is safely ABOVE the EMA
-      if(currentPrice > h1_ema100 + min_dist) 
-      {
-         outType = ORDER_TYPE_BUY_LIMIT;
-         outPrice = h1_ema100; // Entry at EMA 100
-         outSL = outPrice - (sl_points * pt);
-         outTP = outPrice + (sl_points * 2 * pt);
-         return true;
-      }
+      // Get the appropriate zone level
+      zoneLevel = (zone == ZONE_STATUS_IN_BUY2) ? GetZoneLevel(ZONE_BUY2) : GetZoneLevel(ZONE_BUY1);
+
+      outType = ORDER_TYPE_BUY_LIMIT;
+      outPrice = zoneLevel;  // Entry at zone level (support)
+      outSL = outPrice - (sl_points * pt);
+      outTP = outPrice + (sl_points * 2 * pt);
+      return true;
    }
-   
-   // 4. Logic for Sell Limit (Downtrend or Flat/Low)
-   if(trend == TREND_DOWN || (trend == TREND_FLAT && currentPrice < h1_ema100))
+
+   // Sell Limit: In Sell Zone + PA Sell Signal (Reversal at Resistance)
+   if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && signal == SIGNAL_PA_SELL)
    {
-      // Suggest Sell Limit if price is safely BELOW the EMA
-      if(currentPrice < h1_ema100 - min_dist)
-      {
-         outType = ORDER_TYPE_SELL_LIMIT;
-         outPrice = h1_ema100; // Entry at EMA 100
-         outSL = outPrice + (sl_points * pt);
-         outTP = outPrice - (sl_points * 2 * pt);
-         return true;
-      }
+      // Get the appropriate zone level
+      zoneLevel = (zone == ZONE_STATUS_IN_SELL2) ? GetZoneLevel(ZONE_SELL2) : GetZoneLevel(ZONE_SELL1);
+
+      outType = ORDER_TYPE_SELL_LIMIT;
+      outPrice = zoneLevel;  // Entry at zone level (resistance)
+      outSL = outPrice + (sl_points * pt);
+      outTP = outPrice - (sl_points * 2 * pt);
+      return true;
    }
 
    return false;

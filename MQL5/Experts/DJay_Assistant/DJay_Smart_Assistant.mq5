@@ -24,12 +24,9 @@ input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 //--- RR Ratio Settings (NEW)
 input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
 
-//--- Trailing Settings (NEW)
-input bool Input_Default_Trailing = true;  // Default Trailing State
-
 //--- Trade Management Settings (Ladder Logic)
 input group "=== Trade Management (Ladder Logic) ==="
-input bool   Input_Use_TradeManagement = true;   // Enable Ladder Logic Profit Lock
+input bool   Input_Use_TradeManagement = true;   // Default Profit Lock State (sets initial button ON/OFF)
 input int    Input_ProfitLock_Trigger_Pts = 200; // Profit Lock Trigger (points) - e.g., 200 = 20 pips
 input int    Input_ProfitLock_Amount_Pts  = 50;  // Initial Lock Amount (points) - e.g., 50 = 5 pips
 input int    Input_ProfitLock_Step_Pts    = 100; // Step Size (points) - e.g., 100 = 10 pips
@@ -38,7 +35,7 @@ input int    Input_ProfitLock_Step_Pts    = 100; // Step Size (points) - e.g., 1
 input group "=== Auto Mode Options ==="
 input bool   Input_Auto_Arrow          = true;   // Auto Trade on Any Arrow (PA/EMA)
 input bool   Input_Auto_Reversal       = true;   // Auto Trade on Reversal (Zone Bounce)
-input bool   Input_Auto_Breakout       = false;  // Auto Trade on Breakout (Zone Flip)
+input bool   Input_Auto_Breakout       = true;   // Auto Trade on Breakout (Zone Flip)
 
 //--- Chart Zones Settings
 input group "=== Chart Zones Settings ==="
@@ -83,7 +80,7 @@ int OnInit()
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
-   dashboardPanel.InitSettings(Input_Default_RR, Input_Default_Trailing);  // NEW: Initialize Settings
+   dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
    dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
 
@@ -140,8 +137,8 @@ void OnTick()
    }
 
    // Trade Management: Ladder Logic Profit Lock
-   // Only run if enabled in inputs AND the Profit Lock toggle is ON
-   if(Input_Use_TradeManagement && dashboardPanel.IsTrailingEnabled())
+   // Only run when Profit Lock toggle is ON (unified control)
+   if(dashboardPanel.IsTrailingEnabled())  // Single unified control - initialized from Input_Use_TradeManagement
    {
       // Use dynamic Profit Lock values from dashboard (Trigger, Lock, Step)
       int plTrigger = dashboardPanel.GetPL_Trigger();

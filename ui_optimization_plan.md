@@ -58,6 +58,10 @@ input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
 
 //--- Trailing Settings (NEW)
 input bool Input_Default_Trailing = true;  // Default Trailing State
+
+//--- Auto Mode Options (MODIFIED)
+// Ensure Breakout is enabled by default
+input bool   Input_Auto_Breakout       = true;   // Auto Trade on Breakout (Zone Flip)
 ```
 
 **Placement:** Group with existing risk/trade inputs for logical organization.
