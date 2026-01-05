@@ -397,7 +397,7 @@ void OnTimer()
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
    // 3f. Advisor Message
-   string advisorMessage = signalEngine.GetAdvisorMessage();
+   string advisorMessage = signalEngine.GetAdvisorMessage(g_quick_scalp_mode);
    dashboardPanel.UpdateAdvisor(advisorMessage);
 
    // 3g. Check for Pending Order Recommendation

@@ -138,7 +138,7 @@ public:
     double GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_period, int shift);
 
     //--- Natural Language Advisor
-    string GetAdvisorMessage();
+    string GetAdvisorMessage(bool quickScalpMode);
     bool   IsDataReady();
     
     //--- Strategy Helpers
@@ -806,15 +806,11 @@ bool CSignalEngine::IsDataReady()
 //+------------------------------------------------------------------+
 //| Get Advisor Message (Natural Language Trade Recommendation)       |
 //+------------------------------------------------------------------+
-string CSignalEngine::GetAdvisorMessage()
+string CSignalEngine::GetAdvisorMessage(bool quickScalpMode)
 {
-   // 1. Get Trend Direction (using H1 for main trend)
+   // Get trend, zone, and signal
    ENUM_TREND_DIRECTION trend = GetTrendDirection(PERIOD_H1);
-
-   // 2. Get Zone Status
    ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
-
-   // 3. Get Active Signal (H1 + M5 combined for more reliable signals)
    CombinedSignal combinedSig = GetCombinedPASignal();
    ENUM_SIGNAL_TYPE signal = SIGNAL_NONE;
    if(combinedSig.h1Signal == SIGNAL_PA_BUY || combinedSig.m5Signal == SIGNAL_PA_BUY)
@@ -822,71 +818,88 @@ string CSignalEngine::GetAdvisorMessage()
    else if(combinedSig.h1Signal == SIGNAL_PA_SELL || combinedSig.m5Signal == SIGNAL_PA_SELL)
       signal = SIGNAL_PA_SELL;
 
-   // Helper: Check if zone is a Buy zone
+   // Zone helpers
    bool isBuyZone = (zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2);
-
-   // Helper: Check if zone is a Sell zone
    bool isSellZone = (zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2);
 
-   // Logic Tree based on spec
-   if(trend == TREND_UP)
+   // ========== MIDDLE ZONE LOGIC (Quick Scalp Guidance) ==========
+   if(zone == ZONE_STATUS_NONE)
    {
-      if(isBuyZone)
+      if(trend == TREND_UP)
+      {
+         if(!quickScalpMode)
+            return "Trend UP. Enable Quick Scalp for middle zone opportunities.";
+         else
+            return "Trend UP. Quick Scalp active - watching for RSI/Stochastic signals.";
+      }
+      else if(trend == TREND_DOWN)
+      {
+         if(!quickScalpMode)
+            return "Trend DOWN. Enable Quick Scalp for middle zone opportunities.";
+         else
+            return "Trend DOWN. Quick Scalp active - watching for RSI/Stochastic signals.";
+      }
+      else // FLAT or SIDEWAY
+      {
+         return "Choppy. Quick Scalp available when trend develops.";
+      }
+   }
+
+   // ========== BUY ZONE LOGIC ==========
+   if(isBuyZone)
+   {
+      // Quick Scalp warning
+      if(quickScalpMode)
+         return "At Buy1 zone. Disable Quick Scalp - use Zone Trading instead.";
+
+      // Existing zone messages (preserved)
+      if(trend == TREND_UP)
       {
          if(signal == SIGNAL_PA_BUY)
             return "PERFECT BUY: Uptrend + Support + Signal!";
          return "Uptrend pullback to support. Watch for BUY signal.";
       }
-      if(isSellZone)
-      {
-         double resPrice = (zone == ZONE_STATUS_IN_SELL2) ? GetZoneLevel(ZONE_SELL2) : GetZoneLevel(ZONE_SELL1);
-         if(signal == SIGNAL_PA_SELL)
-            return StringFormat("Counter-trend Sell at resistance @%.2f. Scalp with caution.", resPrice);
-         return StringFormat("Strong Uptrend hitting resistance @%.2f. Wait for breakout or pullback.", resPrice);
-      }
-      // Middle zone - Enhanced with price levels
-      double zoneBuy1 = GetZoneLevel(ZONE_BUY1);
-      double distToBuy = MathAbs(GetCurrentPrice() - zoneBuy1);
-      return StringFormat("Trend UP. Pull back to BUY1 @%.2f (%.0f pts).", zoneBuy1, distToBuy/_Point);
-   }
-
-   if(trend == TREND_DOWN)
-   {
-      if(isSellZone)
-      {
-         if(signal == SIGNAL_PA_SELL)
-            return "PERFECT SELL: Downtrend + Resistance + Signal!";
-         return "Downtrend rally to resistance. Watch for SELL signal.";
-      }
-      if(isBuyZone)
+      if(trend == TREND_DOWN)
       {
          double supPrice = (zone == ZONE_STATUS_IN_BUY2) ? GetZoneLevel(ZONE_BUY2) : GetZoneLevel(ZONE_BUY1);
          if(signal == SIGNAL_PA_BUY)
             return StringFormat("Counter-trend Buy at support @%.2f. Scalp with caution.", supPrice);
          return StringFormat("Strong Downtrend hitting support @%.2f. Wait for breakdown or bounce.", supPrice);
       }
-      // Middle zone - Enhanced with price levels
-      double zoneSell1 = GetZoneLevel(ZONE_SELL1);
-      double distToSell = MathAbs(GetCurrentPrice() - zoneSell1);
-      return StringFormat("Trend DOWN. Rally to SELL1 @%.2f (%.0f pts).", zoneSell1, distToSell/_Point);
-   }
-
-   // FLAT trend
-   if(isBuyZone)
-   {
+      // FLAT trend in Buy zone
       if(signal == SIGNAL_PA_BUY)
          return "Range bounce. Buying at support.";
       return "At support in range. Watch for buy signal.";
    }
+
+   // ========== SELL ZONE LOGIC ==========
    if(isSellZone)
    {
+      // Quick Scalp warning
+      if(quickScalpMode)
+         return "At Sell1 zone. Disable Quick Scalp - use Zone Trading instead.";
+
+      // Existing zone messages (preserved)
+      if(trend == TREND_UP)
+      {
+         double resPrice = (zone == ZONE_STATUS_IN_SELL2) ? GetZoneLevel(ZONE_SELL2) : GetZoneLevel(ZONE_SELL1);
+         if(signal == SIGNAL_PA_SELL)
+            return StringFormat("Counter-trend Sell at resistance @%.2f. Scalp with caution.", resPrice);
+         return StringFormat("Strong Uptrend hitting resistance @%.2f. Wait for breakout or pullback.", resPrice);
+      }
+      if(trend == TREND_DOWN)
+      {
+         if(signal == SIGNAL_PA_SELL)
+            return "PERFECT SELL: Downtrend + Resistance + Signal!";
+         return "Downtrend rally to resistance. Watch for SELL signal.";
+      }
+      // FLAT trend in Sell zone
       if(signal == SIGNAL_PA_SELL)
          return "Range rejection. Selling at resistance.";
       return "At resistance in range. Watch for sell signal.";
    }
 
-   double distToNearest = MathMin(MathAbs(GetCurrentPrice()-GetZoneLevel(ZONE_BUY1)), MathAbs(GetCurrentPrice()-GetZoneLevel(ZONE_SELL1)));
-   return StringFormat("Choppy. Wait for clear direction (+/- %.0f pts to zone).", distToNearest/_Point);
+   return "Analyzing market...";
 }
 
 //+------------------------------------------------------------------+
