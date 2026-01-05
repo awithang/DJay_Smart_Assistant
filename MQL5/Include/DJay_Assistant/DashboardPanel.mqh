@@ -71,17 +71,18 @@ public:
    
    void UpdatePrice(double price);
    void UpdateSessionInfo(string session_name, string countdown, bool is_gold_time);
-      void              UpdateDJayZones(double d1_open);
+      void              UpdateDJayZones(double d1_open, int maxZones = 6);
    void UpdateStrategyInfo(string reversal_alert, bool rev_valid, string breakout_alert, bool brk_valid, string pa_sig);
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
+   void UpdateAdvisorDetails(string zone, string trend, string qs, string rsi);
    void UpdateLastAutoTrade(string strategy, string direction, double price);
    void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
 
    // New Methods
    void UpdateTradingMode(int mode);
-   void UpdateStrategyButtons(bool arrow, bool rev, bool brk);
+   void UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool qs);
    void UpdateQuickScalpButton(bool isActive);
    void UpdateConfirmButton(string text, bool enable);
 
@@ -121,7 +122,7 @@ public:
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
-   bool IsQuickScalpClicked(string sparam) { return (sparam == m_prefix+"BtnQuickScalp"); }
+   bool IsStratQSClicked(string sparam) { return (sparam == m_prefix+"BtnStratQS"); }
 
    bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
    bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
@@ -272,29 +273,29 @@ void CDashboardPanel::CreatePanel()
    // 3. Daily Zones Table (Panel A)
    // Shifted down by 140px to accommodate Strategy Signal section
 
-   CreateLabel("LblZ", left_x + pad, 220, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
+   CreateLabel("LblZ", left_x + pad, 295, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
 
-   CreateRect("TableBG", left_x, 240, half_width, 212, C'5,5,15', true, C'45,45,60');
+   CreateRect("TableBG", left_x, 315, half_width, 140, C'5,5,15', true, C'45,45,60');
 
 
 
    // Table Headers
 
-   CreateLabel("H_Z", left_x + 10, 250, "ZONE", clrGray, 8);
+   CreateLabel("H_Z", left_x + 10, 325, "ZONE", clrGray, 8);
 
-   CreateLabel("H_P", left_x + 85, 250, "PRICE", clrGray, 8);
+   CreateLabel("H_P", left_x + 85, 325, "PRICE", clrGray, 8);
 
-   CreateLabel("H_D", left_x + 150, 250, "DIST", clrGray, 8);
+   CreateLabel("H_D", left_x + 150, 325, "DIST", clrGray, 8);
 
 
 
-   for(int i = 0; i < 10; i++)
+   for(int i = 0; i < 6; i++)
 
    {
 
       string id = IntegerToString(i);
 
-      int ry = 265 + (i * 18);
+      int ry = 340 + (i * 18);
 
       CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
 
@@ -307,10 +308,11 @@ void CDashboardPanel::CreatePanel()
 
    // 2. Strategy Signal Section (Panel A)
    // Moved from Panel B to improve layout balance
+   // Expanded Advisor section with more details (zones reduced to 3, saving space)
 
    CreateLabel("LblSig", left_x + pad, 80, "STRATEGY SIGNAL", m_header_color, 10, "Arial Bold");
 
-   CreateRect("InfoBG", left_x, 100, half_width, 105, C'5,5,15');
+   CreateRect("InfoBG", left_x, 100, half_width, 180, C'5,5,15');
 
 
 
@@ -336,13 +338,38 @@ void CDashboardPanel::CreatePanel()
 
 
 
-   sig_y += 5;
+   sig_y += 8;
 
    CreateLabel("Adv_T", left_x + 10, sig_y, "Advisor:", m_accent_color, 10, "Arial Bold");
 
-   CreateLabel("Adv_V", left_x + 10, sig_y + 15, "Scanning market...", clrCyan, 9);
+   sig_y += 16;
 
-   CreateLabel("Adv_V2", left_x + 10, sig_y + 30, "", clrCyan, 9);
+   CreateLabel("Adv_V", left_x + 10, sig_y, "Scanning market...", clrCyan, 9);
+
+   sig_y += 14;
+
+   CreateLabel("Adv_V2", left_x + 10, sig_y, "", clrCyan, 9);
+
+   sig_y += 18;
+
+   // Detailed status labels (formatted like Advisor, but orange)
+   CreateLabel("Stat_T", left_x + 10, sig_y, "Status:", m_accent_color, 10, "Arial Bold");
+
+   sig_y += 16;
+
+   CreateLabel("Stat_Zone", left_x + 10, sig_y, "", C'255,165,0', 9);
+
+   sig_y += 14;
+
+   CreateLabel("Stat_Trend", left_x + 10, sig_y, "", C'255,165,0', 9);
+
+   sig_y += 14;
+
+   CreateLabel("Stat_QS", left_x + 10, sig_y, "", C'255,165,0', 9);
+
+   sig_y += 14;
+
+   CreateLabel("Stat_RSI", left_x + 10, sig_y, "", C'255,165,0', 9);
 
    CreateLabel("Ver", left_x + half_width - pad, 190, "v5.0", clrGray, 8);
 
@@ -1065,69 +1092,21 @@ void CDashboardPanel::CreatePanel()
 
                         right_y += 13;
 
-
-
-         
-
-
-
+                        // Auto Strategy checkboxes (single row)
                         CreateButton("BtnStratArrow", right_x + 10, right_y, 15, 15, "", clrGray);
-
-
-
-         
-
-
-
                         CreateLabel("L_Arrow", right_x + 30, right_y, "Arrow", clrCyan, 9, "Arial Bold");
 
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
                         CreateButton("BtnStratRev", right_x + 85, right_y, 15, 15, "", clrGray);
-
-
-
-         
-
-
-
                         CreateLabel("L_Rev", right_x + 105, right_y, "Rev", clrCyan, 9, "Arial Bold");
 
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
                         CreateButton("BtnStratBreak", right_x + 155, right_y, 15, 15, "", clrGray);
-
-
-
-         
-
-
-
                         CreateLabel("L_Break", right_x + 175, right_y, "Break", clrCyan, 9, "Arial Bold");
+
+                        // Quick Scalp section (separate)
+                        right_y += 25;
+                        CreateLabel("L_QS_Label", right_x + 10, right_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
+                        CreateButton("BtnStratQS", right_x + 100, right_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
+
 
 
 
@@ -1144,16 +1123,6 @@ void CDashboardPanel::CreatePanel()
 
 
                         CreateLabel("LblLastAuto", right_x + 10, right_y + 32, "Last: ---", C'80,80,80', 8);
-
-
-
-
-            // ============================================
-            // Quick Scalp Button
-            // ============================================
-            right_y += 60;
-            CreateLabel("L_QS", right_x + pad, right_y, "QUICK SCALP", m_header_color, 10, "Arial Bold");
-            CreateButton("BtnQuickScalp", right_x + half_width - 110, right_y, 100, 20, "QUICK SCALP", C'50,50,60', C'100,100,100', 8);
 
 
 
@@ -1522,7 +1491,7 @@ void CDashboardPanel::UpdateTradingMode(int mode)
 //+------------------------------------------------------------------+
 //| Update Strategy Selection Buttons                                |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
+void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool qs)
 {
    color bgArrow = arrow ? m_buy_color : clrGray;
    color bgRev   = rev ? m_buy_color : clrGray;
@@ -1531,6 +1500,9 @@ void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratArrow", OBJPROP_BGCOLOR, bgArrow);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratRev", OBJPROP_BGCOLOR, bgRev);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratBreak", OBJPROP_BGCOLOR, bgBrk);
+
+   // Update Quick Scalp button separately
+   UpdateQuickScalpButton(qs);
 }
 
 //+------------------------------------------------------------------+
@@ -1538,13 +1510,13 @@ void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateQuickScalpButton(bool isActive)
 {
-   string text = "QUICK SCALP";
+   string text = isActive ? "ON" : "OFF";
    color bg = isActive ? m_buy_color : C'50,50,60';
-   color txt = clrWhite;
+   color txt = isActive ? clrWhite : C'100,100,100';
 
-   ObjectSetString(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_COLOR, txt);
+   ObjectSetString(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_COLOR, txt);
 }
 
 //+------------------------------------------------------------------+
@@ -1584,7 +1556,7 @@ void CDashboardPanel::UpdateConfirmButton(string text, bool enable)
 //+------------------------------------------------------------------+
 //| Update DJay Zones (Pivot + Support/Resistance)                   |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateDJayZones(double d1_open)
+void CDashboardPanel::UpdateDJayZones(double d1_open, int maxZones)
 {
    if(d1_open <= 0) return;
    double current = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -1599,31 +1571,33 @@ void CDashboardPanel::UpdateDJayZones(double d1_open)
       double minor = (i >= 0) ? (base + 300) : (base - 300);
       AddLevel(levels, labels, d1_open + (minor * pt), StringFormat("D1 %+d", (int)minor));
    }
-   
+
    int count = ArraySize(levels);
-   int best_idx[10]; double best_dist[10];
-   for(int k=0; k<10; k++) { best_dist[k] = 999999; best_idx[k] = -1; }
-   
+   int best_idx[]; double best_dist[];
+   ArrayResize(best_idx, maxZones);
+   ArrayResize(best_dist, maxZones);
+   for(int k=0; k<maxZones; k++) { best_dist[k] = 999999; best_idx[k] = -1; }
+
    for(int i=0; i<count; i++)
    {
       double dist = MathAbs(current - levels[i]);
-      for(int k=0; k<10; k++)
+      for(int k=0; k<maxZones; k++)
       {
          if(dist < best_dist[k])
          {
-            for(int j=9; j>k; j--) { best_dist[j] = best_dist[j-1]; best_idx[j] = best_idx[j-1]; }
+            for(int j=maxZones-1; j>k; j--) { best_dist[j] = best_dist[j-1]; best_idx[j] = best_idx[j-1]; }
             best_dist[k] = dist; best_idx[k] = i; break;
          }
       }
    }
-   
+
    // Sort by Price DESC
-   for(int i=0; i<9; i++)
-      for(int j=0; j<9-i; j++)
+   for(int i=0; i<maxZones-1; i++)
+      for(int j=0; j<maxZones-1-i; j++)
          if(best_idx[j] != -1 && best_idx[j+1] != -1 && levels[best_idx[j]] < levels[best_idx[j+1]])
          { int t = best_idx[j]; best_idx[j] = best_idx[j+1]; best_idx[j+1] = t; }
 
-   for(int i=0; i<10; i++)
+   for(int i=0; i<maxZones; i++)
    {
       int idx = best_idx[i];
       if(idx == -1) continue;
@@ -1635,6 +1609,15 @@ void CDashboardPanel::UpdateDJayZones(double d1_open)
       ObjectSetInteger(m_chart_id, m_prefix+"L_N_"+sid, OBJPROP_COLOR, c);
       ObjectSetString(m_chart_id, m_prefix+"L_P_"+sid, OBJPROP_TEXT, DoubleToString(levels[idx], 2));
       ObjectSetString(m_chart_id, m_prefix+"L_D_"+sid, OBJPROP_TEXT, DoubleToString(MathAbs(current-levels[idx])/pt, 0)+" pts");
+   }
+
+   // Hide unused zone labels (6-9) since we now only show 6 zones
+   for(int i=maxZones; i<10; i++)
+   {
+      string sid = IntegerToString(i);
+      ObjectSetString(m_chart_id, m_prefix+"L_N_"+sid, OBJPROP_TEXT, "");
+      ObjectSetString(m_chart_id, m_prefix+"L_P_"+sid, OBJPROP_TEXT, "");
+      ObjectSetString(m_chart_id, m_prefix+"L_D_"+sid, OBJPROP_TEXT, "");
    }
 }
 
@@ -1898,6 +1881,17 @@ void CDashboardPanel::UpdateAdvisor(string message)
    // Update labels
    ObjectSetString(m_chart_id, m_prefix+"Adv_V", OBJPROP_TEXT, line1);
    ObjectSetString(m_chart_id, m_prefix+"Adv_V2", OBJPROP_TEXT, line2);
+}
+
+//+------------------------------------------------------------------+
+//| Update Advisor Details (Zone, Trend, QS, RSI)                      |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateAdvisorDetails(string zone, string trend, string qs, string rsi)
+{
+   ObjectSetString(m_chart_id, m_prefix+"Stat_Zone", OBJPROP_TEXT, zone);
+   ObjectSetString(m_chart_id, m_prefix+"Stat_Trend", OBJPROP_TEXT, trend);
+   ObjectSetString(m_chart_id, m_prefix+"Stat_QS", OBJPROP_TEXT, qs);
+   ObjectSetString(m_chart_id, m_prefix+"Stat_RSI", OBJPROP_TEXT, rsi);
 }
 
 //+------------------------------------------------------------------+

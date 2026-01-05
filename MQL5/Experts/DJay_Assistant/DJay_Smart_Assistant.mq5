@@ -51,7 +51,7 @@ input bool   Input_Auto_Breakout       = true;   // Auto Trade on Breakout (Zone
 input group "=== Chart Zones Settings ==="
 input bool   Input_Show_Zones_On_Chart   = true;   // Show zones on chart
 input bool   Input_Show_Pivot_Line       = true;   // Show D1 Open pivot line
-input int    Input_Max_Zones_Show        = 10;     // Max zones above/below to display
+input int    Input_Max_Zones_Show        = 3;      // Max zones above/below to display
 input int    Input_Zone_Range_Points     = 50;     // Zone depth (±points from level)
 
 //--- Global Objects
@@ -92,21 +92,20 @@ int OnInit()
 
    // Init Quick Scalp Mode
    g_quick_scalp_mode = Input_QuickScalp_Mode;
-   dashboardPanel.UpdateQuickScalpButton(g_quick_scalp_mode);
 
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
    dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
-   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
 
    // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
    chartZones.Init(d1Open, Input_Zone_Offset1, Input_Zone_Offset2, Input_Zone_Range_Points);
    chartZones.SetSettings(Input_Show_Zones_On_Chart, Input_Show_Pivot_Line, Input_Max_Zones_Show);
 
-   dashboardPanel.UpdateDJayZones(d1Open);
+   dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
 
    EventSetTimer(1);
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // Enable Mouse Events for Dragging
@@ -140,7 +139,7 @@ void OnTick()
    static double prevD1Open = 0;
    if(d1Open != prevD1Open)
    {
-      dashboardPanel.UpdateDJayZones(d1Open);
+      dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
       prevD1Open = d1Open;
    }
 
@@ -400,6 +399,48 @@ void OnTimer()
    string advisorMessage = signalEngine.GetAdvisorMessage(g_quick_scalp_mode);
    dashboardPanel.UpdateAdvisor(advisorMessage);
 
+   // 3f-1. Advisor Details (Zone, Trend, QS, RSI)
+   string zoneText, trendText, qsText, rsiText;
+
+   // Zone info with distance
+   ENUM_ZONE_STATUS zone = signalEngine.GetCurrentZoneStatus();
+   double zoneBuy1 = signalEngine.GetZoneLevel(ZONE_BUY1);
+   double zoneSell1 = signalEngine.GetZoneLevel(ZONE_SELL1);
+   double currentPrice = signalEngine.GetCurrentPrice();
+   double distToBuy = MathAbs(currentPrice - zoneBuy1);
+   double distToSell = MathAbs(currentPrice - zoneSell1);
+
+   if(zone == ZONE_STATUS_NONE)
+      zoneText = StringFormat("Zone: Middle (%.0f pts to Buy1)", distToBuy/_Point);
+   else if(zone == ZONE_STATUS_IN_BUY1)
+      zoneText = StringFormat("Zone: Buy1 (%.0f pts in)", distToBuy/_Point);
+   else if(zone == ZONE_STATUS_IN_BUY2)
+      zoneText = StringFormat("Zone: Buy2 (%.0f pts in)", (currentPrice - zoneBuy1)/_Point);
+   else if(zone == ZONE_STATUS_IN_SELL1)
+      zoneText = StringFormat("Zone: Sell1 (%.0f pts in)", distToSell/_Point);
+   else if(zone == ZONE_STATUS_IN_SELL2)
+      zoneText = StringFormat("Zone: Sell2 (%.0f pts in)", (zoneSell1 - currentPrice)/_Point);
+   else
+      zoneText = "Zone: Scanning...";
+
+   // H1 Trend
+   ENUM_TREND_DIRECTION h1Trend = signalEngine.GetTrendDirection(PERIOD_H1);
+   if(h1Trend == TREND_UP)
+      trendText = "H1 Trend: UP";
+   else if(h1Trend == TREND_DOWN)
+      trendText = "H1 Trend: DOWN";
+   else
+      trendText = "H1 Trend: FLAT";
+
+   // Quick Scalp status
+   qsText = g_quick_scalp_mode ? "QS: Active" : "QS: Inactive";
+
+   // RSI value
+   double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
+   rsiText = (rsiVal > 0) ? StringFormat("RSI(M5): %.0f", rsiVal) : "RSI(M5): --";
+
+   dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText);
+
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
    double recPrice, recSL, recTP;
@@ -427,8 +468,8 @@ void OnTimer()
    // Price and Orders are now updated in OnTick for real-time responsiveness
 
    double d1Open = signalEngine.GetD1Open();
-   dashboardPanel.UpdateDJayZones(d1Open);
-   double currentPrice = signalEngine.GetCurrentPrice();
+   dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
+   currentPrice = signalEngine.GetCurrentPrice();
 
    // 5. Update Chart Zones
    chartZones.Update(d1Open, currentPrice);
@@ -525,25 +566,25 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(dashboardPanel.IsStratArrowClicked(sparam))
       {
          g_strat_arrow = !g_strat_arrow;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsStratRevClicked(sparam))
       {
          g_strat_rev = !g_strat_rev;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsStratBreakClicked(sparam))
       {
          g_strat_break = !g_strat_break;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
-      else if(dashboardPanel.IsQuickScalpClicked(sparam))
+      else if(dashboardPanel.IsStratQSClicked(sparam))
       {
          g_quick_scalp_mode = !g_quick_scalp_mode;
-         dashboardPanel.UpdateQuickScalpButton(g_quick_scalp_mode);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
          Print("Quick Scalp Mode: ", g_quick_scalp_mode ? "ENABLED" : "DISABLED");
       }
