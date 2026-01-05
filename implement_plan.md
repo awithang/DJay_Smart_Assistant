@@ -1,74 +1,81 @@
-# Implementation Plan: Stepped Profit Lock (Ladder Logic)
+# Architecture & Implementation Plan: UI Optimization - DJAY Smart Assistant
 
-## Objective
-Implement a "Ladder" or "Stepped" Profit Lock system.
-Instead of a standard trailing stop that follows price at a distance, this system locks in specific profit levels based on milestones.
+## 1. Objective
+Refine the Dashboard UI to improve usability, visual hierarchy, and logical grouping of information.
+**Key Changes:**
+1.  **Layout Restructuring**: Move "Strategy Signal" to Left Panel (Panel A).
+2.  **Daily Zones Scrolling**: Add scroll functionality (max 10 rows visible) to the Daily Zones table to handle more levels without taking up extra space.
+3.  **Active Orders**: Optimize row layout (Close button on left).
+4.  **Visual Tweaks**: Adjust spacing and highlight key timers.
 
-## The Logic (Ladder System)
+## 2. Technical Constraints & Performance
+*   **Zero-Latency Response**: Interactive elements must remain lightweight (`BORDER_FLAT`).
+*   **Efficient Redraws**:
+    *   **Daily Zones**: Scrolling should trigger a targeted update of just the zone labels, not a full panel redraw.
+    *   **Data Handling**: Use an array to store all calculated zones, then render a "window" of 10 zones based on a scroll offset index.
 
-1.  **Stage 1: Initial Lock**
-    *   **Trigger:** When `CurrentProfit >= Trigger_Points` (e.g., 200 pts).
-    *   **Action:** Move SL to `OpenPrice + Lock_Amount_Points` (e.g., +50 pts).
-    *   *Result:* We have locked our first 5 pips.
+## 3. Detailed Specifications
 
-2.  **Stage 2: Sequential Stepping**
-    *   Once the initial lock is active, we check for **further profit gains**.
-    *   **Trigger:** Has profit increased by another `Step_Points` (e.g., 100 pts) above the *initial trigger*?
-    *   **Formula:** `StepsTaken = Floor((CurrentProfit - Trigger_Points) / Step_Points)`
-    *   **Action:** Move SL to `Initial_Lock_SL + (StepsTaken * Step_Points)`.
-    *   *Result:* If price moves +10 pips, SL moves +10 pips. We maintain the exact same "buffer" distance from the current price as we established in the first step, but only updating in discrete 10-pip jumps.
+### 3.1 Daily Zones Scrolling (New Feature)
+**Goal**: Enable scrolling for the Daily Zones table using the same visual style as Active Orders.
 
-## Files to Modify
+*   **New State Members**:
+    *   `int m_zone_scroll_offset`: Current index of top visible zone row.
+    *   `int m_zone_total_levels`: Total number of calculated zones (e.g., 20 or 60).
+    *   `struct ZoneLevel { double price; string label; string type; };` (or parallel arrays) to store full list.
+*   **UI Components (`CreatePanel`)**:
+    *   **Scroll Buttons**:
+        *   `BtnZoneScrollUp`: Positioned inside `TableBG` (top-right corner).
+        *   `BtnZoneScrollDown`: Positioned inside `TableBG` (bottom-right corner).
+        *   **Style**: 15x15 size, flat border, "▲"/"▼" symbols.
+*   **Rendering Logic (`UpdateDJayZones`)**:
+    *   Calculate ALL levels (e.g., +/- 30 zones).
+    *   Sort and filter to find relevant levels (the existing logic keeps the "best 10").
+    *   **CHANGE**: Instead of keeping just "best 10", keep "best 20" (or more) sorted by price, store them in class member arrays.
+    *   **Display Loop**: Loop from `0` to `9` (10 rows).
+        *   Access index `m_zone_scroll_offset + i`.
+        *   Update labels `L_N_x`, `L_P_x`, `L_D_x`.
+*   **Event Handling (`OnEvent`)**:
+    *   `IsZoneScrollUpClicked`: Decrement offset.
+    *   `IsZoneScrollDownClicked`: Increment offset.
+    *   Call `UpdateDJayZones(0)` (or a dedicated redraw helper) to refresh text.
 
-### 1. `MQL5/Include/EA_Helper/TradeManager.mqh`
-**Action:** Update `ManagePositions` to use this new "Ladder" logic.
+### 3.2 Layout Restructuring
+**Goal**: Move Strategy Signal from Panel B to Panel A (Top-Middle).
 
-*   **Inputs:** `lock_trigger_pts`, `lock_amount_pts`, `step_pts`. (Note: `trail_dist` is no longer needed/used in this logic, or can be kept as a separate optional feature, but for this specific request, we focus on the stepping profit lock).
+*   **Left Panel Flow**: Header -> **Strategy Signal** -> Daily Zones.
+*   **Vertical Shift**: The "Daily Zones" section (and its new scroll buttons) must move down by approx **140px** to make room for Strategy Signal.
 
-*   **Detailed Logic (BUY Example):**
-    ```cpp
-    double currentProfitPts = CurrentPrice - OpenPrice;
+### 3.3 Active Orders Row Layout
+*   **Close Button**: Move to left (`base_x + 10`).
+*   **Info Label**: Shift right. Remove Ticket ID.
 
-    // 1. Check if we reached the start line
-    if (currentProfitPts >= lock_trigger_pts)
-    {
-        // 2. Calculate Base Lock SL (The "Foundation")
-        double baseLockSL = OpenPrice + (lock_amount_pts * Point);
+### 3.4 Spacing & Styling
+*   **Top Left Header**: Increase X-offset for values by **+5px**.
+*   **M5 Timer**: Change color to Orange (`C'255,140,0'`).
 
-        // 3. Calculate how many "Steps" we have climbed BEYOND the trigger
-        //    (CurrentProfit - Trigger) / Step
-        double profitBeyondTrigger = currentProfitPts - lock_trigger_pts;
-        int stepsClimbed = (int)MathFloor(profitBeyondTrigger / step_pts);
+## 4. Implementation Steps (For Coding Agent)
 
-        // 4. Calculate New Target SL
-        //    BaseSL + (Steps * StepDistance)
-        double stepGain = stepsClimbed * (step_pts * Point);
-        double newTargetSL = baseLockSL + stepGain;
+1.  **Class Updates (`DashboardPanel.mqh`)**:
+    *   Add `m_zone_scroll_offset` (init to 0).
+    *   Add private arrays to cache zone data: `m_zone_prices[]`, `m_zone_labels[]`, `m_zone_types[]`.
+    *   Add event handlers for zone scroll buttons.
+2.  **Refactor `CreatePanel`**:
+    *   **Move Strategy Signal**: Cut from Right, Paste to Left (above Zones). Adjust Y-coords.
+    *   **Shift Daily Zones**: Add ~140px to Y-coords.
+    *   **Add Zone Scroll Buttons**: Create `BtnZoneScrollUp` and `BtnZoneScrollDown` within the shifted `TableBG` area.
+3.  **Update `UpdateDJayZones`**:
+    *   Modify logic to store **all** relevant nearest zones (e.g., top 20) into the new cache arrays instead of just writing to the first 10 labels.
+    *   Implement a "Render" loop that reads from cache based on `m_zone_scroll_offset`.
+4.  **Update `UpdateActiveOrders`**:
+    *   Reposition Close Button (Left) and Text (Right).
+5.  **Apply Styling**:
+    *   Spacing + Orange M5 Timer.
 
-        // 5. Apply if better than current SL
-        if (newTargetSL > CurrentSL)
-        {
-            ApplySL(newTargetSL);
-        }
-    }
-    ```
-
-*   **SELL Example:** Inverted logic.
-    *   `currentProfitPts = OpenPrice - CurrentPrice`
-    *   `baseLockSL = OpenPrice - (lock_amount_pts * Point)`
-    *   `newTargetSL = baseLockSL - stepGain` (Moving DOWN)
-    *   Apply if `newTargetSL < CurrentSL` (or `CurrentSL == 0`).
-
-### 2. `MQL5/Experts/EA_Helper/WidwaPa_Assistant.mq5`
-**Action:** Update Inputs to match this logic.
-
-*   **New Inputs:**
-    *   `Input_ProfitLock_Trigger_Pts` = 200 (Start locking at 20 pips profit)
-    *   `Input_ProfitLock_Amount_Pts` = 50 (Lock 5 pips initially)
-    *   `Input_ProfitLock_Step_Pts` = 100 (Move SL every 10 pips of further profit)
-    *   *Removed:* `Input_Trailing_Stop_Pts` (Standard trailing distance is replaced by this logic).
-
-## Performance Impact
-*   **High Performance:** Because we use `MathFloor` and `Step` logic, the SL target `newTargetSL` only changes value when a full step is completed.
-*   **Zero Spam:** The condition `if (newTargetSL > CurrentSL)` will naturally return `false` for 99% of ticks while the price is moving *within* a step, ensuring zero unnecessary server calls.
-
+## 5. Verification
+*   **Daily Zones**:
+    *   Verify scrolling works (values change, order is preserved).
+    *   Verify layout is correctly positioned below Strategy Signal.
+*   **Strategy Signal**: Verify it sits neatly between Header and Zones.
+    *   **Advisor Message**: Ensure `GetAdvisorMessage` output (Trend/Zone/Signal analysis) is still correctly displayed in the moved `Adv_T/V/V2` labels.
+*   **Active Orders**: Verify Left-Close button layout.

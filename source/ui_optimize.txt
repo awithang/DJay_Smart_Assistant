@@ -1,10 +1,8 @@
 Task:
 
-1. remove dragging feature from the panel, because we not success to implrement properly and it's not important feature. I don't need unuse code in project.
-
-2. We relaxing condition for onclick Sell/Buy limit because i never see it work. Now i know how it work then i need to use the best condition for this function to garuntee the best result. (Reference information with @WidwaPaTrade_Vol.2.1)
-
-3. Set default of all "Auto Mode" options to "true".
+1. Adjust section position by:
+- Move Strategy Signal section from panel B to above Daily Zone section in panel A.
+- Adjust space between Strategy Signal section and Daily Zone section to equal as other section distance.
 
 
 *** Important***

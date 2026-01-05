@@ -229,11 +229,11 @@ void CDashboardPanel::CreatePanel()
 
 
 
-      CreateLabel("LblSesValue", left_x + pad + 55, 35, "--", clrGray, 9, "Arial");
+      CreateLabel("LblSesValue", left_x + pad + 60, 35, "--", clrGray, 9, "Arial");
 
 
 
-      CreateLabel("LblTime", left_x + half_width - pad, 35, "M5: --:--", clrGray, 9, "Arial", "right");
+      CreateLabel("LblTime", left_x + half_width - pad, 35, "M5: --:--", clrOrange, 9, "Arial", "right");
 
    
 
@@ -245,7 +245,7 @@ void CDashboardPanel::CreatePanel()
 
       
 
-         CreateLabel("LblRunTime", left_x + pad + 55, 48, "SIDEWAY", clrGray, 9, "Arial");
+         CreateLabel("LblRunTime", left_x + pad + 60, 48, "SIDEWAY", clrGray, 9, "Arial");
 
    
 
@@ -263,25 +263,26 @@ void CDashboardPanel::CreatePanel()
 
       
 
-         CreateLabel("LblZoneStat", left_x + pad + 55, 61, "NEUTRAL", clrGray, 9, "Arial");
+         CreateLabel("LblZoneStat", left_x + pad + 60, 61, "NEUTRAL", clrGray, 9, "Arial");
 
 
 
-   // 2. Daily Zones Table (Panel A)
+   // 3. Daily Zones Table (Panel A)
+   // Shifted down by 140px to accommodate Strategy Signal section
 
-   CreateLabel("LblZ", left_x + pad, 80, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
+   CreateLabel("LblZ", left_x + pad, 220, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
 
-   CreateRect("TableBG", left_x, 100, half_width, 200, C'5,5,15', true, C'45,45,60');
+   CreateRect("TableBG", left_x, 240, half_width, 212, C'5,5,15', true, C'45,45,60');
 
 
 
    // Table Headers
 
-   CreateLabel("H_Z", left_x + 10, 110, "ZONE", clrGray, 8);
+   CreateLabel("H_Z", left_x + 10, 250, "ZONE", clrGray, 8);
 
-   CreateLabel("H_P", left_x + 85, 110, "PRICE", clrGray, 8);
+   CreateLabel("H_P", left_x + 85, 250, "PRICE", clrGray, 8);
 
-   CreateLabel("H_D", left_x + 150, 110, "DIST", clrGray, 8);
+   CreateLabel("H_D", left_x + 150, 250, "DIST", clrGray, 8);
 
 
 
@@ -291,7 +292,7 @@ void CDashboardPanel::CreatePanel()
 
       string id = IntegerToString(i);
 
-      int ry = 125 + (i * 18);
+      int ry = 265 + (i * 18);
 
       CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
 
@@ -301,7 +302,48 @@ void CDashboardPanel::CreatePanel()
 
    }
 
-   // [Strategy Signal Section moved to Panel B]
+
+   // 2. Strategy Signal Section (Panel A)
+   // Moved from Panel B to improve layout balance
+
+   CreateLabel("LblSig", left_x + pad, 80, "STRATEGY SIGNAL", m_header_color, 10, "Arial Bold");
+
+   CreateRect("InfoBG", left_x, 100, half_width, 105, C'5,5,15');
+
+
+
+   int sig_y = 112;
+
+   CreateLabel("Trend_T", left_x + 10, sig_y, "Trend:", m_header_color, 9);
+
+   CreateLabel("Trend_V", left_x + 50, sig_y, "--", clrGray, 9, "Arial Bold");
+
+
+
+   sig_y += 16;
+
+   CreateLabel("PA_T", left_x + 10, sig_y, "PA Signal:", m_header_color, 9);
+
+   CreateLabel("PA_V", left_x + 75, sig_y, "NONE", clrGray, 9);
+
+
+
+   sig_y += 17;
+
+   CreateRect("Sep1", left_x + 8, sig_y, half_width - 16, 1, C'60,60,70');
+
+
+
+   sig_y += 5;
+
+   CreateLabel("Adv_T", left_x + 10, sig_y, "Advisor:", m_accent_color, 10, "Arial Bold");
+
+   CreateLabel("Adv_V", left_x + 10, sig_y + 15, "Scanning market...", clrCyan, 9);
+
+   CreateLabel("Adv_V2", left_x + 10, sig_y + 30, "", clrCyan, 9);
+
+   CreateLabel("Ver", left_x + half_width - pad, 190, "v5.0", clrGray, 8);
+
 
    // ============================================
 
@@ -1115,7 +1157,9 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        // 7. Strategy Signal (Bottom of flow)
+            // ============================================
+            // Strategy Signal section moved to Panel A
+            // ============================================
 
 
 
@@ -1123,7 +1167,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        right_y += 60; // Space after Auto Strategy
+                        // right_y += 60; // REMOVED: Strategy Signal moved to Panel A
 
 
 
@@ -1131,7 +1175,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateLabel("LblSig", right_x + pad, right_y, "STRATEGY SIGNAL", m_header_color, 10, "Arial Bold");
+                        // CreateLabel LblSig REMOVED - now in Panel A
 
 
 
@@ -1139,7 +1183,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateRect("InfoBG", right_x, right_y + 20, half_width, 105, C'5,5,15');
+                        // CreateRect InfoBG REMOVED
 
 
 
@@ -1147,31 +1191,15 @@ void CDashboardPanel::CreatePanel()
 
 
 
-            int sig_y = right_y + 32; 
+            // int sig_y REMOVED 
 
 
 
-            CreateLabel("Trend_T", right_x + 10, sig_y, "Trend:", m_header_color, 9);
+            // CreateLabel Trend_T REMOVED
 
 
 
-            CreateLabel("Trend_V", right_x + 50, sig_y, "--", clrGray, 9, "Arial Bold");
-
-
-
-         
-
-
-
-            sig_y += 16;
-
-
-
-            CreateLabel("PA_T", right_x + 10, sig_y, "PA Signal:", m_header_color, 9);
-
-
-
-            CreateLabel("PA_V", right_x + 75, sig_y, "NONE", clrGray, 9);
+            // CreateLabel Trend_V REMOVED
 
 
 
@@ -1179,31 +1207,15 @@ void CDashboardPanel::CreatePanel()
 
 
 
-            sig_y += 17;
+            // sig_y increment REMOVED
 
 
 
-            CreateRect("Sep1", right_x + 8, sig_y, half_width - 16, 1, C'60,60,70');
+            // CreateLabel PA_T REMOVED
 
 
 
-         
-
-
-
-            sig_y += 5;
-
-
-
-            CreateLabel("Adv_T", right_x + 10, sig_y, "Advisor:", m_accent_color, 10, "Arial Bold");
-
-
-
-            CreateLabel("Adv_V", right_x + 10, sig_y + 15, "Scanning market...", clrCyan, 9);
-
-
-
-            CreateLabel("Adv_V2", right_x + 10, sig_y + 30, "", clrCyan, 9);
+            // CreateLabel PA_V REMOVED
 
 
 
@@ -1211,7 +1223,39 @@ void CDashboardPanel::CreatePanel()
 
 
 
-            CreateLabel("Ver", right_x + half_width - pad, right_y + 110, "v5.0", clrGray, 8);
+            // sig_y increment REMOVED
+
+
+
+            // CreateRect Sep1 REMOVED
+
+
+
+         
+
+
+
+            // sig_y increment REMOVED
+
+
+
+            // CreateLabel Adv_T REMOVED
+
+
+
+            // CreateLabel Adv_V REMOVED
+
+
+
+            // CreateLabel Adv_V2 REMOVED
+
+
+
+         
+
+
+
+            // CreateLabel Ver REMOVED
 
 
 
@@ -2005,24 +2049,24 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
          double profitPct = (balance > 0) ? (profits[actualOrderIndex] / balance) * 100.0 : 0;
          color pColor = (profits[actualOrderIndex] >= 0) ? clrLime : clrOrange;
 
-         // 1. Info Label (Cyan)
-         string infoText = StringFormat("#%d      %s      Lots %.2f      @%.2f", tickets[actualOrderIndex], typeStr, lots[actualOrderIndex], prices[actualOrderIndex]);
+         // 1. Info Label (Cyan) - Ticket ID removed, button moved to left
+         string infoText = StringFormat("%s      Lots %.2f      @%.2f", typeStr, lots[actualOrderIndex], prices[actualOrderIndex]);
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_TEXT, infoText);
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_COLOR, clrCyan);
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, x + 10);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_L_"+sid, OBJPROP_XDISTANCE, x + 50);
 
          // 2. Profit Label ($)
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_TEXT, StringFormat("$%.2f", profits[actualOrderIndex]));
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_COLOR, pColor);
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_XDISTANCE, x + 290);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_M_"+sid, OBJPROP_XDISTANCE, x + 300);
 
          // 3. Percent Label (%)
          ObjectSetString(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_TEXT, StringFormat("(%.2f%%)", profitPct));
          ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_COLOR, pColor);
-         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_XDISTANCE, x + 380);
+         ObjectSetInteger(m_chart_id, m_prefix+"ActOrder_R_"+sid, OBJPROP_XDISTANCE, x + 390);
 
-         // Show close button
-         int btnX = x + m_panel_width - 45;
+         // Show close button (moved to left)
+         int btnX = x + 10;
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_XDISTANCE, btnX);
          ObjectSetInteger(m_chart_id, m_prefix+"BtnCloseOrder_"+sid, OBJPROP_STATE, false);
       }
