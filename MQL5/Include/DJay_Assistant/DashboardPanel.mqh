@@ -82,6 +82,7 @@ public:
    // New Methods
    void UpdateTradingMode(int mode);
    void UpdateStrategyButtons(bool arrow, bool rev, bool brk);
+   void UpdateQuickScalpButton(bool isActive);
    void UpdateConfirmButton(string text, bool enable);
 
    //--- Settings Methods (NEW)
@@ -120,6 +121,7 @@ public:
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
+   bool IsQuickScalpClicked(string sparam) { return (sparam == m_prefix+"BtnQuickScalp"); }
 
    bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
    bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
@@ -1145,6 +1147,16 @@ void CDashboardPanel::CreatePanel()
 
 
 
+
+            // ============================================
+            // Quick Scalp Button
+            // ============================================
+            right_y += 60;
+            CreateLabel("L_QS", right_x + pad, right_y, "QUICK SCALP", m_header_color, 10, "Arial Bold");
+            CreateButton("BtnQuickScalp", right_x + half_width - 110, right_y, 100, 20, "QUICK SCALP", C'50,50,60', C'100,100,100', 8);
+
+
+
          
 
 
@@ -1515,10 +1527,24 @@ void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk)
    color bgArrow = arrow ? m_buy_color : clrGray;
    color bgRev   = rev ? m_buy_color : clrGray;
    color bgBrk   = brk ? m_buy_color : clrGray;
-   
+
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratArrow", OBJPROP_BGCOLOR, bgArrow);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratRev", OBJPROP_BGCOLOR, bgRev);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratBreak", OBJPROP_BGCOLOR, bgBrk);
+}
+
+//+------------------------------------------------------------------+
+//| Update Quick Scalp Button                                         |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateQuickScalpButton(bool isActive)
+{
+   string text = "QUICK SCALP";
+   color bg = isActive ? m_buy_color : C'50,50,60';
+   color txt = clrWhite;
+
+   ObjectSetString(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnQuickScalp", OBJPROP_COLOR, txt);
 }
 
 //+------------------------------------------------------------------+

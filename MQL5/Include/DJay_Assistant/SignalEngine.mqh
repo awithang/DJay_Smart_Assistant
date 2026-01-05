@@ -133,6 +133,10 @@ public:
     //--- Helper to get EMA value
     double GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift);
 
+    //--- Quick Scalp: RSI/Stochastic helper methods
+    double GetRSIValue(ENUM_TIMEFRAMES tf, int period, int shift);
+    double GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_period, int shift);
+
     //--- Natural Language Advisor
     string GetAdvisorMessage();
     bool   IsDataReady();
@@ -840,8 +844,10 @@ string CSignalEngine::GetAdvisorMessage()
             return StringFormat("Counter-trend Sell at resistance @%.2f. Scalp with caution.", resPrice);
          return StringFormat("Strong Uptrend hitting resistance @%.2f. Wait for breakout or pullback.", resPrice);
       }
-      // Middle zone
-      return "Trend is Up. Wait for pullback to better price.";
+      // Middle zone - Enhanced with price levels
+      double zoneBuy1 = GetZoneLevel(ZONE_BUY1);
+      double distToBuy = MathAbs(GetCurrentPrice() - zoneBuy1);
+      return StringFormat("Trend UP. Pull back to BUY1 @%.2f (%.0f pts).", zoneBuy1, distToBuy/_Point);
    }
 
    if(trend == TREND_DOWN)
@@ -859,8 +865,10 @@ string CSignalEngine::GetAdvisorMessage()
             return StringFormat("Counter-trend Buy at support @%.2f. Scalp with caution.", supPrice);
          return StringFormat("Strong Downtrend hitting support @%.2f. Wait for breakdown or bounce.", supPrice);
       }
-      // Middle zone
-      return "Trend is Down. Wait for rally to better price.";
+      // Middle zone - Enhanced with price levels
+      double zoneSell1 = GetZoneLevel(ZONE_SELL1);
+      double distToSell = MathAbs(GetCurrentPrice() - zoneSell1);
+      return StringFormat("Trend DOWN. Rally to SELL1 @%.2f (%.0f pts).", zoneSell1, distToSell/_Point);
    }
 
    // FLAT trend
@@ -877,7 +885,8 @@ string CSignalEngine::GetAdvisorMessage()
       return "At resistance in range. Watch for sell signal.";
    }
 
-   return "Market is choppy. Best to stay out.";
+   double distToNearest = MathMin(MathAbs(GetCurrentPrice()-GetZoneLevel(ZONE_BUY1)), MathAbs(GetCurrentPrice()-GetZoneLevel(ZONE_SELL1)));
+   return StringFormat("Choppy. Wait for clear direction (+/- %.0f pts to zone).", distToNearest/_Point);
 }
 
 //+------------------------------------------------------------------+
@@ -1092,6 +1101,50 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
    }
 
    return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get RSI value for specified timeframe and shift (Quick Scalp)     |
+//+------------------------------------------------------------------+
+double CSignalEngine::GetRSIValue(ENUM_TIMEFRAMES tf, int period, int shift)
+{
+   int handle = iRSI(_Symbol, tf, period, PRICE_CLOSE);
+   if(handle == INVALID_HANDLE)
+   {
+      return -1;  // Error indicator
+   }
+
+   double rsiBuffer[];
+   ArraySetAsSeries(rsiBuffer, true);
+   int copied = CopyBuffer(handle, 0, shift, 1, rsiBuffer);
+   IndicatorRelease(handle);
+
+   if(copied <= 0)
+      return -1;
+
+   return rsiBuffer[0];
+}
+
+//+------------------------------------------------------------------+
+//| Get Stochastic K value for specified timeframe and shift          |
+//+------------------------------------------------------------------+
+double CSignalEngine::GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_period, int shift)
+{
+   int handle = iStochastic(_Symbol, tf, k_period, d_period, 3, MODE_SMA, STO_LOWHIGH);
+   if(handle == INVALID_HANDLE)
+   {
+      return -1;  // Error indicator
+   }
+
+   double stochBuffer[];
+   ArraySetAsSeries(stochBuffer, true);
+   int copied = CopyBuffer(handle, 0, shift, 1, stochBuffer);
+   IndicatorRelease(handle);
+
+   if(copied <= 0)
+      return -1;
+
+   return stochBuffer[0];
 }
 
 //+------------------------------------------------------------------+

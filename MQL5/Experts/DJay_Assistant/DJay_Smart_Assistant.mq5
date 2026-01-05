@@ -21,6 +21,16 @@ input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
+//--- Quick Scalp Settings
+input group "=== Quick Scalp Settings ==="
+input bool   Input_QuickScalp_Mode       = false;  // Enable Quick Scalp mode (default: OFF)
+input int    Input_QS_RSI_Buy_Level      = 40;     // RSI < this for BUY signals
+input int    Input_QS_RSI_Sell_Level     = 60;     // RSI > this for SELL signals
+input int    Input_QS_Stoch_Buy_Level    = 20;     // Stochastic K < this for BUY
+input int    Input_QS_Stoch_Sell_Level   = 80;     // Stochastic K > this for SELL
+input int    Input_QS_TP_Points          = 35;     // Take Profit in pips
+input int    Input_QS_SL_Points          = 20;     // Stop Loss in pips
+
 //--- RR Ratio Settings (NEW)
 input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
 
@@ -56,6 +66,9 @@ bool g_strat_arrow;
 bool g_strat_rev;
 bool g_strat_break;
 
+//--- Quick Scalp Mode State
+bool g_quick_scalp_mode;
+
 //--- Strategy Entry State (for Manual Execution buttons)
 EntryPoint g_last_rev_entry;
 EntryPoint g_last_brk_entry;
@@ -76,6 +89,10 @@ int OnInit()
    g_strat_arrow = Input_Auto_Arrow;
    g_strat_rev = Input_Auto_Reversal;
    g_strat_break = Input_Auto_Breakout;
+
+   // Init Quick Scalp Mode
+   g_quick_scalp_mode = Input_QuickScalp_Mode;
+   dashboardPanel.UpdateQuickScalpButton(g_quick_scalp_mode);
 
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
    tradeManager.Init(Input_MagicNumber);
@@ -265,6 +282,53 @@ void OnTick()
          {
             if(paSignal == SIGNAL_PA_BUY) ExecuteBuyTrade("BREAK");
             if(paSignal == SIGNAL_PA_SELL) ExecuteSellTrade("BREAK");
+         }
+
+         // --- 4. Quick Scalp Mode (Middle Zone Trading) ---
+         if(g_quick_scalp_mode)
+         {
+            // Only trade in middle zone
+            ENUM_ZONE_STATUS zone = signalEngine.GetCurrentZoneStatus();
+
+            if(zone == ZONE_STATUS_NONE)
+            {
+               // Get H1 trend direction
+               ENUM_TREND_DIRECTION h1Trend = signalEngine.GetTrendDirection(PERIOD_H1);
+
+               // Get filter values
+               double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
+               double stochK = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
+
+               // BUY SIGNAL CHECK (all 5 filters must pass)
+               if(paSignal == SIGNAL_PA_BUY
+                  && h1Trend != TREND_DOWN
+                  && rsiVal > 0 && rsiVal < Input_QS_RSI_Buy_Level
+                  && stochK > 0 && stochK < Input_QS_Stoch_Buy_Level)
+               {
+                  // Create Quick Scalp arrow (Lime, code 241)
+                  double prevLow = iLow(_Symbol, PERIOD_M5, 1);
+                  CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 241, clrLime, "QS_Buy");
+
+                  // AUTO MODE execution
+                  if(g_tradingMode == MODE_AUTO)
+                     ExecuteQuickScalpTrade(ORDER_TYPE_BUY, Input_QS_TP_Points, Input_QS_SL_Points);
+               }
+
+               // SELL SIGNAL CHECK (all 5 filters must pass)
+               else if(paSignal == SIGNAL_PA_SELL
+                  && h1Trend != TREND_UP
+                  && rsiVal > 0 && rsiVal > Input_QS_RSI_Sell_Level
+                  && stochK > 0 && stochK > Input_QS_Stoch_Sell_Level)
+               {
+                  // Create Quick Scalp arrow (Red, code 242)
+                  double prevHigh = iHigh(_Symbol, PERIOD_M5, 1);
+                  CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 242, clrRed, "QS_Sell");
+
+                  // AUTO MODE execution
+                  if(g_tradingMode == MODE_AUTO)
+                     ExecuteQuickScalpTrade(ORDER_TYPE_SELL, Input_QS_TP_Points, Input_QS_SL_Points);
+               }
+            }
          }
       }
 
@@ -476,6 +540,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
+      else if(dashboardPanel.IsQuickScalpClicked(sparam))
+      {
+         g_quick_scalp_mode = !g_quick_scalp_mode;
+         dashboardPanel.UpdateQuickScalpButton(g_quick_scalp_mode);
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         Print("Quick Scalp Mode: ", g_quick_scalp_mode ? "ENABLED" : "DISABLED");
+      }
       // Settings Buttons (handled in DashboardPanel - RR, Trailing, and Profit Lock)
       else if(dashboardPanel.IsRR1Clicked(sparam) ||
               dashboardPanel.IsRR15Clicked(sparam) ||
@@ -601,6 +672,41 @@ void ExecuteSellTrade(string strategy="MANUAL")
    else
    {
       Print("Failed to execute Sell trade");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Execute Quick Scalp Trade (fixed TP/SL, 1:1.75 R:R)               |
+//+------------------------------------------------------------------+
+void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_points)
+{
+   // Calculate entry price
+   double entryPrice = (orderType == ORDER_TYPE_BUY) ?
+                        SymbolInfoDouble(_Symbol, SYMBOL_ASK) :
+                        SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   // Calculate TP/SL based on fixed points
+   double point = _Point;
+   double tp = (orderType == ORDER_TYPE_BUY) ? entryPrice + tp_points*point : entryPrice - tp_points*point;
+   double sl = (orderType == ORDER_TYPE_BUY) ? entryPrice - sl_points*point : entryPrice + sl_points*point;
+
+   // Execute trade
+   TradeRequest req;
+   req.type = orderType;
+   req.price = entryPrice;
+   req.sl = sl;
+   req.tp = tp;
+   req.risk_percent = dashboardPanel.GetRiskPercent();
+   req.comment = "QS_" + (string)((orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL");
+
+   if(tradeManager.ExecuteOrder(req))
+   {
+      Print("Quick Scalp ", (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL", " executed at ", entryPrice);
+      dashboardPanel.UpdateLastAutoTrade("QS", (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL", entryPrice);
+   }
+   else
+   {
+      Print("Quick Scalp Order Failed");
    }
 }
 
