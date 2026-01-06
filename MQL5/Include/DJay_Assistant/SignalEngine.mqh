@@ -53,6 +53,7 @@ struct EntryPoint
     string direction;     // "BUY" or "SELL"
     string zone;          // Zone name (e.g., "Buy1", "Sell2")
     string description;   // Human-readable description
+    datetime timestamp;   // When this entry was captured (for TTL expiry)
 };
 
 //+------------------------------------------------------------------+
@@ -992,6 +993,7 @@ EntryPoint CSignalEngine::GetReversalEntryPoint()
    result.direction = "--";
    result.zone = "--";
    result.description = "--";
+   result.timestamp = 0;
 
    // Check if reversal setup exists
    if(!IsReversalSetup())
@@ -1034,6 +1036,7 @@ EntryPoint CSignalEngine::GetReversalEntryPoint()
       result.direction = "BUY";
       result.zone = zoneName;
       result.description = StringFormat("BUY @ %.2f (Bounce %s)", zoneLevel, zoneName);
+      result.timestamp = TimeCurrent();  // Capture timestamp for TTL
    }
    else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_SELL)
    {
@@ -1042,6 +1045,7 @@ EntryPoint CSignalEngine::GetReversalEntryPoint()
       result.direction = "SELL";
       result.zone = zoneName;
       result.description = StringFormat("SELL @ %.2f (Reject %s)", zoneLevel, zoneName);
+      result.timestamp = TimeCurrent();  // Capture timestamp for TTL
    }
 
    return result;
@@ -1058,6 +1062,7 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
    result.direction = "--";
    result.zone = "--";
    result.description = "--";
+   result.timestamp = 0;
 
    // Check if breakout setup exists
    if(!IsBreakoutSetup())
@@ -1102,6 +1107,7 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
       result.direction = "SELL";
       result.zone = zoneName;
       result.description = StringFormat("SELL @ %.2f (Break %s)", result.price, zoneName);
+      result.timestamp = TimeCurrent();  // Capture timestamp for TTL
    }
    else if((zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2) && sig == SIGNAL_PA_BUY)
    {
@@ -1111,6 +1117,7 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
       result.direction = "BUY";
       result.zone = zoneName;
       result.description = StringFormat("BUY @ %.2f (Break %s)", result.price, zoneName);
+      result.timestamp = TimeCurrent();  // Capture timestamp for TTL
    }
 
    return result;

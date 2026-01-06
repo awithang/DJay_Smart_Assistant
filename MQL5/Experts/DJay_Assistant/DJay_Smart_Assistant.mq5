@@ -54,6 +54,11 @@ input bool   Input_Show_Pivot_Line       = true;   // Show D1 Open pivot line
 input int    Input_Max_Zones_Show        = 3;      // Max zones above/below to display
 input int    Input_Zone_Range_Points     = 50;     // Zone depth (±points from level)
 
+//--- Signal Safety Settings
+input group "=== Signal Safety Settings ==="
+input int    Input_Signal_TTL_Seconds    = 300;    // Signal Time-To-Live in seconds (5 min)
+input int    Input_Pending_Min_Buffer   = 50;     // Minimum buffer for pending orders (points)
+
 //--- Global Objects
 CSignalEngine   signalEngine;
 CTradeManager   tradeManager;
@@ -418,6 +423,23 @@ void OnTimer()
       g_has_captured_brk = false;
    }
 
+   // Check Signal TTL (Time-To-Live) for captured entries
+   if(g_has_captured_rev && g_captured_rev_entry.timestamp > 0) {
+      int timeElapsed = (int)(TimeCurrent() - g_captured_rev_entry.timestamp);
+      if(timeElapsed > Input_Signal_TTL_Seconds) {
+         Print("[TTL] Reversal signal expired after ", timeElapsed, " seconds (TTL=", Input_Signal_TTL_Seconds, ")");
+         g_has_captured_rev = false;
+      }
+   }
+
+   if(g_has_captured_brk && g_captured_brk_entry.timestamp > 0) {
+      int timeElapsed = (int)(TimeCurrent() - g_captured_brk_entry.timestamp);
+      if(timeElapsed > Input_Signal_TTL_Seconds) {
+         Print("[TTL] Breakout signal expired after ", timeElapsed, " seconds (TTL=", Input_Signal_TTL_Seconds, ")");
+         g_has_captured_brk = false;
+      }
+   }
+
    dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_rev_entry.isValid, g_last_brk_entry.description, g_last_brk_entry.isValid, paText);
 
    // 3e. Zone Status
@@ -562,7 +584,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             double risk = dashboardPanel.GetRiskPercent();
             double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
             double entryPrice = g_rec_price;
-            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+
+            // Dynamic buffer: MathMax(user_min_buffer, current_spread * 1.5)
+            int spread = (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+            int minBuffer = MathMax(Input_Pending_Min_Buffer, (int)(spread * 1.5));
 
             // Adjust entry price based on current price with buffer
             if(g_rec_type == ORDER_TYPE_BUY_LIMIT)
@@ -601,7 +626,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             }
 
             tradeManager.ExecutePending(g_rec_type, entryPrice, sl, tp, risk, "DJay Pending");
-            Print("Confirm Button: type=", g_rec_type, " current=", currentPrice, " entry=", entryPrice, " orig=", g_rec_price);
+            Print("[TRADE_EXEC] Confirm Button: type=", g_rec_type, " current=", currentPrice, " entry=", entryPrice, " orig=", g_rec_price, " buffer=", minBuffer);
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
       }
@@ -618,8 +643,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ENUM_ORDER_TYPE type;
             double sl, tp;
 
-            // Set entry price with minimum 50-point buffer from current price
-            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+            // Dynamic buffer: MathMax(user_min_buffer, current_spread * 1.5)
+            int spread = (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+            int minBuffer = MathMax(Input_Pending_Min_Buffer, (int)(spread * 1.5));
 
             if(g_captured_rev_entry.direction == "BUY")
             {
@@ -639,7 +665,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             }
 
             tradeManager.ExecutePending(type, entryPrice, sl, tp, risk, "DJay Rev Button");
-            Print("Reversal Button: ", g_captured_rev_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_rev_entry.price);
+            Print("[TRADE_EXEC] Reversal Button: ", g_captured_rev_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_rev_entry.price, " buffer=", minBuffer);
             // Clear capture after execution
             g_has_captured_rev = false;
          }
@@ -661,8 +687,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ENUM_ORDER_TYPE type;
             double sl, tp;
 
-            // Set entry price with minimum 50-point buffer from current price
-            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+            // Dynamic buffer: MathMax(user_min_buffer, current_spread * 1.5)
+            int spread = (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+            int minBuffer = MathMax(Input_Pending_Min_Buffer, (int)(spread * 1.5));
 
             if(g_captured_brk_entry.direction == "BUY")
             {
@@ -682,7 +709,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             }
 
             tradeManager.ExecutePending(type, entryPrice, sl, tp, risk, "DJay Brk Button");
-            Print("Breakout Button: ", g_captured_brk_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_brk_entry.price);
+            Print("[TRADE_EXEC] Breakout Button: ", g_captured_brk_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_brk_entry.price, " buffer=", minBuffer);
             // Clear capture after execution
             g_has_captured_brk = false;
          }
