@@ -59,6 +59,15 @@ input group "=== Signal Safety Settings ==="
 input int    Input_Signal_TTL_Seconds    = 300;    // Signal Time-To-Live in seconds (5 min)
 input int    Input_Pending_Min_Buffer   = 50;     // Minimum buffer for pending orders (points)
 
+//--- Risk Management Settings
+input group "=== Risk Management Settings ==="
+input double Input_Daily_Max_Loss_Percent = 5.0;   // Daily Max Loss % (0 = disabled)
+input int    Input_Max_Open_Trades        = 5;     // Maximum concurrent open trades (0 = unlimited)
+
+//--- Time Settings
+input group "=== Time Settings ==="
+input int    Input_GMT_Offset             = 2;     // GMT Offset (hours) for broker time adjustment
+
 //--- Global Objects
 CSignalEngine   signalEngine;
 CTradeManager   tradeManager;
@@ -90,6 +99,10 @@ double          g_rec_price = 0.0;
 double          g_rec_sl = 0.0;
 double          g_rec_tp = 0.0;
 bool            g_rec_active = false;
+
+//--- Risk Management State
+datetime g_daily_reset_time = 0;   // Track when daily P&L last reset
+double   g_daily_start_balance = 0; // Balance at start of trading day
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -581,6 +594,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       {
          if(g_rec_active)
          {
+            // Risk Management Check
+            if(!IsTradingAllowed())
+            {
+               ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+               return;
+            }
+
             double risk = dashboardPanel.GetRiskPercent();
             double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
             double entryPrice = g_rec_price;
@@ -637,6 +657,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          // REVERSAL: Adjust entry price based on current market price with buffer
          if(g_has_captured_rev && g_captured_rev_entry.price > 0)
          {
+            // Risk Management Check
+            if(!IsTradingAllowed())
+            {
+               ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+               return;
+            }
+
             double risk = dashboardPanel.GetRiskPercent();
             double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
             double entryPrice = 0;
@@ -681,6 +708,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          // BREAKOUT uses STOP orders (entry above/below current price) with buffer
          if(g_has_captured_brk && g_captured_brk_entry.price > 0)
          {
+            // Risk Management Check
+            if(!IsTradingAllowed())
+            {
+               ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+               return;
+            }
+
             double risk = dashboardPanel.GetRiskPercent();
             double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
             double entryPrice = 0;
@@ -802,6 +836,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 //+------------------------------------------------------------------+
 void ExecuteBuyTrade(string strategy="MANUAL")
 {
+   // Risk Management Check
+   if(!IsTradingAllowed())
+      return;
+
    // Duplicate Prevention: Check if position with same strategy comment already exists
    if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
    {
@@ -840,6 +878,10 @@ void ExecuteBuyTrade(string strategy="MANUAL")
 //+------------------------------------------------------------------+
 void ExecuteSellTrade(string strategy="MANUAL")
 {
+   // Risk Management Check
+   if(!IsTradingAllowed())
+      return;
+
    // Duplicate Prevention: Check if position with same strategy comment already exists
    if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
    {
@@ -878,6 +920,10 @@ void ExecuteSellTrade(string strategy="MANUAL")
 //+------------------------------------------------------------------+
 void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_points)
 {
+   // Risk Management Check
+   if(!IsTradingAllowed())
+      return;
+
    // Calculate entry price
    double entryPrice = (orderType == ORDER_TYPE_BUY) ?
                         SymbolInfoDouble(_Symbol, SYMBOL_ASK) :
@@ -906,6 +952,95 @@ void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_poi
    {
       Print("Quick Scalp Order Failed");
    }
+}
+
+//+------------------------------------------------------------------+
+//| Risk Management: Get current open trades count                   |
+//+------------------------------------------------------------------+
+int GetOpenTradesCount()
+{
+   int count = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         if(PositionGetInteger(POSITION_MAGIC) == Input_MagicNumber)
+            count++;
+      }
+   }
+   return count;
+}
+
+//+------------------------------------------------------------------+
+//| Risk Management: Calculate daily P&L as percentage of balance   |
+//+------------------------------------------------------------------+
+double GetDailyPnLPercent()
+{
+   // Check if we need to reset daily tracking (new trading day)
+   datetime currentTime = TimeCurrent();
+   MqlDateTime tm;
+   TimeToStruct(currentTime, tm);
+
+   // Calculate midnight time (00:00) for current day
+   MqlDateTime midnight_tm = tm;
+   midnight_tm.hour = 0;
+   midnight_tm.min = 0;
+   midnight_tm.sec = 0;
+   datetime midnight = StructToTime(midnight_tm);
+
+   // Reset tracking if it's a new day
+   if(g_daily_reset_time < midnight || g_daily_reset_time == 0)
+   {
+      g_daily_reset_time = currentTime;
+      g_daily_start_balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      Print("[RISK_MGMT] New trading day - Start Balance: $", g_daily_start_balance);
+   }
+
+   // Calculate daily P&L
+   double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double dailyPnL = currentBalance - g_daily_start_balance;
+
+   // Convert to percentage
+   if(g_daily_start_balance > 0)
+      return (dailyPnL / g_daily_start_balance) * 100.0;
+   else
+      return 0.0;
+}
+
+//+------------------------------------------------------------------+
+//| Risk Management: Check if trading is allowed                     |
+//+------------------------------------------------------------------+
+bool IsTradingAllowed()
+{
+   string blockReason = "";
+
+   // Check max open trades
+   if(Input_Max_Open_Trades > 0)
+   {
+      int openTrades = GetOpenTradesCount();
+      if(openTrades >= Input_Max_Open_Trades)
+      {
+         blockReason = StringFormat("Max open trades reached (%d/%d)", openTrades, Input_Max_Open_Trades);
+      }
+   }
+
+   // Check daily loss limit
+   if(Input_Daily_Max_Loss_Percent > 0 && blockReason == "")
+   {
+      double dailyPnL = GetDailyPnLPercent();
+      if(dailyPnL < -Input_Daily_Max_Loss_Percent)
+      {
+         blockReason = StringFormat("Daily loss limit reached (%.2f%% / -%.2f%%)", dailyPnL, Input_Daily_Max_Loss_Percent);
+      }
+   }
+
+   if(blockReason != "")
+   {
+      Print("[RISK_BLOCK] Trade blocked - ", blockReason);
+      return false;
+   }
+
+   return true;
 }
 
 //+------------------------------------------------------------------+
