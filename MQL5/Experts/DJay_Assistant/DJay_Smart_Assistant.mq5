@@ -117,7 +117,7 @@ int OnInit()
    // Init Quick Scalp Mode
    g_quick_scalp_mode = Input_QuickScalp_Mode;
 
-   signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2);
+   signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2, Input_GMT_Offset);
    tradeManager.Init(Input_MagicNumber);
    dashboardPanel.Init(0);
    dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state

@@ -82,6 +82,7 @@ private:
 
     int    m_zone_offset1;      // Zone offset 1 (in points)
     int    m_zone_offset2;      // Zone offset 2 (in points)
+    int    m_gmt_offset;        // GMT Offset (hours) for session time adjustment
 
     // Indicator handles (created once, reused)
     int    m_handle_ema100;     // EMA 100 indicator handle (Current)
@@ -103,7 +104,7 @@ public:
     ~CSignalEngine();
 
     //--- Initialization
-    void Init(int zone_offset1, int zone_offset2);
+    void Init(int zone_offset1, int zone_offset2, int gmt_offset = 2);
 
     //--- Data Refresh (Called on New Bar or Timer)
     void RefreshData();
@@ -209,12 +210,13 @@ CSignalEngine::~CSignalEngine()
 }
 
 //+------------------------------------------------------------------+
-//| Initialize with zone offsets                                     |
+//| Initialize with zone offsets and GMT offset                      |
 //+------------------------------------------------------------------+
-void CSignalEngine::Init(int zone_offset1, int zone_offset2)
+void CSignalEngine::Init(int zone_offset1, int zone_offset2, int gmt_offset)
 {
     m_zone_offset1 = zone_offset1;
     m_zone_offset2 = zone_offset2;
+    m_gmt_offset = gmt_offset;  // Store GMT offset for session time adjustment
 
     // Create indicator handles once (reused for lifetime of EA)
     m_handle_ema100 = iMA(_Symbol, PERIOD_CURRENT, 100, 0, MODE_EMA, PRICE_CLOSE);
@@ -426,15 +428,21 @@ bool CSignalEngine::IsEngulfing(int shift, ENUM_TIMEFRAMES tf)
 }
 
 //+------------------------------------------------------------------+
-//| Get current market session                                       |
+//| Get current market session (with GMT offset adjustment)          |
 //+------------------------------------------------------------------+
 ENUM_MARKET_SESSION CSignalEngine::GetCurrentSession()
 {
    MqlDateTime timeStruct;
    TimeToStruct(TimeCurrent(), timeStruct);
 
-   int hour = timeStruct.hour;
+   // Apply GMT offset to get adjusted hour
+   int hour = timeStruct.hour - m_gmt_offset;
    int minute = timeStruct.min;  // MQL5 uses 'min' not 'minute'
+
+   // Handle wrap-around for negative/overflow hours
+   if(hour < 0) hour += 24;
+   if(hour > 23) hour -= 24;
+
    int currentTime = hour * 60 + minute;  // Convert to minutes
 
    // Asia Session: 08:00 - 10:00 (480 - 600 minutes)
