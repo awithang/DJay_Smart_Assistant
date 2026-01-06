@@ -56,9 +56,135 @@ The 50-point buffer implemented to prevent 10015 errors is a good start, but nee
 - [x] **GMT Offset:** Add `Input_GMT_Offset` parameter to adjust session times (Asia/London/NY) for different brokers. ✅ (commit `7735270`)
 
 ### Phase 3: Testing & Verification (Pending)
-- [ ] **TTL Testing:** Reduce Input_Signal_TTL_Seconds to 10s for manual verification
-- [ ] **Dynamic Buffer Testing:** Test with high spread symbol (XAUUSD)
-- [ ] **Risk Management Testing:**
-  - Verify daily loss limit blocks trades
-  - Verify max open trades limit works
-  - Verify midnight reset of daily P&L
+
+#### Test 3.1: Signal TTL (Time-To-Live) Testing
+**Purpose:** Verify captured signals expire after the TTL period
+
+**Test Steps:**
+1. Set `Input_Signal_TTL_Seconds = 10` (reduce from 300 for quick testing)
+2. Wait for a Reversal or Breakout signal to appear (button becomes active)
+3. Wait for 11+ seconds without clicking the button
+4. Check Experts log for `[TTL]` message
+5. Verify button becomes grayed out/inactive
+
+**Expected Results:**
+- Log shows: `[TTL] Reversal signal expired after XX seconds (TTL=10)`
+- Captured entry is reset
+- Button state reflects signal invalid
+
+**Restore:** Set `Input_Signal_TTL_Seconds = 300` after testing
+
+---
+
+#### Test 3.2: Dynamic Pending Order Buffer Testing
+**Purpose:** Verify buffer adapts to current spread
+
+**Test Steps (XAUUSD - High Spread):**
+1. Attach EA to XAUUSD (Gold) chart
+2. Wait for pending signal (Confirm/Reversal/Breakout button active)
+3. Click the button to execute order
+4. Check Experts log for `[TRADE_EXEC]` message
+5. Note the `buffer=` value in the log
+
+**Expected Results:**
+- On XAUUSD (spread ~30-50 points): buffer should be >= 45 points (spread * 1.5)
+- Log example: `[TRADE_EXEC] Reversal Button: ... buffer=75`
+- No Error 10015 (Invalid Price) from broker
+
+**Test Steps (EURGBP - Low Spread):**
+1. Attach EA to EURGBP chart
+2. Wait for pending signal
+3. Execute order and check log
+
+**Expected Results:**
+- On EURGBP (spread ~5-10 points): buffer should be 50 points (Input_Pending_Min_Buffer)
+- Log example: `[TRADE_EXEC] ... buffer=50`
+
+---
+
+#### Test 3.3: Risk Management - Daily Loss Limit
+**Purpose:** Verify trading stops when daily loss limit is reached
+
+**Test Steps:**
+1. Set `Input_Daily_Max_Loss_Percent = 0.1` (0.1% for testing)
+2. Set `Input_Max_Open_Trades = 0` (disable for this test)
+3. Execute some trades to create losses (or wait for natural losses)
+4. When daily P&L drops below -0.1%, try to execute any trade (button or auto)
+5. Check Experts log for `[RISK_BLOCK]` message
+
+**Expected Results:**
+- Log shows: `[RISK_BLOCK] Trade blocked - Daily loss limit reached (-0.15% / -0.10%)`
+- Order is NOT sent to broker
+- Button click does nothing (or auto trade is skipped)
+
+**Restore:** Set `Input_Daily_Max_Loss_Percent = 5.0` after testing
+
+---
+
+#### Test 3.4: Risk Management - Max Open Trades Limit
+**Purpose:** Verify trading stops when max concurrent trades reached
+
+**Test Steps:**
+1. Set `Input_Max_Open_Trades = 2`
+2. Set `Input_Daily_Max_Loss_Percent = 0` (disable for this test)
+3. Manually open 2 positions (or let EA open them)
+4. Try to execute a 3rd trade via any button
+5. Check Experts log for `[RISK_BLOCK]` message
+
+**Expected Results:**
+- Log shows: `[RISK_BLOCK] Trade blocked - Max open trades reached (2/2)`
+- 3rd order is NOT sent to broker
+- Existing positions continue normally
+
+**Restore:** Set `Input_Max_Open_Trades = 5` after testing
+
+---
+
+#### Test 3.5: Risk Management - Midnight Reset
+**Purpose:** Verify daily P&L tracking resets at midnight
+
+**Test Steps:**
+1. Note the current time and balance
+2. Check Experts log for `[RISK_MGMT] New trading day` message
+3. Wait for midnight (broker time) OR manually adjust MT5 time for testing
+4. After midnight reset, execute a trade
+5. Verify daily P&L starts from 0% based on new start balance
+
+**Expected Results:**
+- Log shows: `[RISK_MGMT] New trading day - Start Balance: $XXXXX.XX`
+- Daily P&L calculation uses the new start balance
+- Previous day's losses do not affect new day's limit
+
+**Note:** For testing without waiting for midnight, temporarily change broker time or use demo account with adjustable time.
+
+---
+
+#### Test 3.6: GMT Offset Configuration
+**Purpose:** Verify correct GMT Offset value for session calculations
+
+**Test Steps:**
+1. Open MetaTrader 5 Market Watch
+2. Note the current server time displayed
+3. Compare to GMT/UTC at https://time.is/UTC
+4. Calculate: `GMT_Offset = Broker_Time - GMT_Time`
+5. Set `Input_GMT_Offset` to this value
+6. Restart EA to apply changes
+
+**Example:**
+- Broker shows 14:00, GMT shows 12:00 → Offset = +2
+- Broker shows 10:00, GMT shows 12:00 → Offset = -2
+
+**Expected Results:**
+- Session times (Asia/London/NY) display correctly on dashboard
+- Signals respect the correct session hours
+
+---
+
+#### Testing Checklist Summary
+- [ ] TTL Testing (10-second expiry verification)
+- [ ] Dynamic Buffer Testing (XAUUSD high spread)
+- [ ] Dynamic Buffer Testing (EURGBP low spread)
+- [ ] Daily Loss Limit Testing (0.1% threshold)
+- [ ] Max Open Trades Testing (limit = 2)
+- [ ] Midnight Reset Testing
+- [ ] GMT Offset Configuration
