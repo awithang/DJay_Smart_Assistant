@@ -395,18 +395,16 @@ void OnTimer()
    g_last_rev_entry = signalEngine.GetReversalEntryPoint();
    g_last_brk_entry = signalEngine.GetBreakoutEntryPoint();
 
-   // Capture valid entry points for button execution (preserve until button grays out)
+   // Capture valid entry points for button execution (preserve until signal invalid)
    if(g_last_rev_entry.isValid && !g_has_captured_rev) {
       g_captured_rev_entry = g_last_rev_entry;
       g_has_captured_rev = true;
       Print("DEBUG: Captured Reversal entry - ", g_captured_rev_entry.direction, " @ ", g_captured_rev_entry.price, " (", g_captured_rev_entry.zone, ")");
    }
-   // Reset capture only when button text shows "NO REVERSAL SETUP" (gray button)
-   if(g_last_rev_entry.description == "NO REVERSAL SETUP") {
-      if(g_has_captured_rev) {
-         Print("DEBUG: Resetting captured Reversal entry - button grayed out");
-         g_has_captured_rev = false;
-      }
+   // Reset capture when signal becomes invalid (using isValid flag, not description string)
+   if(!g_last_rev_entry.isValid && g_has_captured_rev) {
+      Print("DEBUG: Resetting captured Reversal entry - signal invalid");
+      g_has_captured_rev = false;
    }
 
    if(g_last_brk_entry.isValid && !g_has_captured_brk) {
@@ -414,12 +412,10 @@ void OnTimer()
       g_has_captured_brk = true;
       Print("DEBUG: Captured Breakout entry - ", g_captured_brk_entry.direction, " @ ", g_captured_brk_entry.price, " (", g_captured_brk_entry.zone, ")");
    }
-   // Reset capture only when button text shows "NO BREAKOUT SETUP" (gray button)
-   if(g_last_brk_entry.description == "NO BREAKOUT SETUP") {
-      if(g_has_captured_brk) {
-         Print("DEBUG: Resetting captured Breakout entry - button grayed out");
-         g_has_captured_brk = false;
-      }
+   // Reset capture when signal becomes invalid (using isValid flag, not description string)
+   if(!g_last_brk_entry.isValid && g_has_captured_brk) {
+      Print("DEBUG: Resetting captured Breakout entry - signal invalid");
+      g_has_captured_brk = false;
    }
 
    dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_rev_entry.isValid, g_last_brk_entry.description, g_last_brk_entry.isValid, paText);
