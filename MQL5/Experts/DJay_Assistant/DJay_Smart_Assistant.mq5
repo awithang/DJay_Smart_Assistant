@@ -73,6 +73,12 @@ bool g_quick_scalp_mode;
 EntryPoint g_last_rev_entry;
 EntryPoint g_last_brk_entry;
 
+//--- Captured Entry Points (preserved when button clicked)
+EntryPoint g_captured_rev_entry;
+bool g_has_captured_rev = false;
+EntryPoint g_captured_brk_entry;
+bool g_has_captured_brk = false;
+
 //--- Recommendation State (for One-Click Execution)
 ENUM_ORDER_TYPE g_rec_type = ORDER_TYPE_BUY_LIMIT; // Default placeholder
 double          g_rec_price = 0.0;
@@ -389,6 +395,33 @@ void OnTimer()
    g_last_rev_entry = signalEngine.GetReversalEntryPoint();
    g_last_brk_entry = signalEngine.GetBreakoutEntryPoint();
 
+   // Capture valid entry points for button execution (preserve until button grays out)
+   if(g_last_rev_entry.isValid && !g_has_captured_rev) {
+      g_captured_rev_entry = g_last_rev_entry;
+      g_has_captured_rev = true;
+      Print("DEBUG: Captured Reversal entry - ", g_captured_rev_entry.direction, " @ ", g_captured_rev_entry.price, " (", g_captured_rev_entry.zone, ")");
+   }
+   // Reset capture only when button text shows "NO REVERSAL SETUP" (gray button)
+   if(g_last_rev_entry.description == "NO REVERSAL SETUP") {
+      if(g_has_captured_rev) {
+         Print("DEBUG: Resetting captured Reversal entry - button grayed out");
+         g_has_captured_rev = false;
+      }
+   }
+
+   if(g_last_brk_entry.isValid && !g_has_captured_brk) {
+      g_captured_brk_entry = g_last_brk_entry;
+      g_has_captured_brk = true;
+      Print("DEBUG: Captured Breakout entry - ", g_captured_brk_entry.direction, " @ ", g_captured_brk_entry.price, " (", g_captured_brk_entry.zone, ")");
+   }
+   // Reset capture only when button text shows "NO BREAKOUT SETUP" (gray button)
+   if(g_last_brk_entry.description == "NO BREAKOUT SETUP") {
+      if(g_has_captured_brk) {
+         Print("DEBUG: Resetting captured Breakout entry - button grayed out");
+         g_has_captured_brk = false;
+      }
+   }
+
    dashboardPanel.UpdateStrategyInfo(g_last_rev_entry.description, g_last_rev_entry.isValid, g_last_brk_entry.description, g_last_brk_entry.isValid, paText);
 
    // 3e. Zone Status
@@ -531,34 +564,135 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          if(g_rec_active)
          {
             double risk = dashboardPanel.GetRiskPercent();
-            tradeManager.ExecutePending(g_rec_type, g_rec_price, g_rec_sl, g_rec_tp, risk, "DJay Pending");
+            double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+            double entryPrice = g_rec_price;
+            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+
+            // Adjust entry price based on current price with buffer
+            if(g_rec_type == ORDER_TYPE_BUY_LIMIT)
+            {
+               // BUY_LIMIT: Must be below current price
+               entryPrice = MathMin(g_rec_price, currentPrice - minBuffer * _Point);
+            }
+            else if(g_rec_type == ORDER_TYPE_SELL_LIMIT)
+            {
+               // SELL_LIMIT: Must be above current price
+               entryPrice = MathMax(g_rec_price, currentPrice + minBuffer * _Point);
+            }
+            // For STOP orders, adjust accordingly
+            else if(g_rec_type == ORDER_TYPE_BUY_STOP)
+            {
+               // BUY_STOP: Must be above current price
+               entryPrice = MathMax(g_rec_price, currentPrice + minBuffer * _Point);
+            }
+            else if(g_rec_type == ORDER_TYPE_SELL_STOP)
+            {
+               // SELL_STOP: Must be below current price
+               entryPrice = MathMin(g_rec_price, currentPrice - minBuffer * _Point);
+            }
+
+            // Recalculate SL/TP based on adjusted entry price
+            double sl, tp;
+            if(g_rec_type == ORDER_TYPE_BUY_LIMIT || g_rec_type == ORDER_TYPE_BUY_STOP)
+            {
+               sl = entryPrice - (Input_SL_Points * _Point);
+               tp = entryPrice + (Input_SL_Points * 2 * _Point);
+            }
+            else  // SELL orders
+            {
+               sl = entryPrice + (Input_SL_Points * _Point);
+               tp = entryPrice - (Input_SL_Points * 2 * _Point);
+            }
+
+            tradeManager.ExecutePending(g_rec_type, entryPrice, sl, tp, risk, "DJay Pending");
+            Print("Confirm Button: type=", g_rec_type, " current=", currentPrice, " entry=", entryPrice, " orig=", g_rec_price);
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
       }
       // Reversal/Breakout Action Buttons
       else if(dashboardPanel.IsRevActionClicked(sparam))
       {
-         if(g_last_rev_entry.isValid)
+         // Use captured entry point (preserved from when button became active)
+         // REVERSAL: Adjust entry price based on current market price with buffer
+         if(g_has_captured_rev && g_captured_rev_entry.price > 0)
          {
             double risk = dashboardPanel.GetRiskPercent();
-            ENUM_ORDER_TYPE type = (g_last_rev_entry.direction == "BUY") ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
-            double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price - (Input_SL_Points * _Point) : g_last_rev_entry.price + (Input_SL_Points * _Point);
-            double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_rev_entry.price + (Input_SL_Points * 2 * _Point) : g_last_rev_entry.price - (Input_SL_Points * 2 * _Point);
-            
-            tradeManager.ExecutePending(type, g_last_rev_entry.price, sl, tp, risk, "DJay Rev Button");
+            double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+            double entryPrice = 0;
+            ENUM_ORDER_TYPE type;
+            double sl, tp;
+
+            // Set entry price with minimum 50-point buffer from current price
+            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+
+            if(g_captured_rev_entry.direction == "BUY")
+            {
+               // BUY_LIMIT: Place below current price
+               entryPrice = MathMin(g_captured_rev_entry.price, currentPrice - minBuffer * _Point);
+               type = ORDER_TYPE_BUY_LIMIT;
+               sl = entryPrice - (Input_SL_Points * _Point);
+               tp = entryPrice + (Input_SL_Points * 2 * _Point);
+            }
+            else  // SELL
+            {
+               // SELL_LIMIT: Place above current price
+               entryPrice = MathMax(g_captured_rev_entry.price, currentPrice + minBuffer * _Point);
+               type = ORDER_TYPE_SELL_LIMIT;
+               sl = entryPrice + (Input_SL_Points * _Point);
+               tp = entryPrice - (Input_SL_Points * 2 * _Point);
+            }
+
+            tradeManager.ExecutePending(type, entryPrice, sl, tp, risk, "DJay Rev Button");
+            Print("Reversal Button: ", g_captured_rev_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_rev_entry.price);
+            // Clear capture after execution
+            g_has_captured_rev = false;
+         }
+         else
+         {
+            Print("Reversal Button: No valid entry point - g_has_captured_rev=", g_has_captured_rev, " price=", g_captured_rev_entry.price);
          }
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsBrkActionClicked(sparam))
       {
-         if(g_last_brk_entry.isValid)
+         // Use captured entry point (preserved from when button became active)
+         // BREAKOUT uses STOP orders (entry above/below current price) with buffer
+         if(g_has_captured_brk && g_captured_brk_entry.price > 0)
          {
             double risk = dashboardPanel.GetRiskPercent();
-            ENUM_ORDER_TYPE type = (g_last_brk_entry.direction == "BUY") ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT;
-            double sl = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price - (Input_SL_Points * _Point) : g_last_brk_entry.price + (Input_SL_Points * _Point);
-            double tp = (type == ORDER_TYPE_BUY_LIMIT) ? g_last_brk_entry.price + (Input_SL_Points * 2 * _Point) : g_last_brk_entry.price - (Input_SL_Points * 2 * _Point);
-            
-            tradeManager.ExecutePending(type, g_last_brk_entry.price, sl, tp, risk, "DJay Brk Button");
+            double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+            double entryPrice = 0;
+            ENUM_ORDER_TYPE type;
+            double sl, tp;
+
+            // Set entry price with minimum 50-point buffer from current price
+            int minBuffer = 50;  // Minimum 50 points (5 pips) from current price
+
+            if(g_captured_brk_entry.direction == "BUY")
+            {
+               // BUY_STOP: Place above current price
+               entryPrice = MathMax(g_captured_brk_entry.price, currentPrice + minBuffer * _Point);
+               type = ORDER_TYPE_BUY_STOP;
+               sl = entryPrice - (Input_SL_Points * _Point);
+               tp = entryPrice + (Input_SL_Points * 2 * _Point);
+            }
+            else  // SELL
+            {
+               // SELL_STOP: Place below current price
+               entryPrice = MathMin(g_captured_brk_entry.price, currentPrice - minBuffer * _Point);
+               type = ORDER_TYPE_SELL_STOP;
+               sl = entryPrice + (Input_SL_Points * _Point);
+               tp = entryPrice - (Input_SL_Points * 2 * _Point);
+            }
+
+            tradeManager.ExecutePending(type, entryPrice, sl, tp, risk, "DJay Brk Button");
+            Print("Breakout Button: ", g_captured_brk_entry.direction, " order - current=", currentPrice, " entry=", entryPrice, " zone=", g_captured_brk_entry.price);
+            // Clear capture after execution
+            g_has_captured_brk = false;
+         }
+         else
+         {
+            Print("Breakout Button: No valid entry point - g_has_captured_brk=", g_has_captured_brk, " price=", g_captured_brk_entry.price);
          }
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
