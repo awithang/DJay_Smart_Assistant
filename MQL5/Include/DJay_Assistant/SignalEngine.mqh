@@ -104,7 +104,7 @@ public:
     ~CSignalEngine();
 
     //--- Initialization
-    void Init(int zone_offset1, int zone_offset2, int gmt_offset = 2);
+    void Init(int zone_offset1, int zone_offset2, int gmt_offset);
 
     //--- Data Refresh (Called on New Bar or Timer)
     void RefreshData();
