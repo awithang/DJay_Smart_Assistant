@@ -556,15 +556,35 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
-      if(dashboardPanel.IsBuyButtonClicked(sparam)) 
+      if(dashboardPanel.IsBuyButtonClicked(sparam))
       {
-         ExecuteBuyTrade();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         // Check if trading is allowed BEFORE attempting execution
+         if(!IsTradingAllowed())
+         {
+            // Trading blocked by risk management - show alert to user
+            Alert("Manual BUY Blocked: Risk Management limit reached. Check Experts log for details.");
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         }
+         else
+         {
+            ExecuteBuyTrade();
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         }
       }
-      else if(dashboardPanel.IsSellButtonClicked(sparam)) 
+      else if(dashboardPanel.IsSellButtonClicked(sparam))
       {
-         ExecuteSellTrade();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         // Check if trading is allowed BEFORE attempting execution
+         if(!IsTradingAllowed())
+         {
+            // Trading blocked by risk management - show alert to user
+            Alert("Manual SELL Blocked: Risk Management limit reached. Check Experts log for details.");
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         }
+         else
+         {
+            ExecuteSellTrade();
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         }
       }
       else if(dashboardPanel.IsModeButtonClicked(sparam))
       {
