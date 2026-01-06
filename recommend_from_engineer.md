@@ -46,8 +46,19 @@ The 50-point buffer implemented to prevent 10015 errors is a good start, but nee
   - Added `[TRADE_EXEC]` prefix to all button execution logs
   - Includes buffer size for debugging
 
-### Phase 2: Risk Management & Time Sync (Pending)
-- [ ] **Risk Inputs:** Add `Input_Daily_Max_Loss_Percent` and `Input_Max_Open_Trades`.
-- [ ] **Daily Loss Logic:** Implement check in `OnTick` or before order execution to block trades if daily loss limit is reached.
-- [ ] **GMT Offset:** Add `Input_GMT_Offset` parameter to adjust session times (Asia/London/NY) for different brokers.
-- [ ] **Testing:** Verify TTL expiry (reduce to 10s for test) and Dynamic Buffer (use high spread symbol).
+### Phase 2: Risk Management & Time Sync (Completed)
+- [x] **Risk Inputs:** Add `Input_Daily_Max_Loss_Percent` and `Input_Max_Open_Trades`. ✅ (commit `7735270`)
+- [x] **Daily Loss Logic:** Implement check in `OnTick` or before order execution to block trades if daily loss limit is reached. ✅ (commit `7735270`)
+  - `GetOpenTradesCount()`: Count open positions by magic number
+  - `GetDailyPnLPercent()`: Calculate daily P&L with auto-reset at midnight
+  - `IsTradingAllowed()`: Central check for all risk management rules
+  - Applied to all execution functions and button handlers
+- [x] **GMT Offset:** Add `Input_GMT_Offset` parameter to adjust session times (Asia/London/NY) for different brokers. ✅ (commit `7735270`)
+
+### Phase 3: Testing & Verification (Pending)
+- [ ] **TTL Testing:** Reduce Input_Signal_TTL_Seconds to 10s for manual verification
+- [ ] **Dynamic Buffer Testing:** Test with high spread symbol (XAUUSD)
+- [ ] **Risk Management Testing:**
+  - Verify daily loss limit blocks trades
+  - Verify max open trades limit works
+  - Verify midnight reset of daily P&L
