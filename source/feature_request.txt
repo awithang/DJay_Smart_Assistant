@@ -1,0 +1,4 @@
+1. Is it possible, if i need Advisor to give detail about current graph, eg.  H1 Bullish Engulfing or candle style that can effect to order? And suggest entry point to user. 
+
+*** Important***
+Please remember,  please analyze and create implement plan only. No coding until i approve, and all implement have to concentrate on EA performance and all buttons response performance. 

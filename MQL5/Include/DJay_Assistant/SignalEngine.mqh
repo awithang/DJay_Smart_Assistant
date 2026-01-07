@@ -88,6 +88,7 @@ private:
     int    m_handle_ema100;     // EMA 100 indicator handle (Current)
     int    m_handle_ema200;     // EMA 200 indicator handle (Current)
     int    m_handle_ema720;     // EMA 720 indicator handle (Current)
+    int    m_handle_adx;        // ADX indicator handle (Current)
 
     // Cached Multi-Timeframe Handles
     int    m_handle_d1_100, m_handle_d1_200;
@@ -138,6 +139,7 @@ public:
     //--- Quick Scalp: RSI/Stochastic helper methods
     double GetRSIValue(ENUM_TIMEFRAMES tf, int period, int shift);
     double GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_period, int shift);
+    double GetADXValue(ENUM_TIMEFRAMES tf);
 
     //--- Natural Language Advisor
     string GetAdvisorMessage(bool quickScalpMode);
@@ -207,6 +209,9 @@ CSignalEngine::~CSignalEngine()
     
     if(m_handle_m15_100 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_100);
     if(m_handle_m15_200 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_200);
+
+    // Release ADX indicator handle (Quick Scalp choppy market filter)
+    if(m_handle_adx != INVALID_HANDLE) IndicatorRelease(m_handle_adx);
 }
 
 //+------------------------------------------------------------------+
@@ -236,8 +241,13 @@ void CSignalEngine::Init(int zone_offset1, int zone_offset2, int gmt_offset)
     m_handle_m15_100 = iMA(_Symbol, PERIOD_M15, 100, 0, MODE_EMA, PRICE_CLOSE);
     m_handle_m15_200 = iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE);
 
+    // Create ADX indicator handle for Quick Scalp choppy market filter
+    m_handle_adx = iADX(_Symbol, PERIOD_CURRENT, 14);
+
     if(m_handle_ema100 == INVALID_HANDLE)
         Print("Error: Failed to create EMA 100 indicator handle");
+    if(m_handle_adx == INVALID_HANDLE)
+        Print("Error: Failed to create ADX indicator handle");
     if(m_handle_ema200 == INVALID_HANDLE)
         Print("Error: Failed to create EMA 200 indicator handle");
     if(m_handle_ema720 == INVALID_HANDLE)
@@ -1173,6 +1183,25 @@ double CSignalEngine::GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_per
       return -1;
 
    return stochBuffer[0];
+}
+
+//+------------------------------------------------------------------+
+//| Get ADX value for specified timeframe                             |
+//| Used in Quick Scalp mode to filter choppy markets                |
+//+------------------------------------------------------------------+
+double CSignalEngine::GetADXValue(ENUM_TIMEFRAMES tf)
+{
+   if(m_handle_adx == INVALID_HANDLE)
+      return 0.0;
+
+   double adxBuffer[];
+   ArraySetAsSeries(adxBuffer, true);
+
+   int copied = CopyBuffer(m_handle_adx, 0, 0, 1, adxBuffer);
+   if(copied <= 0)
+      return 0.0;
+
+   return adxBuffer[0];
 }
 
 //+------------------------------------------------------------------+

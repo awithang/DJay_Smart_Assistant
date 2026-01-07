@@ -1,4 +1,2 @@
-undeclared identifier	DashboardPanel.mqh	168	16
-variable expected	DashboardPanel.mqh	168	16
-   built-in: int ArrayResize(T&[...],int,int)	DashboardPanel.mqh	168	4
-2 errors, 0 warnings		2	0
+'continue' must be used within some loop only	DJay_Smart_Assistant.mq5	331	19
+1 errors, 0 warnings		1	0

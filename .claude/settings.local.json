@@ -4,7 +4,26 @@
       "Bash(wc:*)",
       "Bash(chmod:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(\"C:\\\\Program Files\\\\Metatrader 5\\\\metaeditor64.exe\":*)",
+      "Bash(git --no-pager diff:*)",
+      "Bash(powershell:*)",
+      "Bash(cat:*)",
+      "Bash(\"C:\\\\Program Files\\\\MetaTrader 5\\\\metaeditor64.exe\":*)",
+      "Bash(dir:*)",
+      "Bash(\"C:\\\\Program Files\\\\MetaTrader 5\\\\metaeditor64.exe\" /compile:\"C:\\\\Users\\\\YocH-Dell\\\\Desktop\\\\EA_helper\\\\MQL5\\\\Experts\\\\DJay_Assistant\\\\DJay_Smart_Assistant.mq5\" /log)",
+      "Bash(timeout:*)",
+      "Bash(findstr:*)",
+      "Bash(\"C:/Program Files/MetaTrader 5/metaeditor64.exe\" /compile:*)",
+      "Bash(python:*)",
+      "Bash(del:*)",
+      "Bash(\"C:/Program Files/MetaTrader 5/metaeditor64.exe\":*)",
+      "Bash(\"C:/Program Files/MetaTrader 5/metaeditor64.exe\" /compile:\"C:/Users/YocH-Dell/Desktop/EA_helper/MQL5/Experts/DJay_Assistant/DJay_Smart_Assistant.mq5\" /log:*)",
+      "Bash(git push:*)",
+      "Bash(where:*)",
+      "Bash(\"C:/Program Files/MetaTrader 5/metaeditor64.exe\" /compile:\"C:/Users/YocH-Dell/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Experts/DJay_Assistant/DJay_Smart_Assistant.mq5\" /log)",
+      "Bash(git rm:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

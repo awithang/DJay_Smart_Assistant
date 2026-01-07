@@ -23,11 +23,12 @@ input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
 //--- Quick Scalp Settings
 input group "=== Quick Scalp Settings ==="
-input bool   Input_QuickScalp_Mode       = false;  // Enable Quick Scalp mode (default: OFF)
+input bool   Input_QuickScalp_Mode       = true;   // Enable Quick Scalp mode (default: ON)
 input int    Input_QS_RSI_Buy_Level      = 40;     // RSI < this for BUY signals
 input int    Input_QS_RSI_Sell_Level     = 60;     // RSI > this for SELL signals
 input int    Input_QS_Stoch_Buy_Level    = 20;     // Stochastic K < this for BUY
 input int    Input_QS_Stoch_Sell_Level   = 80;     // Stochastic K > this for SELL
+input int    Input_QS_ADX_Minimum        = 20;     // ADX minimum for scalping (filter choppy markets)
 input int    Input_QS_TP_Points          = 35;     // Take Profit in pips
 input int    Input_QS_SL_Points          = 20;     // Stop Loss in pips
 
@@ -322,11 +323,19 @@ void OnTick()
                double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
                double stochK = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
 
-               // BUY SIGNAL CHECK (all 5 filters must pass)
+               // ADX Filter: Skip choppy markets
+               double adx = signalEngine.GetADXValue(PERIOD_M5);
+               bool adxOK = (adx >= Input_QS_ADX_Minimum);
+
+               // BUY SIGNAL CHECK (OR logic for momentum indicators)
+               // PA signal + Trend filter + ADX filter + (RSI OR Stochastic oversold)
+               bool momentumSignal = (rsiVal > 0 && rsiVal < Input_QS_RSI_Buy_Level) ||
+                                     (stochK > 0 && stochK < Input_QS_Stoch_Buy_Level);
+
                if(paSignal == SIGNAL_PA_BUY
                   && h1Trend != TREND_DOWN
-                  && rsiVal > 0 && rsiVal < Input_QS_RSI_Buy_Level
-                  && stochK > 0 && stochK < Input_QS_Stoch_Buy_Level)
+                  && adxOK
+                  && momentumSignal)
                {
                   // Create Quick Scalp arrow (Lime, code 241)
                   double prevLow = iLow(_Symbol, PERIOD_M5, 1);
@@ -337,11 +346,13 @@ void OnTick()
                      ExecuteQuickScalpTrade(ORDER_TYPE_BUY, Input_QS_TP_Points, Input_QS_SL_Points);
                }
 
-               // SELL SIGNAL CHECK (all 5 filters must pass)
+               // SELL SIGNAL CHECK (OR logic for momentum indicators)
+               // PA signal + Trend filter + ADX filter + (RSI OR Stochastic overbought)
                else if(paSignal == SIGNAL_PA_SELL
                   && h1Trend != TREND_UP
-                  && rsiVal > 0 && rsiVal > Input_QS_RSI_Sell_Level
-                  && stochK > 0 && stochK > Input_QS_Stoch_Sell_Level)
+                  && adxOK
+                  && ((rsiVal > 0 && rsiVal > Input_QS_RSI_Sell_Level) ||
+                      (stochK > 0 && stochK > Input_QS_Stoch_Sell_Level)))
                {
                   // Create Quick Scalp arrow (Red, code 242)
                   double prevHigh = iHigh(_Symbol, PERIOD_M5, 1);
@@ -459,6 +470,17 @@ void OnTimer()
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
+   // 3e-1. Quick Scalp Smart State (Auto-Switch Visual Feedback)
+   if(g_quick_scalp_mode)
+   {
+      double adx = signalEngine.GetADXValue(PERIOD_M5);
+      dashboardPanel.UpdateQuickScalpSmartState(true, zoneStatus, adx, Input_QS_ADX_Minimum);
+   }
+   else
+   {
+      dashboardPanel.UpdateQuickScalpSmartState(false, ZONE_STATUS_NONE, 0, Input_QS_ADX_Minimum);
+   }
+
    // 3f. Advisor Message
    string advisorMessage = signalEngine.GetAdvisorMessage(g_quick_scalp_mode);
    dashboardPanel.UpdateAdvisor(advisorMessage);
@@ -499,11 +521,24 @@ void OnTimer()
    // Quick Scalp status
    qsText = g_quick_scalp_mode ? "QS: Active" : "QS: Inactive";
 
-   // RSI value
+   // RSI and Stochastic values (combined on same row)
    double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
-   rsiText = (rsiVal > 0) ? StringFormat("RSI(M5): %.0f", rsiVal) : "RSI(M5): --";
+   double stochVal = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
 
-   dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText);
+   if(rsiVal > 0 && stochVal > 0)
+      rsiText = StringFormat("RSI: %.0f | Stoch: %.1f", rsiVal, stochVal);
+   else if(rsiVal > 0)
+      rsiText = StringFormat("RSI: %.0f | Stoch: --", rsiVal);
+   else if(stochVal > 0)
+      rsiText = StringFormat("RSI: -- | Stoch: %.1f", stochVal);
+   else
+      rsiText = "RSI: -- | Stoch: --";
+
+   // ADX value
+   double adxVal = signalEngine.GetADXValue(PERIOD_M5);
+   string adxText = (adxVal > 0) ? StringFormat("ADX(M5): %.1f", adxVal) : "ADX(M5): --";
+
+   dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText, adxText);
 
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
