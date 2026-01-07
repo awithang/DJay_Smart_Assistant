@@ -163,6 +163,18 @@ double CTradeManager::CalculateLotSize(double entry_price, double sl_price, doub
    // PointValue = (TickValue / TickSize) * _Point => Value of 1 Point for 1 Lot.
    double pointValue = (tickValue / tickSize) * _Point;
 
+   // PointValue sanity check (P1 fix) - Validate for unusual symbols
+   if(pointValue < 0.01 || pointValue > 100.0)
+   {
+      Print("WARNING: Unusual pointValue calculated: ", pointValue,
+            ". This may indicate incorrect symbol data or unsupported instrument.");
+      Print("DEBUG: TickValue=", tickValue, " TickSize=", tickSize,
+            " Point=", _Point, " Symbol=", _Symbol);
+      // For safety, use conservative estimate
+      pointValue = 1.0;
+      Print("SAFETY: Using conservative pointValue = 1.0");
+   }
+
    // Calculate lot size: RiskAmount / (StopLossPoints * PointValue)
    // We DO NOT divide by contractSize because TickValue is already per Lot.
    double slPoints = priceDiff / _Point;
@@ -196,6 +208,14 @@ double CTradeManager::CalculateLotSize(double entry_price, double sl_price, doub
       lotSize = maxLot;
    }
 
+   // ABSOLUTE SAFETY CAP - Never allow more than 10 lots (P0 fix)
+   const double ABSOLUTE_MAX_LOT = 10.0;
+   if(lotSize > ABSOLUTE_MAX_LOT)
+   {
+      Print("CRITICAL: Lot size capped at absolute safety maximum (", ABSOLUTE_MAX_LOT, ") for account safety");
+      lotSize = ABSOLUTE_MAX_LOT;
+   }
+
    double finalLot = NormalizeDouble(lotSize, 2);
    Print("Calculated lot size: ", finalLot, " (Balance: $", accountBalance,
          ", Risk: ", risk_percent, "%, SL Distance: ", priceDiff / _Point, " points)");
@@ -214,6 +234,26 @@ bool CTradeManager::ExecuteOrder(TradeRequest &req)
    {
       Print("Error: Invalid lot size calculated for order.");
       return false;
+   }
+
+   // Free margin validation (P0 fix) - Don't use more than 80% of free margin
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+   double requiredMargin = lotSize * SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_LONG);
+
+   if(requiredMargin > freeMargin * 0.8)
+   {
+      Print("ERROR: Lot size requires too much margin. Required: $", requiredMargin,
+            " Available: $", freeMargin, " Lot size reduced for safety.");
+      // Reduce lot size to fit within 80% margin limit
+      lotSize = (freeMargin * 0.8) / SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_LONG);
+      // Round to lot step
+      double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+      lotSize = MathFloor(lotSize / lotStep) * lotStep;
+      // Ensure minimum lot
+      double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      if(lotSize < minLot)
+         lotSize = minLot;
+      Print("Adjusted lot size to: ", lotSize, " lots for margin safety");
    }
 
    // Execute based on order type

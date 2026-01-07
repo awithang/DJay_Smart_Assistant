@@ -43,6 +43,12 @@ private:
    int               m_current_rr;           // ENUM_RR_RATIO value
    bool              m_trailing_enabled;     // Profit Lock toggle state (controls Ladder Logic)
 
+   //--- Initial Parameter Values (from EA Inputs) - FIX: UI Inputs sync
+   double            m_initial_risk;         // Initial Risk % from EA inputs
+   int               m_initial_pl_trigger;   // Initial PL Trigger from EA inputs
+   int               m_initial_pl_lock;      // Initial PL Lock Amount from EA inputs
+   int               m_initial_pl_step;      // Initial PL Step from EA inputs
+
    //--- RR Multiplier Lookup Table (NEW)
    double            m_rr_multipliers[3];    // [1.0, 1.5, 2.0]
 
@@ -65,7 +71,7 @@ public:
    CDashboardPanel();
    ~CDashboardPanel() { Destroy(); }
 
-   void Init(long chart_id);
+   void Init(long chart_id, double initial_risk = 1.0, int pl_trigger = 200, int pl_lock = 50, int pl_step = 100);
    void CreatePanel();
    void OnEvent(const int id, const long &lparam, const double &dparam, const string &sparam);
    
@@ -180,9 +186,16 @@ CDashboardPanel::CDashboardPanel()
    m_rr_multipliers[2] = 2.0;   // RR_1_TO_2
 }
 
-void CDashboardPanel::Init(long chart_id)
+void CDashboardPanel::Init(long chart_id, double initial_risk, int pl_trigger, int pl_lock, int pl_step)
 {
    m_chart_id = chart_id;
+
+   // Store initial parameter values from EA inputs
+   m_initial_risk = initial_risk;
+   m_initial_pl_trigger = pl_trigger;
+   m_initial_pl_lock = pl_lock;
+   m_initial_pl_step = pl_step;
+
    CreatePanel();
 }
 
@@ -773,7 +786,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateEdit("EditRisk", right_x + half_width - pad - 40, right_y, 40, row_h, "1.0");
+                        CreateEdit("EditRisk", right_x + half_width - pad - 40, right_y, 40, row_h, DoubleToString(m_initial_risk, 1));
 
 
 
@@ -941,7 +954,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateEdit("EditPL_Trigger", plX + 25, right_y, plEditW, row_h, "200");
+                        CreateEdit("EditPL_Trigger", plX + 25, right_y, plEditW, row_h, IntegerToString(m_initial_pl_trigger));
 
 
 
@@ -981,7 +994,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateEdit("EditPL_Amount", plX + 28, right_y, plEditW, row_h, "50");
+                        CreateEdit("EditPL_Amount", plX + 28, right_y, plEditW, row_h, IntegerToString(m_initial_pl_lock));
 
 
 
@@ -1021,7 +1034,7 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                        CreateEdit("EditPL_Step", plX + 25, right_y, plEditW, row_h, "100");
+                        CreateEdit("EditPL_Step", plX + 25, right_y, plEditW, row_h, IntegerToString(m_initial_pl_step));
 
 
 

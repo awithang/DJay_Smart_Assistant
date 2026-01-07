@@ -29,8 +29,8 @@ input int    Input_QS_RSI_Sell_Level     = 60;     // RSI > this for SELL signal
 input int    Input_QS_Stoch_Buy_Level    = 20;     // Stochastic K < this for BUY
 input int    Input_QS_Stoch_Sell_Level   = 80;     // Stochastic K > this for SELL
 input int    Input_QS_ADX_Minimum        = 20;     // ADX minimum for scalping (filter choppy markets)
-input int    Input_QS_TP_Points          = 35;     // Take Profit in pips
-input int    Input_QS_SL_Points          = 20;     // Stop Loss in pips
+input int    Input_QS_TP_Points          = 350;    // Take Profit in POINTS (35 pips)
+input int    Input_QS_SL_Points          = 200;    // Stop Loss in POINTS (20 pips)
 
 //--- RR Ratio Settings (NEW)
 input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
@@ -120,7 +120,7 @@ int OnInit()
 
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2, Input_GMT_Offset);
    tradeManager.Init(Input_MagicNumber);
-   dashboardPanel.Init(0);
+   dashboardPanel.Init(0, Input_RiskPercent, Input_ProfitLock_Trigger_Pts, Input_ProfitLock_Amount_Pts, Input_ProfitLock_Step_Pts);
    dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
    dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
@@ -999,13 +999,18 @@ void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_poi
    double tp = (orderType == ORDER_TYPE_BUY) ? entryPrice + tp_points*point : entryPrice - tp_points*point;
    double sl = (orderType == ORDER_TYPE_BUY) ? entryPrice - sl_points*point : entryPrice + sl_points*point;
 
+   // Risk Normalization: Scale lot size relative to standard 500-point SL
+   // This ensures QS lot sizes are consistent with other strategies
+   double riskScale = (double)sl_points / 500.0;  // 200/500 = 0.4 (40% of standard risk)
+   double adjustedRisk = dashboardPanel.GetRiskPercent() * riskScale;
+
    // Execute trade
    TradeRequest req;
    req.type = orderType;
    req.price = entryPrice;
    req.sl = sl;
    req.tp = tp;
-   req.risk_percent = dashboardPanel.GetRiskPercent();
+   req.risk_percent = adjustedRisk;  // Use normalized risk
    req.comment = "QS_" + (string)((orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL");
 
    if(tradeManager.ExecuteOrder(req))
