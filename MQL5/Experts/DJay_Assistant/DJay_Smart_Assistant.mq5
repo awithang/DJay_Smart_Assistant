@@ -538,7 +538,17 @@ void OnTimer()
    double adxVal = signalEngine.GetADXValue(PERIOD_M5);
    string adxText = (adxVal > 0) ? StringFormat("ADX(M5): %.1f", adxVal) : "ADX(M5): --";
 
-   dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText, adxText);
+   // Current TF PA Signal (for Quick Scalp reference)
+   ENUM_SIGNAL_TYPE currentTFSignal = signalEngine.GetActiveSignal();
+   string currentTFPAText = "";
+   if(currentTFSignal == SIGNAL_PA_BUY)
+      currentTFPAText = "PA: BUY";
+   else if(currentTFSignal == SIGNAL_PA_SELL)
+      currentTFPAText = "PA: SELL";
+   else
+      currentTFPAText = "PA: NONE";
+
+   dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText, adxText, currentTFPAText);
 
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;

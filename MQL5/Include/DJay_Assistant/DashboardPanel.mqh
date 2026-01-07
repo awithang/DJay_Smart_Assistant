@@ -76,7 +76,7 @@ public:
    void UpdateTrendStrength(string strengthText, color strengthColor);
    void UpdateZoneStatus(int zoneStatus);  // 0=none, 1=buy1, 2=buy2, 3=sell1, 4=sell2
    void UpdateAdvisor(string message);
-   void UpdateAdvisorDetails(string zone, string trend, string qs, string rsi, string adx);
+   void UpdateAdvisorDetails(string zone, string trend, string qs, string rsi, string adx, string pa = "");
    void UpdateLastAutoTrade(string strategy, string direction, double price);
    void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
 
@@ -272,21 +272,21 @@ void CDashboardPanel::CreatePanel()
 
 
    // 3. Daily Zones Table (Panel A)
-   // Shifted down by 140px to accommodate Strategy Signal section
+   // Shifted down to accommodate expanded Strategy Signal section
 
-   CreateLabel("LblZ", left_x + pad, 295, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
+   CreateLabel("LblZ", left_x + pad, 320, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
 
-   CreateRect("TableBG", left_x, 315, half_width, 140, C'5,5,15', true, C'45,45,60');
+   CreateRect("TableBG", left_x, 340, half_width, 140, C'5,5,15', true, C'45,45,60');
 
 
 
    // Table Headers
 
-   CreateLabel("H_Z", left_x + 10, 325, "ZONE", clrGray, 8);
+   CreateLabel("H_Z", left_x + 10, 350, "ZONE", clrGray, 8);
 
-   CreateLabel("H_P", left_x + 85, 325, "PRICE", clrGray, 8);
+   CreateLabel("H_P", left_x + 85, 350, "PRICE", clrGray, 8);
 
-   CreateLabel("H_D", left_x + 150, 325, "DIST", clrGray, 8);
+   CreateLabel("H_D", left_x + 150, 350, "DIST", clrGray, 8);
 
 
 
@@ -296,7 +296,7 @@ void CDashboardPanel::CreatePanel()
 
       string id = IntegerToString(i);
 
-      int ry = 340 + (i * 18);
+      int ry = 365 + (i * 18);
 
       CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
 
@@ -313,7 +313,7 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("LblSig", left_x + pad, 80, "STRATEGY SIGNAL", m_header_color, 10, "Arial Bold");
 
-   CreateRect("InfoBG", left_x, 100, half_width, 180, C'5,5,15');
+   CreateRect("InfoBG", left_x, 100, half_width, 210, C'5,5,15');
 
 
 
@@ -354,7 +354,7 @@ void CDashboardPanel::CreatePanel()
    sig_y += 18;
 
    // Detailed status labels (formatted like Advisor, but orange)
-   CreateLabel("Stat_T", left_x + 10, sig_y, "Status:", m_accent_color, 10, "Arial Bold");
+   CreateLabel("Stat_T", left_x + 10, sig_y, "Quick Scalp Status:", m_accent_color, 10, "Arial Bold");
 
    sig_y += 16;
 
@@ -376,7 +376,13 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Stat_ADX", left_x + 10, sig_y, "", C'100,200,255', 9);
 
-   CreateLabel("Ver", left_x + half_width - pad, 190, "v5.0", clrGray, 8);
+   sig_y += 14;
+
+   CreateLabel("Stat_PA", left_x + 10, sig_y, "", C'150,255,150', 9);
+
+   sig_y += 20;
+
+   CreateLabel("Ver", left_x + half_width - pad, sig_y, "v5.0", clrGray, 8);
 
 
    // ============================================
@@ -1937,15 +1943,17 @@ void CDashboardPanel::UpdateAdvisor(string message)
 }
 
 //+------------------------------------------------------------------+
-//| Update Advisor Details (Zone, Trend, QS, RSI, ADX)                  |
+//| Update Advisor Details (Zone, Trend, QS, RSI, ADX, PA)                  |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateAdvisorDetails(string zone, string trend, string qs, string rsi, string adx)
+void CDashboardPanel::UpdateAdvisorDetails(string zone, string trend, string qs, string rsi, string adx, string pa = "")
 {
    ObjectSetString(m_chart_id, m_prefix+"Stat_Zone", OBJPROP_TEXT, zone);
    ObjectSetString(m_chart_id, m_prefix+"Stat_Trend", OBJPROP_TEXT, trend);
    ObjectSetString(m_chart_id, m_prefix+"Stat_QS", OBJPROP_TEXT, qs);
    ObjectSetString(m_chart_id, m_prefix+"Stat_RSI", OBJPROP_TEXT, rsi);
    ObjectSetString(m_chart_id, m_prefix+"Stat_ADX", OBJPROP_TEXT, adx);
+   if(pa != "")
+      ObjectSetString(m_chart_id, m_prefix+"Stat_PA", OBJPROP_TEXT, pa);
 }
 
 //+------------------------------------------------------------------+

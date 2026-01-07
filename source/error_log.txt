@@ -1,2 +1,3 @@
-'continue' must be used within some loop only	DJay_Smart_Assistant.mq5	331	19
+variable already defined	DJay_Smart_Assistant.mq5	543	11
+   see declaration of variable '"void OnTimer()"::paText'	DJay_Smart_Assistant.mq5	421	11
 1 errors, 0 warnings		1	0
