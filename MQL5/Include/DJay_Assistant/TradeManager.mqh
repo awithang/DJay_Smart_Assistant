@@ -20,6 +20,9 @@ private:
    int           m_magic_number;    // Magic number for identification
    double        m_point;           // Symbol point value
 
+   //--- Sniper Update: Sprint 4 - Risk Management State
+   bool          m_break_even_triggered[100]; // Track BE status by index (max 100 positions)
+
 public:
    //--- Constructor/Destructor
    CTradeManager();
@@ -30,6 +33,11 @@ public:
 
    //--- Risk Calculation
    double CalculateLotSize(double entry_price, double sl_price, double risk_percent);
+
+   //--- Sniper Update: Sprint 4 - Risk Management Automation
+   double CalculateDynamicSL(double entry_price, bool is_buy, double atr_points, double atr_multiplier = 1.5);
+   void   AutoBreakEven(double break_even_profit_pts = 200.0, double sl_padding_pts = 10.0);
+   void   SmartTrail(double atr_points, double trail_multiplier = 1.0, double min_profit_pts = 200.0);
 
    //--- Order Execution
    bool ExecuteOrder(TradeRequest &req);
@@ -57,6 +65,9 @@ CTradeManager::CTradeManager()
 {
    m_magic_number = 123456;
    m_point = _Point;
+
+   // Initialize break-even tracking array
+   ArrayInitialize(m_break_even_triggered, false);
 }
 
 //+------------------------------------------------------------------+
@@ -695,3 +706,249 @@ bool CTradeManager::HasOpenPosition(string comment_filter)
    return false;
 }
 
+//+====================================================================+
+//| SNIPER UPDATE: Sprint 4 - Risk Management Automation                |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Calculate Dynamic Stop Loss (ATR-Based)                            |
+//| Calculates SL based on market volatility (ATR)                     |
+//|                                                                   |
+//| Parameters:                                                       |
+//|   entry_price - Entry price of the trade                           |
+//|   is_buy - true for BUY, false for SELL                            |
+//|   atr_points - ATR value in points                                 |
+//|   atr_multiplier - Multiplier for SL (default 1.5x ATR)            |
+//|                                                                   |
+//| Returns: SL price                                                 |
+//+------------------------------------------------------------------+
+double CTradeManager::CalculateDynamicSL(double entry_price, bool is_buy, double atr_points, double atr_multiplier = 1.5)
+{
+   // Validate inputs
+   if(entry_price <= 0)
+   {
+      Print("CalculateDynamicSL: Invalid entry price");
+      return 0;
+   }
+
+   if(atr_points <= 0)
+   {
+      Print("CalculateDynamicSL: Invalid ATR value (", atr_points, "), using default 100 points");
+      atr_points = 100.0;
+   }
+
+   if(atr_multiplier <= 0)
+   {
+      Print("CalculateDynamicSL: Invalid multiplier, using default 1.5");
+      atr_multiplier = 1.5;
+   }
+
+   // Calculate SL distance in price units
+   double sl_distance = atr_points * atr_multiplier * _Point;
+
+   // Calculate SL price based on direction
+   double sl_price;
+   if(is_buy)
+   {
+      // For BUY: SL is below entry
+      sl_price = entry_price - sl_distance;
+   }
+   else
+   {
+      // For SELL: SL is above entry
+      sl_price = entry_price + sl_distance;
+   }
+
+   // Normalize to symbol digits
+   sl_price = NormalizeDouble(sl_price, _Digits);
+
+   return sl_price;
+}
+
+//+------------------------------------------------------------------+
+//| Auto Break-Even                                                    |
+//| Moves SL to entry price + padding when profit threshold is reached |
+//|                                                                   |
+//| Parameters:                                                       |
+//|   break_even_profit_pts - Profit trigger in points (default 200)  |
+//|   sl_padding_pts - SL padding in points (default 10)              |
+//|                                                                   |
+//| Logic:                                                            |
+//|   1. Check each position for profit level                         |
+//|   2. If profit >= trigger AND BE not yet triggered:              |
+//|      - Move SL to Open + Padding (protect small profit)           |
+//|      - Mark position as BE triggered                              |
+//+------------------------------------------------------------------+
+void CTradeManager::AutoBreakEven(double break_even_profit_pts = 200.0, double sl_padding_pts = 10.0)
+{
+   // Validate inputs
+   if(break_even_profit_pts <= 0 || sl_padding_pts < 0)
+      return;
+
+   // Convert points to price
+   double beTrigger = break_even_profit_pts * _Point;
+   double slPadding = sl_padding_pts * _Point;
+
+   // Get current positions count (limit to array size)
+   int totalPos = MathMin(PositionsTotal(), 100);
+
+   for(int i = 0; i < totalPos; i++)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         // Filter: Only our positions
+         if(PositionGetString(POSITION_SYMBOL) != _Symbol ||
+            PositionGetInteger(POSITION_MAGIC) != m_magic_number)
+            continue;
+
+         ulong ticket = PositionGetTicket(i);
+         double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+         double currentSL = PositionGetDouble(POSITION_SL);
+         double currentTP = PositionGetDouble(POSITION_TP);
+         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+         // Get current price
+         double currentPrice = SymbolInfoDouble(_Symbol,
+            (posType == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
+
+         // Calculate current profit
+         double currentProfit = 0.0;
+         if(posType == POSITION_TYPE_BUY)
+            currentProfit = currentPrice - openPrice;
+         else
+            currentProfit = openPrice - currentPrice;
+
+         // Check if BE already triggered for this position
+         if(m_break_even_triggered[i])
+            continue; // Skip if already done
+
+         // Check profit trigger
+         if(currentProfit >= beTrigger)
+         {
+            // Calculate new SL (Open + Padding)
+            double newSL;
+            if(posType == POSITION_TYPE_BUY)
+               newSL = openPrice + slPadding;
+            else
+               newSL = openPrice - slPadding;
+
+            newSL = NormalizeDouble(newSL, _Digits);
+
+            // Only modify if new SL is better than current
+            bool shouldModify = false;
+            if(posType == POSITION_TYPE_BUY)
+               shouldModify = (newSL > currentSL || currentSL == 0);
+            else
+               shouldModify = (newSL < currentSL || currentSL == 0);
+
+            if(shouldModify)
+            {
+               if(m_trade.PositionModify(ticket, newSL, currentTP))
+               {
+                  m_break_even_triggered[i] = true; // Mark as triggered
+                  Print("Auto Break-Even #", ticket, " SL: ", DoubleToString(currentSL, _Digits),
+                        " -> ", DoubleToString(newSL, _Digits), " (Profit: ", DoubleToString(currentProfit/_Point, 0), " pts)");
+               }
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Smart Trail (ATR-Based Trailing Stop)                             |
+//| Trailing stop based on ATR to maximize runners                    |
+//|                                                                   |
+//| Parameters:                                                       |
+//|   atr_points - Current ATR value in points                         |
+//|   trail_multiplier - Trail distance multiplier (default 1.0x ATR)  |
+//|   min_profit_pts - Minimum profit before trail activates          |
+//|                                                                   |
+//| Logic:                                                            |
+//|   1. Only trail if profit >= min_profit_pts                       |
+//|   2. Trail distance = ATR * multiplier                            |
+//|   3. For BUY: SL = Price - TrailDist                              |
+//|   4. For SELL: SL = Price + TrailDist                             |
+//|   5. Only modify if new SL is better (not worse)                  |
+//+------------------------------------------------------------------+
+void CTradeManager::SmartTrail(double atr_points, double trail_multiplier = 1.0, double min_profit_pts = 200.0)
+{
+   // Validate inputs
+   if(atr_points <= 0 || trail_multiplier <= 0 || min_profit_pts < 0)
+      return;
+
+   // Convert points to price
+   double minProfit = min_profit_pts * _Point;
+   double trailDist = atr_points * trail_multiplier * _Point;
+
+   // Minimum trail distance (prevent tight stops)
+   double minTrail = 50 * _Point; // Minimum 50 points
+   if(trailDist < minTrail)
+      trailDist = minTrail;
+
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         // Filter: Only our positions
+         if(PositionGetString(POSITION_SYMBOL) != _Symbol ||
+            PositionGetInteger(POSITION_MAGIC) != m_magic_number)
+            continue;
+
+         ulong ticket = PositionGetTicket(i);
+         double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+         double currentSL = PositionGetDouble(POSITION_SL);
+         double currentTP = PositionGetDouble(POSITION_TP);
+         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+         // Get current price
+         double currentPrice = SymbolInfoDouble(_Symbol,
+            (posType == POSITION_TYPE_BUY) ? SYMBOL_BID : SYMBOL_ASK);
+
+         // Calculate current profit
+         double currentProfit = 0.0;
+         if(posType == POSITION_TYPE_BUY)
+            currentProfit = currentPrice - openPrice;
+         else
+            currentProfit = openPrice - currentPrice;
+
+         // Check minimum profit requirement
+         if(currentProfit < minProfit)
+            continue; // Skip - not enough profit to trail
+
+         // Calculate new trailing SL
+         double newSL;
+         if(posType == POSITION_TYPE_BUY)
+         {
+            // BUY: Trail below current price
+            newSL = currentPrice - trailDist;
+         }
+         else
+         {
+            // SELL: Trail above current price
+            newSL = currentPrice + trailDist;
+         }
+
+         newSL = NormalizeDouble(newSL, _Digits);
+
+         // Only modify if new SL is better than current
+         bool shouldModify = false;
+         if(posType == POSITION_TYPE_BUY)
+            shouldModify = (newSL > currentSL || currentSL == 0);
+         else
+            shouldModify = (newSL < currentSL || currentSL == 0);
+
+         if(shouldModify)
+         {
+            if(m_trade.PositionModify(ticket, newSL, currentTP))
+            {
+               // Optional: Debug logging (commented out for performance)
+               // Print("SmartTrail #", ticket, " SL: ", DoubleToString(currentSL, _Digits),
+               //       " -> ", DoubleToString(newSL, _Digits), " (Profit: ", DoubleToString(currentProfit/_Point, 0), " pts)");
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+

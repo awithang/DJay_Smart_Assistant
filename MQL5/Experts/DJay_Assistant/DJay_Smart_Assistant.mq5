@@ -42,6 +42,19 @@ input int    Input_ProfitLock_Trigger_Pts = 200; // Profit Lock Trigger (points)
 input int    Input_ProfitLock_Amount_Pts  = 50;  // Initial Lock Amount (points) - e.g., 50 = 5 pips
 input int    Input_ProfitLock_Step_Pts    = 100; // Step Size (points) - e.g., 100 = 10 pips
 
+//--- Sniper Update Settings (Sprint 1-4)
+input group "=== Sniper Update Settings ==="
+input bool   Input_Enable_Sniper_Mode     = false;  // Enable Sniper Mode (M15-based filtered signals)
+input bool   Input_Sniper_Debug_Mode      = false;  // Enable Debug Mode (logs signal rejection reasons)
+input double Input_Sniper_ATR_Multiplier  = 1.5;    // Dynamic SL Multiplier (default 1.5x ATR)
+input double Input_Sniper_Zone_Tolerance  = 50.0;   // Structure proximity tolerance (points)
+input double Input_Sniper_BE_Trigger_Pts  = 200.0;  // Auto Break-Even trigger (points)
+input double Input_Sniper_BE_Padding_Pts  = 10.0;   // Auto Break-Even SL padding (points)
+input double Input_Sniper_Trail_Mult      = 1.0;    // Smart Trail multiplier (1.0x ATR)
+input double Input_Sniper_Trail_Min_Profit = 200.0; // Minimum profit before trail activates (points)
+input int    Input_Sniper_ADX_Trend_Min   = 25;     // ADX threshold for Trending market
+input int    Input_Sniper_ADX_Range_Max   = 20;     // ADX threshold for Ranging market
+
 //--- Auto Mode Options
 input group "=== Auto Mode Options ==="
 input bool   Input_Auto_Arrow          = true;   // Auto Trade on Any Arrow (PA/EMA)
@@ -105,6 +118,10 @@ bool            g_rec_active = false;
 datetime g_daily_reset_time = 0;   // Track when daily P&L last reset
 double   g_daily_start_balance = 0; // Balance at start of trading day
 
+//--- Sniper Update State
+MarketContext g_marketContext;       // Current market intelligence (Sprint 1)
+bool g_sniper_mode_enabled = false;  // Track if Sniper Mode is active
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -117,6 +134,11 @@ int OnInit()
 
    // Init Quick Scalp Mode
    g_quick_scalp_mode = Input_QuickScalp_Mode;
+
+   // Init Sniper Mode
+   g_sniper_mode_enabled = Input_Enable_Sniper_Mode;
+   if(g_sniper_mode_enabled)
+      Print("SNIPER MODE: ENABLED - Using M15 3-filter signals");
 
    signalEngine.Init(Input_Zone_Offset1, Input_Zone_Offset2, Input_GMT_Offset);
    tradeManager.Init(Input_MagicNumber);
@@ -155,11 +177,27 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   signalEngine.RefreshData();
+   // 1. Fast Price Update (Real-time)
+   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
-   double currentPrice = signalEngine.GetCurrentPrice();
+   // 2. Throttled Analysis (Run every 1 second)
+   // This prevents blocking the UI thread with heavy calculations on every tick
+   static ulong last_calc_time = 0;
+   ulong now = GetMicrosecondCount();
+   
+   if (now - last_calc_time > 1000000) // 1 second throttle
+   {
+       signalEngine.RefreshData();
+       
+       // SNIPER UPDATE: Risk Management & Ghost Buttons
+       g_marketContext = signalEngine.GetMarketContext();
+       dashboardPanel.UpdateExecutionButtons(g_marketContext);
+       
+       last_calc_time = now;
+   }
+
    double d1Open = signalEngine.GetD1Open();
-
+   
    // Update zones if D1 Open changes (new day)
    static double prevD1Open = 0;
    if(d1Open != prevD1Open)
@@ -168,24 +206,25 @@ void OnTick()
       prevD1Open = d1Open;
    }
 
-   // Update account info on profit change
-   static double prevProfit = 0;
+   // Calculate Profit (Needed for UI and Logic)
    double totalProfit = tradeManager.GetPositionProfit();
-   if(MathAbs(totalProfit - prevProfit) > 0.01 || PositionsTotal() > 0)
-   {
-      // dashboardPanel.UpdateAccountInfo(); // Removed
-      prevProfit = totalProfit;
-   }
 
    // Trade Management: Ladder Logic Profit Lock
-   // Only run when Profit Lock toggle is ON (unified control)
-   if(dashboardPanel.IsTrailingEnabled())  // Single unified control - initialized from Input_Use_TradeManagement
+   if(dashboardPanel.IsTrailingEnabled())
    {
-      // Use dynamic Profit Lock values from dashboard (Trigger, Lock, Step)
       int plTrigger = dashboardPanel.GetPL_Trigger();
       int plAmount = dashboardPanel.GetPL_Amount();
       int plStep = dashboardPanel.GetPL_Step();
       tradeManager.ManagePositions(plTrigger, plAmount, plStep);
+   }
+
+   // Auto Break-Even (moves SL to entry + padding after profit threshold)
+   if(g_sniper_mode_enabled)
+   {
+      tradeManager.AutoBreakEven(Input_Sniper_BE_Trigger_Pts, Input_Sniper_BE_Padding_Pts);
+
+      // Smart Trail (ATR-based trailing stop)
+      tradeManager.SmartTrail(g_marketContext.atrM15, Input_Sniper_Trail_Mult, Input_Sniper_Trail_Min_Profit);
    }
 
    // --- Real-time Dashboard Updates (Safe Implementation) ---
@@ -308,8 +347,41 @@ void OnTick()
             if(paSignal == SIGNAL_PA_SELL) ExecuteSellTrade("BREAK");
          }
 
-         // --- 4. Quick Scalp Mode (Middle Zone Trading) ---
-         if(g_quick_scalp_mode)
+         // --- 4. SNIPER MODE (M15 3-Filter Signals) ---
+         if(g_sniper_mode_enabled)
+         {
+            // Get Sniper Signal (M15-based with 3-filter stack)
+            ENUM_SIGNAL_TYPE sniperSignal = signalEngine.GetSniperSignal(
+               Input_Sniper_Debug_Mode,
+               1.0,  // ATR multiplier for volume filter
+               Input_Sniper_Zone_Tolerance  // Structure proximity
+            );
+
+            // Create arrow and execute trade on valid Sniper signal
+            if(sniperSignal == SIGNAL_PA_BUY)
+            {
+               // Create Sniper arrow (Lime, code 233 - different from QS)
+               double prevLow = iLow(_Symbol, PERIOD_M15, 1);
+               CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 233, clrLime, "SNIPER_Buy");
+
+               // AUTO MODE execution with Dynamic SL
+               if(g_tradingMode == MODE_AUTO)
+                  ExecuteSniperTrade(ORDER_TYPE_BUY);
+            }
+            else if(sniperSignal == SIGNAL_PA_SELL)
+            {
+               // Create Sniper arrow (Red, code 234)
+               double prevHigh = iHigh(_Symbol, PERIOD_M15, 1);
+               CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 234, clrRed, "SNIPER_Sell");
+
+               // AUTO MODE execution with Dynamic SL
+               if(g_tradingMode == MODE_AUTO)
+                  ExecuteSniperTrade(ORDER_TYPE_SELL);
+            }
+         }
+
+         // --- 5. Quick Scalp Mode (Middle Zone Trading) - DISABLED when Sniper Mode is ON ---
+         if(g_quick_scalp_mode && !g_sniper_mode_enabled)
          {
             // Only trade in middle zone
             ENUM_ZONE_STATUS zone = signalEngine.GetCurrentZoneStatus();
@@ -400,6 +472,12 @@ void OnTimer()
    string timeStr = StringFormat("M5: %02d:%02d", timeLeft/60, timeLeft%60);
 
    dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
+
+   // PERFORMANCE OPTIMIZATION: Throttle Heavy Logic
+   // Run heavy analysis only every 3 seconds to keep UI responsive
+   static int heavy_tick = 0;
+   heavy_tick++;
+   if(heavy_tick % 3 != 0) return;
 
    // 3. Update Strategy Signals using SignalEngine methods
    signalEngine.RefreshData();
@@ -550,6 +628,17 @@ void OnTimer()
 
    dashboardPanel.UpdateAdvisorDetails(zoneText, trendText, qsText, rsiText, adxText, currentTFPAText);
 
+   //============================================================
+   // SNIPER UPDATE: Sprint 3 - Dashboard 3-Column Grid Update
+   //============================================================
+   // Get RSI and Stochastic for the grid
+   double rsiForGrid = signalEngine.GetRSIValue(PERIOD_M15, 14, 0);
+   double stochForGrid = signalEngine.GetStochKValue(PERIOD_M15, 14, 3, 0);
+   ENUM_SIGNAL_TYPE m15Signal = signalEngine.GetActiveSignal();
+
+   // Update the Market Intelligence Grid with all context data
+   dashboardPanel.UpdateMarketIntelligenceGrid(g_marketContext, rsiForGrid, stochForGrid, m15Signal);
+
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
    double recPrice, recSL, recTP;
@@ -586,9 +675,9 @@ void OnTimer()
    // Final Redraw to update all changes
    dashboardPanel.Redraw();
    
-   ulong duration = GetMicrosecondCount() - start;
-   if(duration > 10000) // Print if > 10ms
-      Print("WARNING: OnTimer took ", duration, " us");
+   // ulong duration = GetMicrosecondCount() - start;
+   // if(duration > 10000) // Print if > 10ms
+   //    Print("WARNING: OnTimer took ", duration, " us");
 }
 
 //+------------------------------------------------------------------+
@@ -905,6 +994,25 @@ void ExecuteBuyTrade(string strategy="MANUAL")
    if(!IsTradingAllowed())
       return;
 
+   // SAFETY CHECK: Smart Filters (Ghost Button Logic applied to Auto-Trade)
+   // Only apply if NOT Manual (Manual trades override safety) AND NOT Aggressive Mode
+   if(strategy != "MANUAL" && !dashboardPanel.IsAggressiveOn())
+   {
+      // 1. Slope Check (Falling Knife Protection)
+      if(g_marketContext.slopeH1 == SLOPE_CRASH)
+      {
+         Print("[AUTO_BLOCK] Buy blocked by CRASH slope protection");
+         return;
+      }
+
+      // 2. Trend Filter Check
+      if(dashboardPanel.IsTrendFilterOn() && g_marketContext.trendMatrix.h1 == TREND_DOWN)
+      {
+         Print("[AUTO_BLOCK] Buy blocked by H1 Downtrend (Trend Filter ON)");
+         return;
+      }
+   }
+
    // Duplicate Prevention: Check if position with same strategy comment already exists
    if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
    {
@@ -946,6 +1054,25 @@ void ExecuteSellTrade(string strategy="MANUAL")
    // Risk Management Check
    if(!IsTradingAllowed())
       return;
+
+   // SAFETY CHECK: Smart Filters (Ghost Button Logic applied to Auto-Trade)
+   // Only apply if NOT Manual (Manual trades override safety) AND NOT Aggressive Mode
+   if(strategy != "MANUAL" && !dashboardPanel.IsAggressiveOn())
+   {
+      // 1. Slope Check (Rocket Protection)
+      if(g_marketContext.slopeH1 == SLOPE_UP)
+      {
+         Print("[AUTO_BLOCK] Sell blocked by STRONG UP slope protection");
+         return;
+      }
+
+      // 2. Trend Filter Check
+      if(dashboardPanel.IsTrendFilterOn() && g_marketContext.trendMatrix.h1 == TREND_UP)
+      {
+         Print("[AUTO_BLOCK] Sell blocked by H1 Uptrend (Trend Filter ON)");
+         return;
+      }
+   }
 
    // Duplicate Prevention: Check if position with same strategy comment already exists
    if(strategy != "MANUAL" && tradeManager.HasOpenPosition(strategy))
@@ -1021,6 +1148,89 @@ void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_poi
    else
    {
       Print("Quick Scalp Order Failed");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Execute Sniper Trade (Dynamic ATR-based SL/TP)                    |
+//+------------------------------------------------------------------+
+void ExecuteSniperTrade(ENUM_ORDER_TYPE orderType)
+{
+   // Risk Management Check
+   if(!IsTradingAllowed())
+      return;
+
+   // SAFETY CHECK: Smart Filters (Ghost Button Logic applied to Sniper Auto-Trade)
+   if(!dashboardPanel.IsAggressiveOn())
+   {
+      if(orderType == ORDER_TYPE_BUY)
+      {
+         // 1. Slope Check
+         if(g_marketContext.slopeH1 == SLOPE_CRASH)
+         {
+            Print("[SNIPER_BLOCK] Buy blocked by CRASH slope protection");
+            return;
+         }
+         // 2. Trend Check
+         if(dashboardPanel.IsTrendFilterOn() && g_marketContext.trendMatrix.h1 == TREND_DOWN)
+         {
+            Print("[SNIPER_BLOCK] Buy blocked by H1 Downtrend");
+            return;
+         }
+      }
+      else // SELL
+      {
+         // 1. Slope Check
+         if(g_marketContext.slopeH1 == SLOPE_UP)
+         {
+            Print("[SNIPER_BLOCK] Sell blocked by STRONG UP slope protection");
+            return;
+         }
+         // 2. Trend Check
+         if(dashboardPanel.IsTrendFilterOn() && g_marketContext.trendMatrix.h1 == TREND_UP)
+         {
+            Print("[SNIPER_BLOCK] Sell blocked by H1 Uptrend");
+            return;
+         }
+      }
+   }
+
+   // Calculate entry price
+   double entryPrice = (orderType == ORDER_TYPE_BUY) ?
+                        SymbolInfoDouble(_Symbol, SYMBOL_ASK) :
+                        SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   // Use Dynamic SL based on current ATR (Sprint 4)
+   bool isBuy = (orderType == ORDER_TYPE_BUY);
+   double sl = tradeManager.CalculateDynamicSL(entryPrice, isBuy, g_marketContext.atrM15, Input_Sniper_ATR_Multiplier);
+
+   // Calculate TP using RR multiplier from dashboard (1:2 default)
+   double rrMultiplier = dashboardPanel.GetRRMultiplier();
+   double slDistance = MathAbs(entryPrice - sl);
+   double tp = isBuy ? (entryPrice + slDistance * rrMultiplier) : (entryPrice - slDistance * rrMultiplier);
+
+   // Normalize values
+   sl = NormalizeDouble(sl, _Digits);
+   tp = NormalizeDouble(tp, _Digits);
+
+   // Execute trade
+   TradeRequest req;
+   req.type = orderType;
+   req.price = entryPrice;
+   req.sl = sl;
+   req.tp = tp;
+   req.risk_percent = dashboardPanel.GetRiskPercent();
+   req.comment = "SNIPER_" + (string)(isBuy ? "BUY" : "SELL");
+
+   if(tradeManager.ExecuteOrder(req))
+   {
+      Print("SNIPER ", (isBuy ? "BUY" : "SELL"), " executed at ", entryPrice,
+            " SL=", sl, " (Dynamic ATR=", g_marketContext.atrM15, " pts)");
+      dashboardPanel.UpdateLastAutoTrade("SNIPER", (isBuy ? "BUY" : "SELL"), entryPrice);
+   }
+   else
+   {
+      Print("SNIPER Order Failed");
    }
 }
 

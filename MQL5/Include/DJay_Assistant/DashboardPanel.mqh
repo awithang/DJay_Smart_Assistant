@@ -43,6 +43,11 @@ private:
    int               m_current_rr;           // ENUM_RR_RATIO value
    bool              m_trailing_enabled;     // Profit Lock toggle state (controls Ladder Logic)
 
+   //--- Filter State (Smart Filters - v5.0)
+   bool              m_filter_trend_enabled;
+   bool              m_filter_zone_enabled;
+   bool              m_filter_aggr_enabled;
+
    //--- Initial Parameter Values (from EA Inputs) - FIX: UI Inputs sync
    double            m_initial_risk;         // Initial Risk % from EA inputs
    int               m_initial_pl_trigger;   // Initial PL Trigger from EA inputs
@@ -84,7 +89,13 @@ public:
    void UpdateAdvisor(string message);
    void UpdateAdvisorDetails(string zone, string trend, string qs, string rsi, string adx, string pa = "");
    void UpdateLastAutoTrade(string strategy, string direction, double price);
+
+   //--- Sniper Update: Sprint 3 - Market Intelligence Grid Update Methods
+   void UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal);
    void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
+   
+   //--- Ghost Button Logic (v5.0)
+   void UpdateExecutionButtons(MarketContext &ctx);
 
    // New Methods
    void UpdateTradingMode(int mode);
@@ -106,6 +117,12 @@ public:
    int  GetPL_Trigger()        { return (int)StringToInteger(ObjectGetString(m_chart_id, m_prefix+"EditPL_Trigger", OBJPROP_TEXT)); }
    int  GetPL_Amount()         { return (int)StringToInteger(ObjectGetString(m_chart_id, m_prefix+"EditPL_Amount", OBJPROP_TEXT)); }
    int  GetPL_Step()           { return (int)StringToInteger(ObjectGetString(m_chart_id, m_prefix+"EditPL_Step", OBJPROP_TEXT)); }
+
+   //--- Filter Accessors (NEW)
+   bool IsTrendFilterOn() { return m_filter_trend_enabled; }
+   bool IsZoneFilterOn()  { return m_filter_zone_enabled; }
+   bool IsAggressiveOn()  { return m_filter_aggr_enabled; }
+   void UpdateFilterVisuals();
 
    //--- Scroll Support for Active Orders (NEW)
    int  GetScrollOffset()      { return m_scroll_offset; }
@@ -155,11 +172,11 @@ CDashboardPanel::CDashboardPanel()
 {
    m_chart_id = 0;
    m_corner = CORNER_LEFT_LOWER;
-   m_prefix = "EA_"; // Simple prefix to catch everything
+   m_prefix = "DJ_"; // NEW PREFIX to force UI Reset (was "EA_")
    m_base_x = 10;
    m_base_y = 10;
-   m_panel_width = 500;  // Wider for two-panel layout (50/50 split)
-   m_panel_height = 710;  // Reduced from 780 to remove gap (v6)
+   m_panel_width = 650;  // Widened to 650px
+   m_panel_height = 710; 
    m_blink_state = false;
 
    m_bg_color = C'35,35,45';      // Dark Grey Background
@@ -174,6 +191,11 @@ CDashboardPanel::CDashboardPanel()
    // Initialize Settings State (will be overridden by InitSettings)
    m_current_rr = RR_1_TO_2;
    m_trailing_enabled = true;
+
+   // Initialize Filter State
+   m_filter_trend_enabled = true; // Default ON
+   m_filter_zone_enabled = true;  // Default ON
+   m_filter_aggr_enabled = false; // Default OFF
 
    // Initialize Scroll State for Active Orders
    m_scroll_offset = 0;
@@ -196,6 +218,8 @@ void CDashboardPanel::Init(long chart_id, double initial_risk, int pl_trigger, i
    m_initial_pl_lock = pl_lock;
    m_initial_pl_step = pl_step;
 
+   Print("DEBUG: Dashboard Panel v5.0 Loaded. Target Width=", m_panel_width); // Verify update
+
    CreatePanel();
 }
 
@@ -204,198 +228,116 @@ void CDashboardPanel::CreatePanel()
    Destroy();
 
    int x = m_base_x;
-
    int pad = 10;
-
-   int half_width = 235;  
-
+   
+   // NEW WIDER LAYOUT
+   int half_width = 310;  // 310 + 310 + 10 padding + 20 margin = 650
    int left_x = x + 5;
-
    int right_x = x + 5 + half_width + 10; 
 
-
-
    // ============================================
-
    // MAIN BACKGROUND
-
    // ============================================
-
    CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, clrWhite);
 
-
-
    // ============================================
-
    // LEFT PANEL (Panel A)
-
    // ============================================
-
-
 
       // 1. Header Section (Market Status)
-
-
-
-      // Center the title label in left panel (half_width = 235, text width ~130px)
       CreateLabel("Title", left_x + (half_width / 2) - 65, 15, "DJAY Smart Assistant", C'255,223,0', 11, "Arial Bold");
-
-
-
       CreateLabel("LblSesTitle", left_x + pad, 35, "SESSION:", m_text_color, 9);
-
-
-
       CreateLabel("LblSesValue", left_x + pad + 60, 35, "--", clrGray, 9, "Arial");
-
-
-
       CreateLabel("LblTime", left_x + half_width - pad, 35, "M5: --:--", clrOrange, 9, "Arial", "right");
 
-   
+      CreateLabel("LblRunTimeTitle", left_x + pad, 48, "STATUS:", m_text_color, 9);
+      CreateLabel("LblRunTime", left_x + pad + 60, 48, "SIDEWAY", clrGray, 9, "Arial");
 
-      
+      CreateLabel("LblZoneStatTitle", left_x + pad, 61, "ZONE:", m_text_color, 9);
+      CreateLabel("LblZoneStat", left_x + pad + 60, 61, "NEUTRAL", clrGray, 9, "Arial");
 
-         CreateLabel("LblRunTimeTitle", left_x + pad, 48, "STATUS:", m_text_color, 9);
+   // 2. MARKET INTELLIGENCE GRID (Panel A) - WIDENED 3-COL LAYOUT
+   CreateLabel("LblSig", left_x + pad, 80, "MARKET INTELLIGENCE", m_header_color, 10, "Arial Bold");
+   CreateRect("InfoBG", left_x, 100, half_width, 210, C'5,5,15', true, C'45,45,60');
 
-   
+   // New Spacious Column Positions (~100px each)
+   int col1_x = left_x + 10;   // CONTEXT
+   int col2_x = left_x + 110;  // MOMENTUM (Shifted Right)
+   int col3_x = left_x + 210;  // RISK (Shifted Right)
 
-      
+   // Row positions
+   int row1_y = 110;
+   int row2_y = 135;
+   int row3_y = 158;
+   int row4_y = 181;
+   int row5_y = 204;
+   int row6_y = 227;
 
-         CreateLabel("LblRunTime", left_x + pad + 60, 48, "SIDEWAY", clrGray, 9, "Arial");
+   // --- COLUMN 1: CONTEXT ---
+   CreateLabel("Ctx_T", col1_x, row1_y, "CONTEXT", C'100,200,255', 8, "Arial Bold");
+   CreateLabel("Bias_Light", col1_x, row2_y, "●", clrGray, 14); 
+   CreateLabel("Bias_Label", col1_x + 15, row2_y + 3, "NEUTRAL", clrGray, 7); 
 
-   
+   CreateLabel("TM_H4_Label", col1_x, row3_y, "H4:", clrGray, 8);
+   CreateLabel("TM_H4_Arrow", col1_x + 25, row3_y - 2, "→", clrGray, 10); 
 
-      
+   CreateLabel("TM_H1_Label", col1_x, row4_y, "H1:", clrGray, 8);
+   CreateLabel("TM_H1_Arrow", col1_x + 25, row4_y - 2, "→", clrGray, 10);
 
-         
+   CreateLabel("TM_M15_Label", col1_x, row5_y, "M15:", clrGray, 8);
+   CreateLabel("TM_M15_Arrow", col1_x + 25, row5_y - 2, "→", clrGray, 10);
 
-   
+   CreateLabel("State_Label", col1_x, row6_y, "ACTION:", clrGray, 7);
+   CreateLabel("State_Value", col1_x + 35, row6_y, "WAIT", clrGray, 7); 
 
-      
+   // --- COLUMN 2: MOMENTUM ---
+   CreateLabel("Mom_T", col2_x, row1_y, "MOMENTUM", C'100,200,255', 8, "Arial Bold");
+   CreateLabel("PA_T2", col2_x, row2_y, "M15 PA:", clrGray, 8);
+   CreateLabel("PA_V2", col2_x + 45, row2_y, "NONE", clrGray, 8, "Arial Bold");
 
-         CreateLabel("LblZoneStatTitle", left_x + pad, 61, "ZONE:", m_text_color, 9);
+   CreateLabel("RSI_T", col2_x, row3_y, "RSI:", clrGray, 8);
+   CreateLabel("RSI_V", col2_x + 25, row3_y, "--", clrGray, 8);
 
-   
+   CreateLabel("Stoch_T", col2_x, row4_y, "Stoch:", clrGray, 8);
+   CreateLabel("Stoch_V", col2_x + 30, row4_y, "--", clrGray, 8);
 
-      
+   CreateLabel("Slope_T", col2_x, row5_y, "Slope H1:", clrGray, 8);
+   CreateLabel("Slope_V", col2_x + 45, row5_y, "FLAT", clrGray, 7);
+   CreateLabel("Slope_Warn", col2_x, row6_y, "", clrRed, 7, "Arial Bold");
 
-         CreateLabel("LblZoneStat", left_x + pad + 60, 61, "NEUTRAL", clrGray, 9, "Arial");
+   // --- COLUMN 3: RISK ---
+   CreateLabel("Risk_T", col3_x, row1_y, "RISK", C'100,200,255', 8, "Arial Bold");
+   CreateLabel("ATR_T", col3_x, row2_y, "ATR M15:", clrGray, 8);
+   CreateLabel("ATR_V", col3_x + 45, row2_y, "-- pts", clrGray, 8);
 
+   CreateLabel("Dist_T", col3_x, row3_y, "EMA Dist:", clrGray, 8);
+   CreateLabel("Dist_V", col3_x + 45, row3_y, "--", clrGray, 8);
 
+   CreateLabel("Space_T", col3_x, row4_y, "Space:", clrGray, 8);
+   CreateLabel("Space_V", col3_x + 35, row4_y, "--", clrGray, 8);
+
+   CreateLabel("Struct_T", col3_x, row5_y, "To Zone:", clrGray, 8);
+   CreateLabel("Struct_V", col3_x + 40, row5_y, "--", clrGray, 8);
+
+   CreateLabel("ADX_T2", col3_x, row6_y, "ADX:", clrGray, 8);
+   CreateLabel("ADX_V2", col3_x + 25, row6_y, "--", clrGray, 8);
 
    // 3. Daily Zones Table (Panel A)
-   // Shifted down to accommodate expanded Strategy Signal section
-
    CreateLabel("LblZ", left_x + pad, 320, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
-
    CreateRect("TableBG", left_x, 340, half_width, 140, C'5,5,15', true, C'45,45,60');
 
-
-
-   // Table Headers
-
    CreateLabel("H_Z", left_x + 10, 350, "ZONE", clrGray, 8);
-
-   CreateLabel("H_P", left_x + 85, 350, "PRICE", clrGray, 8);
-
-   CreateLabel("H_D", left_x + 150, 350, "DIST", clrGray, 8);
-
-
+   CreateLabel("H_P", left_x + 120, 350, "PRICE", clrGray, 8); // Shifted Right
+   CreateLabel("H_D", left_x + 220, 350, "DIST", clrGray, 8);  // Shifted Right
 
    for(int i = 0; i < 6; i++)
-
    {
-
       string id = IntegerToString(i);
-
       int ry = 365 + (i * 18);
-
       CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
-
-      CreateLabel("L_P_" + id, left_x + 85, ry, "0.00", m_text_color, 9);
-
-      CreateLabel("L_D_" + id, left_x + 150, ry, "0 pts", clrGray, 9);
-
+      CreateLabel("L_P_" + id, left_x + 120, ry, "0.00", m_text_color, 9); // Shifted
+      CreateLabel("L_D_" + id, left_x + 220, ry, "0 pts", clrGray, 9);    // Shifted
    }
-
-
-   // 2. Strategy Signal Section (Panel A)
-   // Moved from Panel B to improve layout balance
-   // Expanded Advisor section with more details (zones reduced to 3, saving space)
-
-   CreateLabel("LblSig", left_x + pad, 80, "STRATEGY SIGNAL", m_header_color, 10, "Arial Bold");
-
-   CreateRect("InfoBG", left_x, 100, half_width, 210, C'5,5,15');
-
-
-
-   int sig_y = 112;
-
-   CreateLabel("Trend_T", left_x + 10, sig_y, "Trend:", m_header_color, 9);
-
-   CreateLabel("Trend_V", left_x + 50, sig_y, "--", clrGray, 9, "Arial Bold");
-
-
-
-   sig_y += 16;
-
-   CreateLabel("PA_T", left_x + 10, sig_y, "PA Signal:", m_header_color, 9);
-
-   CreateLabel("PA_V", left_x + 75, sig_y, "NONE", clrGray, 9);
-
-
-
-   sig_y += 17;
-
-   CreateRect("Sep1", left_x + 8, sig_y, half_width - 16, 1, C'60,60,70');
-
-
-
-   sig_y += 8;
-
-   CreateLabel("Adv_T", left_x + 10, sig_y, "Advisor:", m_accent_color, 10, "Arial Bold");
-
-   sig_y += 16;
-
-   CreateLabel("Adv_V", left_x + 10, sig_y, "Scanning market...", clrCyan, 9);
-
-   sig_y += 14;
-
-   CreateLabel("Adv_V2", left_x + 10, sig_y, "", clrCyan, 9);
-
-   sig_y += 18;
-
-   // Detailed status labels (formatted like Advisor, but orange)
-   CreateLabel("Stat_T", left_x + 10, sig_y, "Quick Scalp Status:", m_accent_color, 10, "Arial Bold");
-
-   sig_y += 16;
-
-   CreateLabel("Stat_Zone", left_x + 10, sig_y, "", C'255,165,0', 9);
-
-   sig_y += 14;
-
-   CreateLabel("Stat_Trend", left_x + 10, sig_y, "", C'255,165,0', 9);
-
-   sig_y += 14;
-
-   CreateLabel("Stat_QS", left_x + 10, sig_y, "", C'255,165,0', 9);
-
-   sig_y += 14;
-
-   CreateLabel("Stat_RSI", left_x + 10, sig_y, "", C'255,165,0', 9);
-
-   sig_y += 14;
-
-   CreateLabel("Stat_ADX", left_x + 10, sig_y, "", C'100,200,255', 9);
-
-   sig_y += 14;
-
-   CreateLabel("Stat_PA", left_x + 10, sig_y, "", C'150,255,150', 9);
-
-   sig_y += 20;
-
-   CreateLabel("Ver", left_x + half_width - pad, sig_y, "v5.0", clrGray, 8);
 
 
    // ============================================
@@ -534,538 +476,78 @@ void CDashboardPanel::CreatePanel()
 
 
 
-                                                // 5. Settings Section (SWAPPED - NOW 2ND)
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                CreateLabel("LblSettings", right_x + pad, right_y, "SETTINGS", m_header_color, 10, "Arial Bold");
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                // Changed to "Open Properties" with wider button
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                // Settings icon (gear) - left position
-                                                CreateButton("BtnOpenSettings", right_x + half_width - 50, right_y, 20, 20, "⚙", clrGray, clrWhite, 12);
-
-                                                // Statistics icon (clipboard) - to the right of Settings
-                                                CreateButton("BtnStats", right_x + half_width - 25, right_y, 20, 20, "📋", clrGray, clrWhite, 12);
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                right_y += 20; 
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                                                // Compact Height: 150px
-
-
-
-         
-
-
-
-                        CreateRect("SettingsBG", right_x, right_y, half_width, 150, C'5,5,15', true, C'45,45,60');
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // Row 1: RR Radio Buttons
-
-
-
-         
-
-
-
-                        right_y += 8;
-
-
-
-         
-
-
-
-                        CreateLabel("L_RR_Title", right_x + pad, right_y + 3, "RR:", clrGray, 9);
-
-
-
-         
-
-
-
-                        
-
-
-
-         
-
-
-
-                        int rrBtnW = 45;
-
-
-
-         
-
-
-
-                        int rrGap = 5;
-
-
-
-         
-
-
-
-                        int rrTotalW = (rrBtnW * 3) + (rrGap * 2);
-
-
-
-         
-
-
-
-                        int rrStartX = (right_x + half_width - pad) - rrTotalW; 
-
-
-
-         
-
-
-
-                        
-
-
-
-         
-
-
-
-                        CreateButton("BtnRR1", rrStartX, right_y, rrBtnW, row_h, "1:1", clrGray, clrWhite, 8);
-
-
-
-         
-
-
-
-                        CreateButton("BtnRR15", rrStartX + rrBtnW + rrGap, right_y, rrBtnW, row_h, "1:1.5", clrGray, clrWhite, 8);
-
-
-
-         
-
-
-
-                        CreateButton("BtnRR2", rrStartX + (rrBtnW + rrGap) * 2, right_y, rrBtnW, row_h, "1:2", m_buy_color, clrWhite, 8); 
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // Row 2: Risk %
-
-
-
-         
-
-
-
-                        right_y += row_h + 8; // Compact gap
-
-
-
-         
-
-
-
-                        CreateLabel("LblRisk", right_x + pad, right_y + 3, "Risk %", clrGray, 9);
-
-
-
-         
-
-
-
-                        CreateEdit("EditRisk", right_x + half_width - pad - 40, right_y, 40, row_h, DoubleToString(m_initial_risk, 1));
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // Row 3: Profit Lock Toggle
-
-
-
-         
-
-
-
-                        right_y += row_h + 8; // Compact gap
-
-
-
-         
-
-
-
-                        CreateLabel("L_Trail", right_x + pad, right_y + 3, "Profit Lock", clrGray, 9);
-
-
-
-         
-
-
-
-                        CreateButton("BtnTrailToggle", right_x + half_width - 65, right_y, 60, row_h, "ON", m_buy_color, clrWhite, 9);
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // Row 4: Profit Lock Label
-
-
-
-         
-
-
-
-                        right_y += row_h + 8; 
-
-
-
-         
-
-
-
-                        CreateLabel("L_PL_Title", right_x + pad, right_y, "Profit Lock Settings", clrGray, 9); 
-
-
-
-         
-
-
-
-                        
-
-
-
-         
-
-
-
-                        // Row 5: Profit Lock Inputs
-
-
-
-         
-
-
+                        // 5. COMPACT SETTINGS Section (Redesigned)
+                        CreateLabel("LblSettings", right_x + pad, right_y, "SETTINGS", m_header_color, 10, "Arial Bold");
+
+                        // Icons (Gear + Stats)
+                        CreateButton("BtnOpenSettings", right_x + half_width - 50, right_y, 20, 20, "⚙", clrGray, clrWhite, 12);
+                        CreateButton("BtnStats", right_x + half_width - 25, right_y, 20, 20, "📋", clrGray, clrWhite, 12);
 
                         right_y += 20; 
-
-
-
-         
-
-
-
                         
+                        // Compact Background (Reduced height from 150 -> 75)
+                        CreateRect("SettingsBG", right_x, right_y, half_width, 75, C'5,5,15', true, C'45,45,60');
 
-
-
-         
-
-
-
-                        int plEditW = 35;
-
-
-
-         
-
-
-
-                        int plGap = 15; 
-
-
-
-         
-
-
-
-                        int plTotalW = 213; 
-
-
-
-         
-
-
-
-                        int plX = (right_x + half_width - pad) - plTotalW; 
-
-
-
-         
-
-
-
+                        // Row 1: RR Ratio + Risk %
+                        right_y += 10;
+                        int rrBtnW = 40;
+                        int rrGap = 2;
                         
+                        CreateLabel("L_RR_Title", right_x + 10, right_y + 3, "RR:", clrGray, 8);
+                        CreateButton("BtnRR1", right_x + 35, right_y, rrBtnW, 20, "1:1", clrGray, clrWhite, 8);
+                        CreateButton("BtnRR15", right_x + 35 + rrBtnW + rrGap, right_y, rrBtnW, 20, "1:1.5", clrGray, clrWhite, 8);
+                        CreateButton("BtnRR2", right_x + 35 + (rrBtnW + rrGap)*2, right_y, rrBtnW, 20, "1:2", m_buy_color, clrWhite, 8); 
 
+                        // Risk Input (Small)
+                        CreateLabel("L_Risk", right_x + half_width - 70, right_y + 3, "Risk:", clrGray, 8);
+                        CreateEdit("EditRisk", right_x + half_width - 40, right_y, 30, 20, DoubleToString(m_initial_risk, 1));
 
-
-         
-
-
-
-                        // Trigger
-
-
-
-         
-
-
-
-                        CreateLabel("L_PL_Trig", plX, right_y + 3, "Trig", clrGray, 8);
-
-
-
-         
-
-
-
-                        CreateEdit("EditPL_Trigger", plX + 25, right_y, plEditW, row_h, IntegerToString(m_initial_pl_trigger));
-
-
-
-         
-
-
-
+                        // Row 2: Profit Lock (Compact Row)
+                        right_y += 28;
+                        CreateLabel("L_Trail", right_x + 10, right_y + 3, "PL:", clrGray, 8);
+                        CreateButton("BtnTrailToggle", right_x + 35, right_y, 35, 20, "ON", m_buy_color, clrWhite, 8);
                         
-
-
-
-         
-
-
-
-                        // Lock
-
-
-
-         
-
-
-
-                        plX += 25 + plEditW + plGap;
-
-
-
-         
-
-
-
-                        CreateLabel("L_PL_Lock", plX, right_y + 3, "Lock", clrGray, 8);
-
-
-
-         
-
-
-
-                        CreateEdit("EditPL_Amount", plX + 28, right_y, plEditW, row_h, IntegerToString(m_initial_pl_lock));
-
-
-
-         
-
-
-
+                        // Inputs: Trig | Lock | Step
+                        int plInputW = 35;
+                        int plX = right_x + 80;
                         
+                        CreateLabel("L_T", plX, right_y + 3, "T", clrGray, 8);
+                        CreateEdit("EditPL_Trigger", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_trigger));
+                        
+                        plX += 10 + plInputW + 5;
+                        CreateLabel("L_L", plX, right_y + 3, "L", clrGray, 8);
+                        CreateEdit("EditPL_Amount", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_lock));
+                        
+                        plX += 10 + plInputW + 5;
+                        CreateLabel("L_S", plX, right_y + 3, "S", clrGray, 8);
+                        CreateEdit("EditPL_Step", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_step));
 
+                        // ----------------------------------------------------
+                        // 6. SMART FILTERS (NEW SECTION)
+                        // ----------------------------------------------------
+                        right_y += 45; // Gap
+                        CreateLabel("LblFilters", right_x + pad, right_y, "SMART FILTERS", m_header_color, 10, "Arial Bold");
+                        
+                        right_y += 20;
+                        CreateRect("FilterBG", right_x, right_y, half_width, 60, C'5,5,15', true, C'45,45,60');
+                        
+                        // Row 1: Trend + Zone Filters
+                        right_y += 10;
+                        CreateButton("BtnFilterTrend", right_x + 10, right_y, 15, 15, "X", m_buy_color, clrWhite, 8);
+                        CreateLabel("L_F_Trend", right_x + 30, right_y, "Trend Filter", clrWhite, 8);
+                        
+                        CreateButton("BtnFilterZone", right_x + 150, right_y, 15, 15, "X", m_buy_color, clrWhite, 8);
+                        CreateLabel("L_F_Zone", right_x + 170, right_y, "Zone Filter", clrWhite, 8);
+                        
+                        // Row 2: Aggressive Mode
+                        right_y += 25;
+                        CreateButton("BtnFilterAggr", right_x + 10, right_y, 15, 15, "", clrGray, clrWhite, 8);
+                        CreateLabel("L_F_Aggr", right_x + 30, right_y, "Aggressive (Ignore All)", C'255,100,100', 8);
 
-
-         
-
-
-
-                        // Step
-
-
-
-         
-
-
-
-                        plX += 28 + plEditW + plGap;
-
-
-
-         
-
-
-
-                        CreateLabel("L_PL_Step", plX, right_y + 3, "Step", clrGray, 8);
-
-
-
-         
-
-
-
-                        CreateEdit("EditPL_Step", plX + 25, right_y, plEditW, row_h, IntegerToString(m_initial_pl_step));
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // 6. Auto Strategy Options (SWAPPED - NOW 3RD)
-
-
-
-         
-
-
-
-                        right_y += 45; // Gap after Settings
-
-
-
-         
-
-
-
+                        // ----------------------------------------------------
+                        // 7. AUTO STRATEGY (Adjusted Position)
+                        // ----------------------------------------------------
+                        right_y += 40; 
                         CreateLabel("LblStratTitle", right_x + pad, right_y + 3, "AUTO STRATEGY", m_header_color, 10, "Arial Bold");
 
 
@@ -1129,6 +611,7 @@ void CDashboardPanel::CreatePanel()
                         // Quick Scalp section (separate)
                         right_y += 25;
                         CreateLabel("L_QS_Label", right_x + 10, right_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
+                        CreateLabel("QS_Status_Dot", right_x + 85, right_y, "●", clrGray, 10);
                         CreateButton("BtnStratQS", right_x + 100, right_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
 
 
@@ -1586,9 +1069,18 @@ void CDashboardPanel::UpdateQuickScalpSmartState(bool isEnabled, ENUM_ZONE_STATU
    }
 
    // Update button
-   ObjectSetString(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_TEXT, btnText);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_COLOR, btnColor);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_BGCOLOR, bgColor);
+   SetText("BtnStratQS", btnText);
+   SetBgColor("BtnStratQS", bgColor);
+   SetColor("BtnStratQS", btnColor);
+
+   // Update Status Dot (Phase 4.1 Restoration)
+   color dotColor = clrGray;
+   if(isEnabled)
+   {
+      if(btnText == "READY") dotColor = clrLime;
+      else dotColor = clrRed;
+   }
+   SetColor("QS_Status_Dot", dotColor);
 }
 
 //+------------------------------------------------------------------+
@@ -2074,6 +1566,33 @@ void CDashboardPanel::UpdateTrailingButtonVisuals()
 }
 
 //+------------------------------------------------------------------+
+//| Update Smart Filter Visuals (v5.0)                                |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateFilterVisuals()
+{
+   // Trend Filter
+   string trendText = m_filter_trend_enabled ? "X" : "";
+   color trendBg = m_filter_trend_enabled ? m_buy_color : clrGray;
+   SetText("BtnFilterTrend", trendText);
+   SetBgColor("BtnFilterTrend", trendBg);
+
+   // Zone Filter
+   string zoneText = m_filter_zone_enabled ? "X" : "";
+   color zoneBg = m_filter_zone_enabled ? m_buy_color : clrGray;
+   SetText("BtnFilterZone", zoneText);
+   SetBgColor("BtnFilterZone", zoneBg);
+
+   // Aggressive Mode
+   string aggrText = m_filter_aggr_enabled ? "ON" : "";
+   color aggrBg = m_filter_aggr_enabled ? C'255,100,100' : clrGray;
+   SetText("BtnFilterAggr", aggrText);
+   SetBgColor("BtnFilterAggr", aggrBg);
+   
+   // Logic: If Aggressive is ON, filters are visually "ignored" (but we keep their state)
+   // We might want to dim the filter buttons if Aggressive is ON, but for now simple toggle is fine.
+}
+
+//+------------------------------------------------------------------+
 //| Get RR Multiplier                                                 |
 //+------------------------------------------------------------------+
 double CDashboardPanel::GetRRMultiplier()
@@ -2185,6 +1704,209 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
    }
 }
 
+//+====================================================================+
+//| SNIPER UPDATE: Sprint 3 - Market Intelligence Grid Update           |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Update Market Intelligence Grid (3-Column Layout)                   |
+//| Populates the new dashboard grid with market context data           |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal)
+{
+   //===========================================================
+   // COLUMN 1: CONTEXT (Trend Matrix, Bias, Market State)
+   //===========================================================
+
+   // 1. Traffic Light Bias Indicator
+   color biasColor = ctx.trendMatrix.displayColor;
+   string biasText = ctx.trendMatrix.description;
+
+   // Update bias light (colored circle)
+   SetColor("Bias_Light", biasColor);
+   SetText("Bias_Label", biasText);
+   SetColor("Bias_Label", biasColor);
+
+   // 2. Trend Matrix (H4/H1/M15 arrows)
+   string h4Arrow = (ctx.trendMatrix.h4 == TREND_UP) ? "↑" : ((ctx.trendMatrix.h4 == TREND_DOWN) ? "↓" : "→");
+   string h1Arrow = (ctx.trendMatrix.h1 == TREND_UP) ? "↑" : ((ctx.trendMatrix.h1 == TREND_DOWN) ? "↓" : "→");
+   string m15Arrow = (ctx.trendMatrix.m15 == TREND_UP) ? "↑" : ((ctx.trendMatrix.m15 == TREND_DOWN) ? "↓" : "→");
+
+   color h4Color = (ctx.trendMatrix.h4 == TREND_UP) ? clrLime : ((ctx.trendMatrix.h4 == TREND_DOWN) ? clrRed : clrGray);
+   color h1Color = (ctx.trendMatrix.h1 == TREND_UP) ? clrLime : ((ctx.trendMatrix.h1 == TREND_DOWN) ? clrRed : clrGray);
+   color m15Color = (ctx.trendMatrix.m15 == TREND_UP) ? clrLime : ((ctx.trendMatrix.m15 == TREND_DOWN) ? clrRed : clrGray);
+
+   SetText("TM_H4_Arrow", h4Arrow);
+   SetColor("TM_H4_Arrow", h4Color);
+
+   SetText("TM_H1_Arrow", h1Arrow);
+   SetColor("TM_H1_Arrow", h1Color);
+
+   SetText("TM_M15_Arrow", m15Arrow);
+   SetColor("TM_M15_Arrow", m15Color);
+
+   // 3. Action Logic (Synthesis)
+   string actionText = "WAIT";
+   color actionColor = C'255,100,100'; // Redish
+
+   // Condition: Strong Trend Alignment (Score >= 2) AND Not Choppy (ADX > 20)
+   if (MathAbs(ctx.trendMatrix.score) >= 2 && ctx.adxValue > 20)
+   {
+      // Safety Check: Ensure Momentum supports the Trend (No Crash/Rocket against trend)
+      bool safe = true;
+      if (ctx.trendMatrix.h1 == TREND_UP && ctx.slopeH1 == SLOPE_CRASH) safe = false;
+      if (ctx.trendMatrix.h1 == TREND_DOWN && ctx.slopeH1 == SLOPE_UP) safe = false;
+      
+      if (safe)
+      {
+         actionText = "READY";
+         actionColor = clrLime;
+      }
+   }
+
+   SetText("State_Value", actionText);
+   SetColor("State_Value", actionColor);
+
+   //===========================================================
+   // COLUMN 2: MOMENTUM (PA Signal, RSI, Stoch, Slope)
+   //===========================================================
+
+   // 1. M15 PA Signal
+   string paText = "NONE";
+   color paColor = clrGray;
+
+   if(m15Signal == SIGNAL_PA_BUY)
+   {
+      paText = "BUY";
+      paColor = m_buy_color;
+   }
+   else if(m15Signal == SIGNAL_PA_SELL)
+   {
+      paText = "SELL";
+      paColor = m_sell_color;
+   }
+
+   SetText("PA_V2", paText);
+   SetColor("PA_V2", paColor);
+
+   // 2. RSI Value
+   string rsiText = (rsi > 0) ? StringFormat("%.0f", rsi) : "--";
+   color rsiColor = clrGray;
+
+   if(rsi > 70)
+      rsiColor = clrRed;        // Overbought
+   else if(rsi < 30)
+      rsiColor = clrLime;       // Oversold
+   else if(rsi > 60)
+      rsiColor = m_sell_color;  // Bullish zone
+   else if(rsi < 40)
+      rsiColor = m_buy_color;   // Bearish zone
+
+   SetText("RSI_V", rsiText);
+   SetColor("RSI_V", rsiColor);
+
+   // 3. Stochastic Value
+   string stochText = (stoch > 0) ? StringFormat("%.0f", stoch) : "--";
+   color stochColor = clrGray;
+
+   if(stoch > 80)
+      stochColor = clrRed;      // Overbought
+   else if(stoch < 20)
+      stochColor = clrLime;     // Oversold
+   else if(stoch > 60)
+      stochColor = m_sell_color; // Bullish zone
+   else if(stoch < 40)
+      stochColor = m_buy_color;  // Bearish zone
+
+   SetText("Stoch_V", stochText);
+   SetColor("Stoch_V", stochColor);
+
+   // 4. EMA Slope (H1)
+   string slopeText = "FLAT";
+   color slopeColor = clrGray;
+
+   switch(ctx.slopeH1)
+   {
+      case SLOPE_UP:
+         slopeText = "UP";
+         slopeColor = clrLime;
+         break;
+      case SLOPE_DOWN:
+         slopeText = "DOWN";
+         slopeColor = m_sell_color;
+         break;
+      case SLOPE_CRASH:
+         slopeText = "CRASH";
+         slopeColor = clrRed;
+         break;
+      case SLOPE_FLAT:
+         slopeText = "FLAT";
+         slopeColor = clrGray;
+         break;
+   }
+
+   SetText("Slope_V", slopeText);
+   SetColor("Slope_V", slopeColor);
+
+   // 5. Slope Warning (NO BUY if crash)
+   if(ctx.slopeH1 == SLOPE_CRASH)
+   {
+      SetText("Slope_Warn", "⚠ NO BUY");
+   }
+   else
+   {
+      SetText("Slope_Warn", "");
+   }
+
+   //===========================================================
+   // COLUMN 3: RISK (ATR, EMA Distance, Space to Run, Structure)
+   //===========================================================
+
+   // 1. ATR Value (M15)
+   string atrText = (ctx.atrM15 > 0) ? StringFormat("%.0f", ctx.atrM15) : "--";
+   SetText("ATR_V", atrText + " pts");
+
+   // 2. EMA Distance (calculated from slope value)
+   string distText = (ctx.slopeValue != 0) ? StringFormat("%.0f", ctx.slopeValue) : "--";
+   color distColor = clrGray;
+   if(ctx.slopeValue > 200)
+      distColor = m_sell_color;  // Price extended above EMA
+   else if(ctx.slopeValue < -200)
+      distColor = m_buy_color;   // Price extended below EMA
+
+   SetText("Dist_V", distText + " pts");
+   SetColor("Dist_V", distColor);
+
+   // 3. Space to Run (distance to nearest opposite zone)
+   // For now, use distance to nearest zone as a proxy
+   string spaceText = (ctx.distanceToNearestZone > 0) ? StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
+   SetText("Space_V", spaceText + " pts");
+
+   // 4. Structure Distance
+   string structText = (ctx.distanceToNearestZone > 0) ? StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
+   color structColor = ctx.nearStructuralLevel ? clrLime : clrGray;
+   SetText("Struct_V", structText + " pts");
+   SetColor("Struct_V", structColor);
+
+   // 5. ADX Value
+   string adxText = (ctx.adxValue > 0) ? StringFormat("%.1f", ctx.adxValue) : "--";
+   SetText("ADX_V2", adxText);
+
+   // ==========================================================
+   // VISUAL SAFETY ALERT (Panel Flash)
+   // ==========================================================
+   color mainBorder = C'45,45,60'; // Default Neutral Border
+
+   // Flash RED if Market is in CRASH mode or Extreme Upward Momentum (Dangerous)
+   if (ctx.slopeH1 == SLOPE_CRASH || ctx.slopeH1 == SLOPE_UP)
+   {
+      mainBorder = clrRed;
+   }
+   
+   // Apply to Main Background
+   ObjectSetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_BORDER_COLOR, mainBorder);
+}
+
 //+------------------------------------------------------------------+
 //| Check if individual order close button was clicked (with Scroll)   |
 //+------------------------------------------------------------------+
@@ -2274,6 +1996,81 @@ void CDashboardPanel::OnEvent(const int id, const long &lparam, const double &dp
          return;
       }
 
+      //--- SMART FILTERS Toggle Clicks (v5.0)
+      if(sparam == m_prefix + "BtnFilterTrend")
+      {
+         ObjectSetInteger(m_chart_id, sparam, OBJPROP_STATE, false);
+         m_filter_trend_enabled = !m_filter_trend_enabled;
+         UpdateFilterVisuals();
+         ChartRedraw(m_chart_id);
+         return;
+      }
+      if(sparam == m_prefix + "BtnFilterZone")
+      {
+         ObjectSetInteger(m_chart_id, sparam, OBJPROP_STATE, false);
+         m_filter_zone_enabled = !m_filter_zone_enabled;
+         UpdateFilterVisuals();
+         ChartRedraw(m_chart_id);
+         return;
+      }
+      if(sparam == m_prefix + "BtnFilterAggr")
+      {
+         ObjectSetInteger(m_chart_id, sparam, OBJPROP_STATE, false);
+         m_filter_aggr_enabled = !m_filter_aggr_enabled;
+         // If Aggressive ON -> Filters ignored (visually dimmed)
+         UpdateFilterVisuals();
+         ChartRedraw(m_chart_id);
+         return;
+      }
+
       // Note: Profit Lock inputs (Trigger/Lock/Step Edits) are handled natively by MT5
    }
+}
+
+//+------------------------------------------------------------------+
+//| Update Execution Buttons (Ghost Button Logic)                     |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateExecutionButtons(MarketContext &ctx)
+{
+   bool safeToBuy = true;
+   bool safeToSell = true;
+
+   // 1. Check Aggressive Override (If ON, everything is safe)
+   if (!m_filter_aggr_enabled)
+   {
+      // 2. Check Slope (Falling Knife Protection)
+      if (ctx.slopeH1 == SLOPE_CRASH) safeToBuy = false;
+      if (ctx.slopeH1 == SLOPE_UP)    safeToSell = false;
+
+      // 3. Check Trend Filter
+      if (m_filter_trend_enabled)
+      {
+         // If H1 is DOWN, Don't Buy (unless it's a deep pullback, but for safety we block)
+         if (ctx.trendMatrix.h1 == TREND_DOWN) safeToBuy = false;
+         
+         // If H1 is UP, Don't Sell
+         if (ctx.trendMatrix.h1 == TREND_UP)   safeToSell = false;
+      }
+      
+      // 4. Check Zone Filter (Middle Zone Protection)
+      // If Zone Filter is ON, we generally discourage trading in the middle, 
+      // but blocking Manual execution might be too strict. 
+      // Let's keep Ghost Buttons focused on MOMENTUM/TREND safety.
+   }
+
+   // Visual Update
+   color buyColor = safeToBuy ? m_buy_color : C'60,60,60'; // Dimmed Dark Gray
+   color sellColor = safeToSell ? m_sell_color : C'60,60,60';
+   
+   color buyText = safeToBuy ? clrWhite : C'150,150,150';
+   color sellText = safeToSell ? clrWhite : C'150,150,150';
+
+   SetBgColor("BtnBuy", buyColor);
+   SetColor("BtnBuy", buyText);
+   
+   SetBgColor("BtnSell", sellColor);
+   SetColor("BtnSell", sellText);
+   
+   // We do NOT disable the button functionality (IsBuyButtonClicked checks are still valid).
+   // This is a "Nudge", not a hard lock. User can still click if they really want to.
 }

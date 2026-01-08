@@ -95,6 +95,7 @@ private:
     int    m_handle_h4_100, m_handle_h4_200;
     int    m_handle_h1_100, m_handle_h1_200;
     int    m_handle_m15_100, m_handle_m15_200;
+    int    m_handle_m15_20, m_handle_m15_50; // Cached for Sniper/Trend Matrix
 
     // Helper method for copying indicator buffer values
     double CopyBufferValue(int handle, int buffer_num);
@@ -144,6 +145,21 @@ public:
     //--- Natural Language Advisor
     string GetAdvisorMessage(bool quickScalpMode);
     bool   IsDataReady();
+
+    //--- Sniper Update: Market Context Functions (Sprint 1)
+    double GetATRValue(int period = 14, ENUM_TIMEFRAMES tf = PERIOD_M15);  // Return ATR in points
+    ENUM_SLOPE_DIRECTION GetEMASlope(ENUM_TIMEFRAMES tf = PERIOD_H1, int ema_period = 20, double steep_threshold = 0.0);
+    TrendMatrix GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 200,
+                               int h1_fast_ema = 100, int h1_slow_ema = 200,
+                               int m15_fast_ema = 20, int m15_slow_ema = 50);
+    ENUM_MARKET_STATE GetMarketState(double adx_trend_min = 25.0, double adx_range_max = 20.0);
+    bool IsNearStructuralLevel(double price, double tolerance_points = 50.0);
+    MarketContext GetMarketContext();  // Get complete market context in one call
+
+    //--- Sniper Update: Sprint 2 - Sniper Filter Functions
+    ENUM_SIGNAL_TYPE GetSniperSignal(bool debug_mode = false,  // M15-based filtered signals
+                                     double atr_multiplier = 1.0,      // Volume filter multiplier
+                                     double zone_tolerance = 50.0);    // Structure proximity tolerance
     
     //--- Strategy Helpers
     bool   IsReversalSetup();
@@ -183,6 +199,7 @@ CSignalEngine::CSignalEngine()
     m_handle_h4_100 = INVALID_HANDLE; m_handle_h4_200 = INVALID_HANDLE;
     m_handle_h1_100 = INVALID_HANDLE; m_handle_h1_200 = INVALID_HANDLE;
     m_handle_m15_100 = INVALID_HANDLE; m_handle_m15_200 = INVALID_HANDLE;
+    m_handle_m15_20 = INVALID_HANDLE; m_handle_m15_50 = INVALID_HANDLE;
 }
 
 //+------------------------------------------------------------------+
@@ -209,6 +226,9 @@ CSignalEngine::~CSignalEngine()
     
     if(m_handle_m15_100 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_100);
     if(m_handle_m15_200 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_200);
+    
+    if(m_handle_m15_20 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_20);
+    if(m_handle_m15_50 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_50);
 
     // Release ADX indicator handle (Quick Scalp choppy market filter)
     if(m_handle_adx != INVALID_HANDLE) IndicatorRelease(m_handle_adx);
@@ -240,6 +260,9 @@ void CSignalEngine::Init(int zone_offset1, int zone_offset2, int gmt_offset)
     
     m_handle_m15_100 = iMA(_Symbol, PERIOD_M15, 100, 0, MODE_EMA, PRICE_CLOSE);
     m_handle_m15_200 = iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE);
+    
+    m_handle_m15_20 = iMA(_Symbol, PERIOD_M15, 20, 0, MODE_EMA, PRICE_CLOSE);
+    m_handle_m15_50 = iMA(_Symbol, PERIOD_M15, 50, 0, MODE_EMA, PRICE_CLOSE);
 
     // Create ADX indicator handle for Quick Scalp choppy market filter
     m_handle_adx = iADX(_Symbol, PERIOD_CURRENT, 14);
@@ -582,6 +605,8 @@ double CSignalEngine::GetEMAValue(ENUM_TIMEFRAMES tf, int period, int shift)
       else if(tf == PERIOD_M15) handle = m_handle_m15_200;
       else if(tf == PERIOD_CURRENT) handle = m_handle_ema200;
    }
+   else if(period == 20 && tf == PERIOD_M15) handle = m_handle_m15_20;
+   else if(period == 50 && tf == PERIOD_M15) handle = m_handle_m15_50;
    
    // Fallback for non-cached params (e.g. 720 or other TFs if added later)
    if(handle == INVALID_HANDLE)
@@ -1202,6 +1227,407 @@ double CSignalEngine::GetADXValue(ENUM_TIMEFRAMES tf)
       return 0.0;
 
    return adxBuffer[0];
+}
+
+//+====================================================================+
+//| SNIPER UPDATE: Sprint 1 - Market Context Functions                 |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Get ATR Value (Sniper Update)                                     |
+//| Calculate Average True Range for specified timeframe and period   |
+//| Returns: ATR value in POINTS (not pips)                           |
+//+------------------------------------------------------------------+
+double CSignalEngine::GetATRValue(int period = 14, ENUM_TIMEFRAMES tf = PERIOD_M15)
+{
+   int handle = iATR(_Symbol, tf, period);
+   if(handle == INVALID_HANDLE)
+      return 0.0;
+
+   double atrBuffer[];
+   ArraySetAsSeries(atrBuffer, true);
+
+   int copied = CopyBuffer(handle, 0, 0, 1, atrBuffer);
+   IndicatorRelease(handle);
+
+   if(copied <= 0)
+      return 0.0;
+
+   // Convert ATR from price to points
+   return atrBuffer[0] / _Point;
+}
+
+//+------------------------------------------------------------------+
+//| Get EMA Slope Direction (Sniper Update)                           |
+//| Calculate the slope of EMA to determine momentum strength         |
+//| Parameters:                                                       |
+//|   tf - Timeframe for slope calculation                            |
+//|   ema_period - EMA period to use                                  |
+//|   steep_threshold - Points threshold for "steep" slope (0=auto)   |
+//| Returns: SLOPE_FLAT, SLOPE_UP, SLOPE_DOWN, or SLOPE_CRASH         |
+//+------------------------------------------------------------------+
+ENUM_SLOPE_DIRECTION CSignalEngine::GetEMASlope(ENUM_TIMEFRAMES tf = PERIOD_H1, int ema_period = 20, double steep_threshold = 0.0)
+{
+   // Get current and previous EMA values
+   double emaCurrent = GetEMAValue(tf, ema_period, 0);
+   double emaPrev1 = GetEMAValue(tf, ema_period, 1);
+   double emaPrev2 = GetEMAValue(tf, ema_period, 2);
+
+   if(emaCurrent <= 0 || emaPrev1 <= 0 || emaPrev2 <= 0)
+      return SLOPE_FLAT;
+
+   // Calculate slope as change in EMA over 2 bars (in points)
+   double slopeChange = (emaCurrent - emaPrev2) / _Point;
+
+   // Auto-calculate steep threshold if not provided (use 2x ATR as reference)
+   if(steep_threshold == 0.0)
+   {
+      double atr = GetATRValue(14, tf);
+      steep_threshold = atr * 2.0;  // Steep = 2x ATR change over 2 bars
+   }
+
+   // Determine slope direction
+   if(slopeChange > steep_threshold)
+      return SLOPE_UP;       // Strong upward slope
+   else if(slopeChange > steep_threshold * 0.3)
+      return SLOPE_UP;       // Moderate upward slope
+   else if(slopeChange < -steep_threshold)
+      return SLOPE_CRASH;    // Steep downward (falling knife)
+   else if(slopeChange < -steep_threshold * 0.3)
+      return SLOPE_DOWN;     // Moderate downward slope
+   else
+      return SLOPE_FLAT;     // Flat/sideways
+}
+
+//+------------------------------------------------------------------+
+//| Get Trend Matrix (Sniper Update)                                  |
+//| Multi-timeframe trend analysis for H4, H1, M15                    |
+//| Uses configurable EMA periods for each TF                         |
+//| Returns: TrendMatrix structure with alignment score               |
+//+------------------------------------------------------------------+
+TrendMatrix CSignalEngine::GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 200,
+                                          int h1_fast_ema = 100, int h1_slow_ema = 200,
+                                          int m15_fast_ema = 20, int m15_slow_ema = 50)
+{
+   TrendMatrix result;
+   result.h4 = TREND_FLAT;
+   result.h1 = TREND_FLAT;
+   result.m15 = TREND_FLAT;
+   result.score = 0;
+   result.description = "No Data";
+   result.displayColor = clrGray;
+
+   // Get EMA values for H4 (Strategic bias)
+   double h4_fast = GetEMAValue(PERIOD_H4, h4_fast_ema, 0);
+   double h4_slow = GetEMAValue(PERIOD_H4, h4_slow_ema, 0);
+
+   // Get EMA values for H1 (Tactical trend)
+   double h1_fast = GetEMAValue(PERIOD_H1, h1_fast_ema, 0);
+   double h1_slow = GetEMAValue(PERIOD_H1, h1_slow_ema, 0);
+
+   // Get EMA values for M15 (Entry setup)
+   double m15_fast = GetEMAValue(PERIOD_M15, m15_fast_ema, 0);
+   double m15_slow = GetEMAValue(PERIOD_M15, m15_slow_ema, 0);
+
+   // Determine trend for each timeframe
+   if(h4_fast > h4_slow) { result.h4 = TREND_UP; result.score++; }
+   else if(h4_fast < h4_slow) { result.h4 = TREND_DOWN; result.score--; }
+
+   if(h1_fast > h1_slow) { result.h1 = TREND_UP; result.score++; }
+   else if(h1_fast < h1_slow) { result.h1 = TREND_DOWN; result.score--; }
+
+   if(m15_fast > m15_slow) { result.m15 = TREND_UP; result.score++; }
+   else if(m15_fast < m15_slow) { result.m15 = TREND_DOWN; result.score--; }
+
+   // Generate description and color based on alignment score
+   int absScore = MathAbs(result.score);
+
+   if(absScore == 3)
+   {
+      result.description = (result.score > 0) ? "STRONG UPTREND" : "STRONG DOWNTREND";
+      result.displayColor = (result.score > 0) ? clrLime : clrRed;
+   }
+   else if(absScore == 2)
+   {
+      result.description = (result.score > 0) ? "UPTREND" : "DOWNTREND";
+      result.displayColor = (result.score > 0) ? clrMediumSeaGreen : clrOrangeRed;
+   }
+   else if(absScore == 1)
+   {
+      result.description = (result.score > 0) ? "WEAK UPTREND" : "WEAK DOWNTREND";
+      result.displayColor = (result.score > 0) ? clrYellowGreen : clrLightSalmon;
+   }
+   else
+   {
+      // Mixed signals - check for divergence
+      if(result.h4 == TREND_UP && result.m15 == TREND_DOWN)
+         result.description = "PULLBACK (Bull)";
+      else if(result.h4 == TREND_DOWN && result.m15 == TREND_UP)
+         result.description = "PULLBACK (Bear)";
+      else
+         result.description = "MIXED";
+      result.displayColor = clrGray;
+   }
+
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| Get Market State (Sniper Update)                                  |
+//| Determine if market is TRENDING, RANGING, or CHOPPY based on ADX  |
+//| Parameters:                                                       |
+//|   adx_trend_min - Minimum ADX for trending market (default 25)    |
+//|   adx_range_max - Maximum ADX for ranging market (default 20)     |
+//| Returns: STATE_TRENDING, STATE_RANGING, or STATE_CHOPPY          |
+//+------------------------------------------------------------------+
+ENUM_MARKET_STATE CSignalEngine::GetMarketState(double adx_trend_min = 25.0, double adx_range_max = 20.0)
+{
+   double adx = GetADXValue(PERIOD_H1);  // Use H1 ADX for market state
+
+   if(adx >= adx_trend_min)
+      return STATE_TRENDING;
+   else if(adx <= adx_range_max)
+      return STATE_RANGING;
+   else
+      return STATE_CHOPPY;  // Transition zone
+}
+
+//+------------------------------------------------------------------+
+//| Is Near Structural Level (Sniper Update)                          |
+//| Check if price is near a known structural level (zone)            |
+//| Parameters:                                                       |
+//|   price - Price to check                                         |
+//|   tolerance_points - Distance tolerance in points (default 50)    |
+//| Returns: true if price is within tolerance of a zone             |
+//+------------------------------------------------------------------+
+bool CSignalEngine::IsNearStructuralLevel(double price, double tolerance_points = 50.0)
+{
+   // Check all zone levels
+   double zones[4];
+   zones[0] = GetZoneLevel(ZONE_BUY1);
+   zones[1] = GetZoneLevel(ZONE_BUY2);
+   zones[2] = GetZoneLevel(ZONE_SELL1);
+   zones[3] = GetZoneLevel(ZONE_SELL2);
+
+   double tolerance = tolerance_points * _Point;
+
+   for(int i = 0; i < 4; i++)
+   {
+      if(MathAbs(price - zones[i]) <= tolerance)
+         return true;
+   }
+
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Get Market Context (Sniper Update)                                |
+//| Get complete market intelligence in a single call                 |
+//| Returns: MarketContext structure with all market data            |
+//+------------------------------------------------------------------+
+MarketContext CSignalEngine::GetMarketContext()
+{
+   MarketContext ctx;
+
+   // ATR values (volatility)
+   ctx.atrM15 = GetATRValue(14, PERIOD_M15);
+   ctx.atrM5 = GetATRValue(14, PERIOD_M5);
+
+   // EMA Slope (momentum)
+   ctx.slopeH1 = GetEMASlope(PERIOD_H1, 20, 0.0);
+
+   // Trend Matrix (multi-TF alignment)
+   ctx.trendMatrix = GetTrendMatrix(100, 200, 100, 200, 20, 50);
+
+   // Market State (ADX-based)
+   ctx.marketState = GetMarketState(25.0, 20.0);
+   ctx.adxValue = GetADXValue(PERIOD_H1);
+
+   // Structure (distance to nearest zone)
+   double zones[4];
+   zones[0] = GetZoneLevel(ZONE_BUY1);
+   zones[1] = GetZoneLevel(ZONE_BUY2);
+   zones[2] = GetZoneLevel(ZONE_SELL1);
+   zones[3] = GetZoneLevel(ZONE_SELL2);
+
+   double minDistance = DBL_MAX;
+   for(int i = 0; i < 4; i++)
+   {
+      double dist = MathAbs(m_current_price - zones[i]) / _Point;
+      if(dist < minDistance)
+         minDistance = dist;
+   }
+   ctx.distanceToNearestZone = minDistance;
+   ctx.nearStructuralLevel = (minDistance <= 50.0);  // 50 points default tolerance
+
+   return ctx;
+}
+
+//+====================================================================+
+//| SNIPER UPDATE: Sprint 2 - Sniper Filter Functions                 |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Get Sniper Signal (Sniper Filter)                                 |
+//| M15-based filtered signals with 3-filter stack for high-quality  |
+//| entries. Used for auto-trading decisions.                        |
+//|                                                                   |
+//| Filter Stack:                                                     |
+//|   1. Pullback: Price must be at value (near M15 EMA)             |
+//|   2. Volume: Signal candle body > ATR(14) * multiplier           |
+//|   3. Structure: Price must touch/wick a known structural level   |
+//|                                                                   |
+//| Returns: SIGNAL_PA_BUY, SIGNAL_PA_SELL, or SIGNAL_NONE            |
+//+------------------------------------------------------------------+
+ENUM_SIGNAL_TYPE CSignalEngine::GetSniperSignal(bool debug_mode = false,
+                                               double atr_multiplier = 1.0,
+                                               double zone_tolerance = 50.0)
+{
+   //--- Get market context data
+   double atrM15 = GetATRValue(14, PERIOD_M15);
+   double ema20 = GetEMAValue(PERIOD_M15, 20, 0);  // M15 EMA 20 for pullback check
+   double currentPrice = m_current_price;
+
+   //--- Check M15 Price Action signals (shift 1 = previous completed candle)
+   bool isHammer = IsHammer(1, PERIOD_M15);
+   bool isShootingStar = IsShootingStar(1, PERIOD_M15);
+   bool isEngulfing = IsEngulfing(1, PERIOD_M15);
+
+   //--- Determine signal direction from PA patterns
+   ENUM_SIGNAL_TYPE rawSignal = SIGNAL_NONE;
+   double signalOpen = iOpen(_Symbol, PERIOD_M15, 1);
+   double signalClose = iClose(_Symbol, PERIOD_M15, 1);
+   double signalHigh = iHigh(_Symbol, PERIOD_M15, 1);
+   double signalLow = iLow(_Symbol, PERIOD_M15, 1);
+
+   if(isHammer)
+      rawSignal = SIGNAL_PA_BUY;
+   else if(isShootingStar)
+      rawSignal = SIGNAL_PA_SELL;
+   else if(isEngulfing)
+      rawSignal = (signalClose > signalOpen) ? SIGNAL_PA_BUY : SIGNAL_PA_SELL;
+
+   //--- No raw signal found
+   if(rawSignal == SIGNAL_NONE)
+   {
+      if(debug_mode)
+         Print("[Sniper Filter] REJECTED: No M15 PA pattern detected");
+      return SIGNAL_NONE;
+   }
+
+   //====================================================================
+   // FILTER 1: PULLBACK CHECK (Price at Value)
+   // Buy: Price should be below or near EMA (discounted)
+   // Sell: Price should be above or near EMA (extended)
+   //====================================================================
+   double emaDistance = (currentPrice - ema20) / _Point;  // Points from EMA
+
+   bool pullbackOK = false;
+   if(rawSignal == SIGNAL_PA_BUY)
+   {
+      // For buy: Price should be at or below EMA (buying the dip)
+      // Allow small tolerance of ATR * 0.5 above EMA
+      pullbackOK = (emaDistance <= atrM15 * 0.5);
+
+      if(debug_mode && !pullbackOK)
+         Print(StringFormat("[Sniper Filter] REJECTED (Buy): Price %d pts ABOVE EMA (not at value)",
+                          (int)emaDistance));
+   }
+   else if(rawSignal == SIGNAL_PA_SELL)
+   {
+      // For sell: Price should be at or above EMA (selling the rally)
+      // Allow small tolerance of ATR * 0.5 below EMA
+      pullbackOK = (emaDistance >= -atrM15 * 0.5);
+
+      if(debug_mode && !pullbackOK)
+         Print(StringFormat("[Sniper Filter] REJECTED (Sell): Price %d pts BELOW EMA (not at value)",
+                          (int)MathAbs(emaDistance)));
+   }
+
+   if(!pullbackOK)
+      return SIGNAL_NONE;
+
+   //====================================================================
+   // FILTER 2: VOLUME/MOMENTUM CHECK (Strong Move)
+   // Signal candle body must be significant compared to ATR
+   //====================================================================
+   double candleBody = MathAbs(signalClose - signalOpen) / _Point;  // Body in points
+   double candleRange = (signalHigh - signalLow) / _Point;          // Full range in points
+
+   // Use the larger of body or range for momentum check
+   double candleStrength = MathMax(candleBody, candleRange);
+   double requiredStrength = atrM15 * atr_multiplier;
+
+   bool volumeOK = (candleStrength >= requiredStrength);
+
+   if(debug_mode && !volumeOK)
+      Print(StringFormat("[Sniper Filter] REJECTED: Candle strength %.0f pts < ATR*%.1f (%.0f pts)",
+                       candleStrength, atr_multiplier, requiredStrength));
+
+   if(!volumeOK)
+      return SIGNAL_NONE;
+
+   //====================================================================
+   // FILTER 3: STRUCTURAL ANCHOR CHECK (High-Probability Location)
+   // Signal must occur near a known structural level (zone)
+   // Check: signal candle's high/low touched a zone
+   //====================================================================
+   bool nearZone = false;
+
+   // Check if signal candle touched any zone
+   if(rawSignal == SIGNAL_PA_BUY)
+   {
+      // For buy: check if the LOW (wick) touched a buy zone or support
+      // OR if the signal candle closed near a buy zone
+      double buyZone1 = GetZoneLevel(ZONE_BUY1);
+      double buyZone2 = GetZoneLevel(ZONE_BUY2);
+
+      double tolerance = zone_tolerance * _Point;
+
+      // Check if signal low touched a buy zone
+      bool touchedBuy1 = (MathAbs(signalLow - buyZone1) <= tolerance);
+      bool touchedBuy2 = (MathAbs(signalLow - buyZone2) <= tolerance);
+      bool closedNearBuy1 = (MathAbs(signalClose - buyZone1) <= tolerance);
+      bool closedNearBuy2 = (MathAbs(signalClose - buyZone2) <= tolerance);
+
+      nearZone = (touchedBuy1 || touchedBuy2 || closedNearBuy1 || closedNearBuy2);
+   }
+   else if(rawSignal == SIGNAL_PA_SELL)
+   {
+      // For sell: check if the HIGH (wick) touched a sell zone or resistance
+      // OR if the signal candle closed near a sell zone
+      double sellZone1 = GetZoneLevel(ZONE_SELL1);
+      double sellZone2 = GetZoneLevel(ZONE_SELL2);
+
+      double tolerance = zone_tolerance * _Point;
+
+      // Check if signal high touched a sell zone
+      bool touchedSell1 = (MathAbs(signalHigh - sellZone1) <= tolerance);
+      bool touchedSell2 = (MathAbs(signalHigh - sellZone2) <= tolerance);
+      bool closedNearSell1 = (MathAbs(signalClose - sellZone1) <= tolerance);
+      bool closedNearSell2 = (MathAbs(signalClose - sellZone2) <= tolerance);
+
+      nearZone = (touchedSell1 || touchedSell2 || closedNearSell1 || closedNearSell2);
+   }
+
+   if(debug_mode && !nearZone)
+      Print(StringFormat("[Sniper Filter] REJECTED: Signal not within %d pts of structural level",
+                       (int)zone_tolerance));
+
+   if(!nearZone)
+      return SIGNAL_NONE;
+
+   //====================================================================
+   // ALL FILTERS PASSED - RETURN VALID SIGNAL
+   //====================================================================
+   if(debug_mode)
+   {
+      string signalType = (rawSignal == SIGNAL_PA_BUY) ? "BUY" : "SELL";
+      Print(StringFormat("[Sniper Filter] ✓ VALID %s SIGNAL: Pullback=OK, Volume=%.0f pts, Structure=OK",
+                       signalType, candleStrength));
+   }
+
+   return rawSignal;
 }
 
 //+------------------------------------------------------------------+

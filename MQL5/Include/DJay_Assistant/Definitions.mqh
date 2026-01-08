@@ -121,3 +121,98 @@ struct TradeRequest
 };
 
 //+------------------------------------------------------------------+
+//| Market State Enumeration (Sniper Update)                          |
+//+------------------------------------------------------------------+
+enum ENUM_MARKET_STATE
+{
+    STATE_TRENDING,    // Trending market (ADX > threshold)
+    STATE_RANGING,     // Ranging market (ADX < threshold)
+    STATE_CHOPPY       // Choppy/transition zone
+};
+
+//+------------------------------------------------------------------+
+//| Momentum Bias Enumeration (Sniper Update)                         |
+//+------------------------------------------------------------------+
+enum ENUM_MOMENTUM_BIAS
+{
+    MOMENTUM_STRONG_UP,    // Strong upward momentum
+    MOMENTUM_STRONG_DOWN,  // Strong downward momentum
+    MOMENTUM_NEUTRAL       // Neutral/sideways momentum
+};
+
+//+------------------------------------------------------------------+
+//| Slope Direction Enumeration (Sniper Update)                       |
+//+------------------------------------------------------------------+
+enum ENUM_SLOPE_DIRECTION
+{
+    SLOPE_FLAT,       // Flat slope (no significant direction)
+    SLOPE_UP,         // Moderate upward slope
+    SLOPE_DOWN,       // Moderate downward slope
+    SLOPE_CRASH       // Steep downward slope (falling knife)
+};
+
+//+------------------------------------------------------------------+
+//| Trend Matrix Structure (Sniper Update)                            |
+//| Multi-timeframe trend alignment for H4, H1, M15                    |
+//+------------------------------------------------------------------+
+struct TrendMatrix
+{
+    ENUM_TREND_DIRECTION h4;      // H4 trend (strategic bias)
+    ENUM_TREND_DIRECTION h1;      // H1 trend (tactical trend)
+    ENUM_TREND_DIRECTION m15;     // M15 trend (entry setup)
+    int score;                    // Alignment score (-3 to +3)
+    string description;           // Human-readable description
+    color displayColor;           // Color for dashboard display
+
+    // Constructor
+    void TrendMatrix()
+    {
+        h4 = TREND_FLAT;
+        h1 = TREND_FLAT;
+        m15 = TREND_FLAT;
+        score = 0;
+        description = "No Data";
+        displayColor = clrGray;
+    }
+};
+
+//+------------------------------------------------------------------+
+//| Market Context Structure (Sniper Update)                          |
+//| Complete market intelligence for decision support                 |
+//+------------------------------------------------------------------+
+struct MarketContext
+{
+    // Volatility
+    double atrM15;                  // ATR(14) value on M15 in points
+    double atrM5;                   // ATR(14) value on M5 in points
+
+    // Momentum
+    ENUM_SLOPE_DIRECTION slopeH1;   // H1 EMA slope direction
+    double slopeValue;              // Raw slope value (for debugging)
+
+    // Trend Alignment
+    TrendMatrix trendMatrix;        // Multi-TF trend analysis
+
+    // Market State
+    ENUM_MARKET_STATE marketState;  // TRENDING, RANGING, or CHOPPY
+    double adxValue;                // Raw ADX value
+
+    // Structure
+    double distanceToNearestZone;   // Distance to nearest structural level (points)
+    bool nearStructuralLevel;       // True if price near zone
+
+    // Constructor
+    void MarketContext()
+    {
+        atrM15 = 0.0;
+        atrM5 = 0.0;
+        slopeH1 = SLOPE_FLAT;
+        slopeValue = 0.0;
+        marketState = STATE_CHOPPY;
+        adxValue = 0.0;
+        distanceToNearestZone = 0.0;
+        nearStructuralLevel = false;
+    }
+};
+
+//+------------------------------------------------------------------+

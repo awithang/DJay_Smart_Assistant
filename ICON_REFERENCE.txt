@@ -1,0 +1,41 @@
+=== UNICODE ICONS - QUICK REFERENCE ===
+
+SETTINGS BUTTON (Gear icon):
+  CreateButton("BtnSettings", x, y, 20, 20, "⚙", clrGray, clrWhite, 12);
+
+REPORTS BUTTON (Clipboard icon):
+  CreateButton("BtnReports", x, y, 20, 20, "📋", clrGray, clrWhite, 12);
+
+STATISTICS BUTTON:
+  CreateButton("BtnStats", x, y, 20, 20, "📊", clrGray, clrWhite, 12);
+
+=== COMMON ICONS ===
+⚙ = Settings / Properties
+📋 = Clipboard / Reports
+📊 = Statistics / Charts
+📈 = Graph / Analytics
+💾 = Save
+🔄 = Refresh
+▶️ = Start / Play
+⏸ = Stop / Pause
+✓ = Checkmark / OK
+
+=== USAGE NOTES ===
+- Just copy emoji directly into button text
+- No extra code needed
+- Size parameter: 20x20 is standard for icon buttons
+- Font size: 10-12 works well for emojis
+- Adjust clrGray to m_buy_color for active state
+
+=== EXAMPLE: TWO ICON BUTTONS ===
+int iconSize = 20;
+int iconGap = 5;
+
+// Settings icon (gear)
+CreateButton("BtnSettings", right_x + half_width - 50, y, iconSize, iconSize, "⚙", clrGray, clrWhite, 12);
+
+// Reports icon (clipboard) - positioned to the left
+CreateButton("BtnReports", right_x + half_width - 50 - iconSize - iconGap, y, iconSize, iconSize, "📋", clrGray, clrWhite, 12);
+
+=== TO IMPLEMENT ===
+Just tell Claude: "Check ICON_REFERENCE.txt and add icon buttons to header"
