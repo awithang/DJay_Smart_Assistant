@@ -153,6 +153,13 @@ public:
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
    bool IsStratQSClicked(string sparam) { return (sparam == m_prefix+"BtnStratQS"); }
 
+   //--- Test Button Click Handlers (Sprint 6) - Hybrid Mode Testing
+   bool IsTestStateClicked(string sparam)    { return (sparam == m_prefix+"BtnTestState"); }
+   bool IsTestSignalClicked(string sparam)   { return (sparam == m_prefix+"BtnTestSignal"); }
+   bool IsTestFiltersClicked(string sparam)  { return (sparam == m_prefix+"BtnTestFilters"); }
+   bool IsTestTradeClicked(string sparam)    { return (sparam == m_prefix+"BtnTestTrade"); }
+   bool IsTestLotsClicked(string sparam)     { return (sparam == m_prefix+"BtnTestLots"); }
+
    bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
    bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
 
@@ -618,6 +625,26 @@ void CDashboardPanel::CreatePanel()
                         CreateLabel("L_QS_Label", right_x + 10, right_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
                         CreateLabel("QS_Status_Dot", right_x + 85, right_y, "●", clrGray, 10);
                         CreateButton("BtnStratQS", right_x + 100, right_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
+
+                        // === TEST HELPERS SECTION (Sprint 6) ===
+                        right_y += 30;
+                        CreateLabel("L_Test_Label", right_x + 10, right_y, "TEST TOOLS:", m_header_color, 9, "Arial Bold");
+
+                        // Test button row 1
+                        right_y += 20;
+                        CreateButton("BtnTestState", right_x + 10, right_y, 70, 18, "STATE", C'40,60,80', clrWhite, 7);
+                        CreateButton("BtnTestSignal", right_x + 85, right_y, 70, 18, "SIGNAL", C'40,60,80', clrWhite, 7);
+
+                        // Test button row 2
+                        right_y += 22;
+                        CreateButton("BtnTestFilters", right_x + 10, right_y, 70, 18, "FILTERS", C'40,60,80', clrWhite, 7);
+                        CreateButton("BtnTestTrade", right_x + 85, right_y, 70, 18, "TRADE", C'40,60,80', clrWhite, 7);
+
+                        // Test button row 3
+                        right_y += 22;
+                        CreateButton("BtnTestLots", right_x + 10, right_y, 145, 18, "LOT CALC", C'40,60,80', clrWhite, 7);
+
+                        right_y += 25;
 
 
 

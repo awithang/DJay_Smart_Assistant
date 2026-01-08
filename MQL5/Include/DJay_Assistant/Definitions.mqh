@@ -181,7 +181,8 @@ enum ENUM_SLOPE_DIRECTION
     SLOPE_FLAT,       // Flat slope (no significant direction)
     SLOPE_UP,         // Moderate upward slope
     SLOPE_DOWN,       // Moderate downward slope
-    SLOPE_CRASH       // Steep downward slope (falling knife)
+    SLOPE_CRASH,      // Steep downward slope (falling knife)
+    SLOPE_ROCKET      // Steep upward slope (rocket - blocks sell signals)
 };
 
 //+------------------------------------------------------------------+
