@@ -165,7 +165,7 @@ public:
    bool IsBuyButtonClicked(string sparam)  { return (sparam == m_prefix+"BtnBuy"); }
    bool IsSellButtonClicked(string sparam) { return (sparam == m_prefix+"BtnSell"); }
    
-   void Destroy() { ObjectsDeleteAll(m_chart_id, "EA_"); ChartRedraw(m_chart_id); }
+   void Destroy() { ObjectsDeleteAll(m_chart_id, m_prefix); ObjectsDeleteAll(m_chart_id, "EA_"); ChartRedraw(m_chart_id); }
 };
 
 CDashboardPanel::CDashboardPanel()
@@ -303,7 +303,7 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Slope_T", col2_x, row5_y, "Slope H1:", clrGray, 8);
    CreateLabel("Slope_V", col2_x + 45, row5_y, "FLAT", clrGray, 7);
-   CreateLabel("Slope_Warn", col2_x, row6_y, "", clrRed, 7, "Arial Bold");
+   CreateLabel("Slope_Warn", col2_x, row6_y, " ", clrRed, 7, "Arial Bold");
 
    // --- COLUMN 3: RISK ---
    CreateLabel("Risk_T", col3_x, row1_y, "RISK", C'100,200,255', 8, "Arial Bold");
@@ -1855,7 +1855,7 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
    }
    else
    {
-      SetText("Slope_Warn", "");
+      SetText("Slope_Warn", " "); // Clear text (Space to avoid 'Label' artifact)
    }
 
    //===========================================================
@@ -1866,24 +1866,24 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
    string atrText = (ctx.atrM15 > 0) ? StringFormat("%.0f", ctx.atrM15) : "--";
    SetText("ATR_V", atrText + " pts");
 
-   // 2. EMA Distance (calculated from slope value)
-   string distText = (ctx.slopeValue != 0) ? StringFormat("%.0f", ctx.slopeValue) : "--";
+   // 2. EMA Distance (Price vs H1 EMA 20)
+   string distText = (ctx.emaDistance != 0) ? StringFormat("%.0f", ctx.emaDistance) : "0";
    color distColor = clrGray;
-   if(ctx.slopeValue > 200)
-      distColor = m_sell_color;  // Price extended above EMA
-   else if(ctx.slopeValue < -200)
-      distColor = m_buy_color;   // Price extended below EMA
+   
+   // High extension warning (> 200 pts)
+   if(ctx.emaDistance > 200) distColor = m_sell_color;      // Extended Up (Pullback likely)
+   else if(ctx.emaDistance < -200) distColor = m_buy_color; // Extended Down (Pullback likely)
 
    SetText("Dist_V", distText + " pts");
    SetColor("Dist_V", distColor);
 
-   // 3. Space to Run (distance to nearest opposite zone)
-   // For now, use distance to nearest zone as a proxy
-   string spaceText = (ctx.distanceToNearestZone > 0) ? StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
+   // 3. Space to Run (Distance to next target)
+   string spaceText = (ctx.spaceToTarget > 0) ? StringFormat("%.0f", ctx.spaceToTarget) : "--";
    SetText("Space_V", spaceText + " pts");
 
-   // 4. Structure Distance
-   string structText = (ctx.distanceToNearestZone > 0) ? StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
+   // 4. Structure Distance (Distance to nearest zone)
+   string structText = (ctx.distanceToNearestZone > 0 && ctx.distanceToNearestZone < 1000000) ? 
+                       StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
    color structColor = ctx.nearStructuralLevel ? clrLime : clrGray;
    SetText("Struct_V", structText + " pts");
    SetColor("Struct_V", structColor);

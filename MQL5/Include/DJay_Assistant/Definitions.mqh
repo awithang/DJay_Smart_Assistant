@@ -53,6 +53,25 @@ enum ENUM_TREND_DIRECTION
 };
 
 //+------------------------------------------------------------------+
+//| Trend Bias Enumeration (Hybrid Mode)                              |
+//+------------------------------------------------------------------+
+enum ENUM_TREND_BIAS
+{
+    TREND_BIAS_BULLISH,
+    TREND_BIAS_BEARISH,
+    TREND_BIAS_NEUTRAL
+};
+
+//+------------------------------------------------------------------+
+//| Lot Size Calculation Mode (Hybrid Mode)                           |
+//+------------------------------------------------------------------+
+enum ENUM_LOT_SIZE_MODE
+{
+    LOT_MODE_RISK_PERCENT,     // Calculate lots based on risk % of account
+    LOT_MODE_FIXED_LOTS        // Use fixed lot size (manual)
+};
+
+//+------------------------------------------------------------------+
 //| Zone Type Enumeration                                           |
 //+------------------------------------------------------------------+
 enum ENUM_ZONE_TYPE
@@ -189,6 +208,7 @@ struct MarketContext
     // Momentum
     ENUM_SLOPE_DIRECTION slopeH1;   // H1 EMA slope direction
     double slopeValue;              // Raw slope value (for debugging)
+    double emaDistance;             // Distance from Price to H1 EMA 20 (points)
 
     // Trend Alignment
     TrendMatrix trendMatrix;        // Multi-TF trend analysis
@@ -199,6 +219,7 @@ struct MarketContext
 
     // Structure
     double distanceToNearestZone;   // Distance to nearest structural level (points)
+    double spaceToTarget;           // Distance to next logical target (points)
     bool nearStructuralLevel;       // True if price near zone
 
     // Constructor
@@ -208,9 +229,11 @@ struct MarketContext
         atrM5 = 0.0;
         slopeH1 = SLOPE_FLAT;
         slopeValue = 0.0;
+        emaDistance = 0.0;
         marketState = STATE_CHOPPY;
         adxValue = 0.0;
         distanceToNearestZone = 0.0;
+        spaceToTarget = 0.0;
         nearStructuralLevel = false;
     }
 };

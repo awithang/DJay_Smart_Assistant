@@ -21,16 +21,21 @@ input int    Input_Zone_Offset1 = 300;      // Zone 1 offset (points)
 input int    Input_Zone_Offset2 = 1000;     // Zone 2 offset (points)
 input int    Input_MagicNumber = 123456;    // Unique ID for EA trades
 
-//--- Quick Scalp Settings
-input group "=== Quick Scalp Settings ==="
-input bool   Input_QuickScalp_Mode       = true;   // Enable Quick Scalp mode (default: ON)
-input int    Input_QS_RSI_Buy_Level      = 40;     // RSI < this for BUY signals
-input int    Input_QS_RSI_Sell_Level     = 60;     // RSI > this for SELL signals
-input int    Input_QS_Stoch_Buy_Level    = 20;     // Stochastic K < this for BUY
-input int    Input_QS_Stoch_Sell_Level   = 80;     // Stochastic K > this for SELL
-input int    Input_QS_ADX_Minimum        = 20;     // ADX minimum for scalping (filter choppy markets)
-input int    Input_QS_TP_Points          = 350;    // Take Profit in POINTS (35 pips)
-input int    Input_QS_SL_Points          = 200;    // Stop Loss in POINTS (20 pips)
+//--- M15/M5 Hybrid Scalp Settings (Replaces Quick Scalp)
+input group "=== M15/M5 Hybrid Scalp ==="
+input bool   Input_Enable_Hybrid_Mode    = false;  // Enable Hybrid Mode (M15 Context + M5 Entry)
+input int    Input_Hybrid_TP_Points      = 100;    // Take Profit (points) - Quick scalp target
+input int    Input_Hybrid_SL_Points      = 150;    // Stop Loss (points) - Tight risk
+input double Input_Hybrid_EMA_MaxDist    = 0.5;    // Max EMA distance (ATR multiplier for pullback)
+input bool   Input_Hybrid_UseTrendFilter = true;   // Require M15 trend alignment (strict)
+input int    Input_Hybrid_MinATR         = 50;     // Minimum M15 ATR (volatility filter)
+input bool   Input_Hybrid_Debug_Mode     = false;  // Enable debug logging (development)
+input double Input_Hybrid_Trend_MinScore = 2.0;    // Minimum trend score (2=2/3 TFs aligned)
+
+//--- Lot Size Calculation Mode
+input ENUM_LOT_SIZE_MODE Input_Hybrid_Lot_Mode    = LOT_MODE_RISK_PERCENT;  // Lot size: Risk% or Fixed
+input double             Input_Hybrid_Fixed_Lots  = 0.01;                   // Fixed lot size (when Mode=Fixed)
+input double             Input_Hybrid_Risk_Percent = 1.0;                   // Risk % (when Mode=Risk%)
 
 //--- RR Ratio Settings (NEW)
 input ENUM_RR_RATIO Input_Default_RR = RR_1_TO_2;  // Default RR Ratio
@@ -94,8 +99,10 @@ bool g_strat_arrow;
 bool g_strat_rev;
 bool g_strat_break;
 
-//--- Quick Scalp Mode State
-bool g_quick_scalp_mode;
+//--- M15/M5 Hybrid Mode State (Replaces Quick Scalp)
+bool g_hybrid_mode_enabled;          // Track if Hybrid Mode is active
+bool g_hybrid_context_ready;         // M15 context allows trading
+ENUM_TREND_BIAS g_hybrid_bias;       // Current bias: BULLISH/BEARISH/NEUTRAL
 
 //--- Strategy Entry State (for Manual Execution buttons)
 EntryPoint g_last_rev_entry;
@@ -132,8 +139,10 @@ int OnInit()
    g_strat_rev = Input_Auto_Reversal;
    g_strat_break = Input_Auto_Breakout;
 
-   // Init Quick Scalp Mode
-   g_quick_scalp_mode = Input_QuickScalp_Mode;
+   // Init M15/M5 Hybrid Mode
+   g_hybrid_mode_enabled = Input_Enable_Hybrid_Mode;
+   if(g_hybrid_mode_enabled)
+      Print("HYBRID MODE: ENABLED - M15 Context + M5 Entry");
 
    // Init Sniper Mode
    g_sniper_mode_enabled = Input_Enable_Sniper_Mode;
@@ -145,7 +154,7 @@ int OnInit()
    dashboardPanel.Init(0, Input_RiskPercent, Input_ProfitLock_Trigger_Pts, Input_ProfitLock_Amount_Pts, Input_ProfitLock_Step_Pts);
    dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
-   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
+   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
 
    // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
@@ -380,64 +389,6 @@ void OnTick()
             }
          }
 
-         // --- 5. Quick Scalp Mode (Middle Zone Trading) - DISABLED when Sniper Mode is ON ---
-         if(g_quick_scalp_mode && !g_sniper_mode_enabled)
-         {
-            // Only trade in middle zone
-            ENUM_ZONE_STATUS zone = signalEngine.GetCurrentZoneStatus();
-
-            if(zone == ZONE_STATUS_NONE)
-            {
-               // Get H1 trend direction
-               ENUM_TREND_DIRECTION h1Trend = signalEngine.GetTrendDirection(PERIOD_H1);
-
-               // Get filter values
-               double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
-               double stochK = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
-
-               // ADX Filter: Skip choppy markets
-               double adx = signalEngine.GetADXValue(PERIOD_M5);
-               bool adxOK = (adx >= Input_QS_ADX_Minimum);
-
-               // BUY SIGNAL CHECK (OR logic for momentum indicators)
-               // PA signal + Trend filter + ADX filter + (RSI OR Stochastic oversold)
-               bool momentumSignal = (rsiVal > 0 && rsiVal < Input_QS_RSI_Buy_Level) ||
-                                     (stochK > 0 && stochK < Input_QS_Stoch_Buy_Level);
-
-               if(paSignal == SIGNAL_PA_BUY
-                  && h1Trend != TREND_DOWN
-                  && adxOK
-                  && momentumSignal)
-               {
-                  // Create Quick Scalp arrow (Lime, code 241)
-                  double prevLow = iLow(_Symbol, PERIOD_M5, 1);
-                  CreateSignalArrow(currentBarTime, prevLow - 50*_Point, 241, clrLime, "QS_Buy");
-
-                  // AUTO MODE execution
-                  if(g_tradingMode == MODE_AUTO)
-                     ExecuteQuickScalpTrade(ORDER_TYPE_BUY, Input_QS_TP_Points, Input_QS_SL_Points);
-               }
-
-               // SELL SIGNAL CHECK (OR logic for momentum indicators)
-               // PA signal + Trend filter + ADX filter + (RSI OR Stochastic overbought)
-               else if(paSignal == SIGNAL_PA_SELL
-                  && h1Trend != TREND_UP
-                  && adxOK
-                  && ((rsiVal > 0 && rsiVal > Input_QS_RSI_Sell_Level) ||
-                      (stochK > 0 && stochK > Input_QS_Stoch_Sell_Level)))
-               {
-                  // Create Quick Scalp arrow (Red, code 242)
-                  double prevHigh = iHigh(_Symbol, PERIOD_M5, 1);
-                  CreateSignalArrow(currentBarTime, prevHigh + 50*_Point, 242, clrRed, "QS_Sell");
-
-                  // AUTO MODE execution
-                  if(g_tradingMode == MODE_AUTO)
-                     ExecuteQuickScalpTrade(ORDER_TYPE_SELL, Input_QS_TP_Points, Input_QS_SL_Points);
-               }
-            }
-         }
-      }
-
       lastBarTime = currentBarTime;
    }
 }
@@ -548,22 +499,23 @@ void OnTimer()
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
-   // 3e-1. Quick Scalp Smart State (Auto-Switch Visual Feedback)
-   if(g_quick_scalp_mode)
+   // 3e-1. Hybrid Mode Smart State (Context-aware Visual Feedback) - Phase 2.5+
+   if(g_hybrid_mode_enabled)
    {
-      double adx = signalEngine.GetADXValue(PERIOD_M5);
-      dashboardPanel.UpdateQuickScalpSmartState(true, zoneStatus, adx, Input_QS_ADX_Minimum);
-   }
-   else
-   {
-      dashboardPanel.UpdateQuickScalpSmartState(false, ZONE_STATUS_NONE, 0, Input_QS_ADX_Minimum);
+      // TODO Phase 2.5: Calculate M15 context readiness
+      // TrendMatrix tm = signalEngine.GetTrendMatrix();
+      // int trendScore = tm.h4 + tm.h1 + tm.m15;
+      // bool contextReady = (trendScore >= 2 || trendScore <= -2);
+      // ENUM_TREND_BIAS bias = (trendScore >= 2) ? TREND_BIAS_BULLISH :
+      //                         (trendScore <= -2) ? TREND_BIAS_BEARISH : TREND_BIAS_NEUTRAL;
+      // dashboardPanel.UpdateHybridStatus(contextReady, bias);
    }
 
    // 3f. Advisor Message
-   string advisorMessage = signalEngine.GetAdvisorMessage(g_quick_scalp_mode);
+   string advisorMessage = signalEngine.GetAdvisorMessage(g_hybrid_mode_enabled);
    dashboardPanel.UpdateAdvisor(advisorMessage);
 
-   // 3f-1. Advisor Details (Zone, Trend, QS, RSI)
+   // 3f-1. Advisor Details (Zone, Trend, Hybrid, RSI)
    string zoneText, trendText, qsText, rsiText;
 
    // Zone info with distance
@@ -596,8 +548,8 @@ void OnTimer()
    else
       trendText = "H1 Trend: FLAT";
 
-   // Quick Scalp status
-   qsText = g_quick_scalp_mode ? "QS: Active" : "QS: Inactive";
+   // Hybrid Mode status
+   qsText = g_hybrid_mode_enabled ? "HYBRID: Active" : "HYBRID: Inactive";
 
    // RSI and Stochastic values (combined on same row)
    double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
@@ -911,27 +863,27 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(dashboardPanel.IsStratArrowClicked(sparam))
       {
          g_strat_arrow = !g_strat_arrow;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsStratRevClicked(sparam))
       {
          g_strat_rev = !g_strat_rev;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsStratBreakClicked(sparam))
       {
          g_strat_break = !g_strat_break;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       else if(dashboardPanel.IsStratQSClicked(sparam))
       {
-         g_quick_scalp_mode = !g_quick_scalp_mode;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_quick_scalp_mode);
+         g_hybrid_mode_enabled = !g_hybrid_mode_enabled;
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         Print("Quick Scalp Mode: ", g_quick_scalp_mode ? "ENABLED" : "DISABLED");
+         Print("Hybrid Mode: ", g_hybrid_mode_enabled ? "ENABLED" : "DISABLED");
       }
       // Settings Buttons (handled in DashboardPanel - RR, Trailing, and Profit Lock)
       else if(dashboardPanel.IsRR1Clicked(sparam) ||
@@ -1104,50 +1056,6 @@ void ExecuteSellTrade(string strategy="MANUAL")
    else
    {
       Print("Failed to execute Sell trade");
-   }
-}
-
-//+------------------------------------------------------------------+
-//| Execute Quick Scalp Trade (fixed TP/SL, 1:1.75 R:R)               |
-//+------------------------------------------------------------------+
-void ExecuteQuickScalpTrade(ENUM_ORDER_TYPE orderType, int tp_points, int sl_points)
-{
-   // Risk Management Check
-   if(!IsTradingAllowed())
-      return;
-
-   // Calculate entry price
-   double entryPrice = (orderType == ORDER_TYPE_BUY) ?
-                        SymbolInfoDouble(_Symbol, SYMBOL_ASK) :
-                        SymbolInfoDouble(_Symbol, SYMBOL_BID);
-
-   // Calculate TP/SL based on fixed points
-   double point = _Point;
-   double tp = (orderType == ORDER_TYPE_BUY) ? entryPrice + tp_points*point : entryPrice - tp_points*point;
-   double sl = (orderType == ORDER_TYPE_BUY) ? entryPrice - sl_points*point : entryPrice + sl_points*point;
-
-   // Risk Normalization: Scale lot size relative to standard 500-point SL
-   // This ensures QS lot sizes are consistent with other strategies
-   double riskScale = (double)sl_points / 500.0;  // 200/500 = 0.4 (40% of standard risk)
-   double adjustedRisk = dashboardPanel.GetRiskPercent() * riskScale;
-
-   // Execute trade
-   TradeRequest req;
-   req.type = orderType;
-   req.price = entryPrice;
-   req.sl = sl;
-   req.tp = tp;
-   req.risk_percent = adjustedRisk;  // Use normalized risk
-   req.comment = "QS_" + (string)((orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL");
-
-   if(tradeManager.ExecuteOrder(req))
-   {
-      Print("Quick Scalp ", (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL", " executed at ", entryPrice);
-      dashboardPanel.UpdateLastAutoTrade("QS", (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL", entryPrice);
-   }
-   else
-   {
-      Print("Quick Scalp Order Failed");
    }
 }
 
