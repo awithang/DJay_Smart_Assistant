@@ -41,6 +41,7 @@ public:
 
    //--- Order Execution
    bool ExecuteOrder(TradeRequest &req);
+   bool ExecuteOrderWithLot(TradeRequest &req);  // Hybrid Mode: Direct lot size support
    bool ExecuteBuy(double price, double sl, double tp, double lot, string comment);
    bool ExecuteSell(double price, double sl, double tp, double lot, string comment);
    bool ExecutePending(ENUM_ORDER_TYPE type, double price, double sl, double tp, double risk_percent, string comment);
@@ -278,6 +279,103 @@ bool CTradeManager::ExecuteOrder(TradeRequest &req)
    }
 
    Print("Error: Invalid order type.");
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Execute Order with Direct Lot Size Specification                 |
+//|                                                                   |
+//| This function allows specifying lot size directly instead of   |
+//| calculating from risk percentage. Used for fixed lot mode.      |
+//|                                                                   |
+//| Parameters:                                                       |
+//|   req - TradeRequest with lot_size field set (>0)                |
+//|                                                                   |
+//| Returns:                                                          |
+//|   true if order executed successfully                             |
+//|   false if failed                                                 |
+//+------------------------------------------------------------------+
+bool CTradeManager::ExecuteOrderWithLot(TradeRequest &req)
+{
+   // Validate lot size
+   if(req.lot_size <= 0)
+   {
+      Print("ExecuteOrderWithLot: Invalid lot size (", req.lot_size, ")");
+      return false;
+   }
+
+   // Validate and normalize lot size
+   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+
+   if(minLot <= 0 || maxLot <= 0 || lotStep <= 0)
+   {
+      Print("Error: Invalid lot parameters (min: ", minLot, ", max: ", maxLot, ", step: ", lotStep, ")");
+      return false;
+   }
+
+   double lotSize = req.lot_size;
+
+   // Adjust to min/max if needed
+   if(lotSize < minLot)
+   {
+      Print("Warning: Lot size adjusted to minimum (", minLot, ")");
+      lotSize = minLot;
+   }
+   if(lotSize > maxLot)
+   {
+      Print("Warning: Lot size adjusted to maximum (", maxLot, ")");
+      lotSize = maxLot;
+   }
+
+   // Round to lot step
+   lotSize = MathFloor(lotSize / lotStep) * lotStep;
+   lotSize = NormalizeDouble(lotSize, 2);
+
+   // ABSOLUTE SAFETY CAP - Never allow more than 10 lots
+   const double ABSOLUTE_MAX_LOT = 10.0;
+   if(lotSize > ABSOLUTE_MAX_LOT)
+   {
+      Print("CRITICAL: Lot size capped at absolute safety maximum (", ABSOLUTE_MAX_LOT, ") for account safety");
+      lotSize = ABSOLUTE_MAX_LOT;
+   }
+
+   // Free margin validation (P0 fix) - Don't use more than 80% of free margin
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+   double requiredMargin = lotSize * SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_LONG);
+
+   if(requiredMargin > freeMargin * 0.8)
+   {
+      Print("ERROR: Lot size requires too much margin. Required: $", requiredMargin,
+            " Available: $", freeMargin, " Lot size reduced for safety.");
+      // Reduce lot size to fit within 80% margin limit
+      lotSize = (freeMargin * 0.8) / SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_LONG);
+      // Round to lot step
+      lotSize = MathFloor(lotSize / lotStep) * lotStep;
+      // Ensure minimum lot
+      if(lotSize < minLot)
+         lotSize = minLot;
+      Print("Adjusted lot size to: ", lotSize, " lots for margin safety");
+   }
+
+   // Normalize prices
+   double price = NormalizeDouble(req.price, _Digits);
+   double sl = NormalizeDouble(req.sl, _Digits);
+   double tp = NormalizeDouble(req.tp, _Digits);
+   double lot = NormalizeDouble(lotSize, 2);
+
+   // Execute based on order type
+   if(req.type == ORDER_TYPE_BUY)
+   {
+      return ExecuteBuy(price, sl, tp, lot, req.comment);
+   }
+   else if(req.type == ORDER_TYPE_SELL)
+   {
+      return ExecuteSell(price, sl, tp, lot, req.comment);
+   }
+
+   Print("ExecuteOrderWithLot: Invalid order type");
    return false;
 }
 

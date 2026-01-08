@@ -160,7 +160,13 @@ public:
     ENUM_SIGNAL_TYPE GetSniperSignal(bool debug_mode = false,  // M15-based filtered signals
                                      double atr_multiplier = 1.0,      // Volume filter multiplier
                                      double zone_tolerance = 50.0);    // Structure proximity tolerance
-    
+
+    //--- Hybrid Mode: M15 Context + M5 Entry (Sprint 6)
+    ENUM_SIGNAL_TYPE GetHybridSignal(bool debugMode = false,
+                                     double emaMaxDist = 0.5,
+                                     double minTrendScore = 2.0);
+    ENUM_SIGNAL_TYPE GetActiveSignalTF(ENUM_TIMEFRAMES tf);  // Get PA signal for specific timeframe
+
     //--- Strategy Helpers
     bool   IsReversalSetup();
     bool   IsBreakoutSetup();
@@ -1436,6 +1442,16 @@ MarketContext CSignalEngine::GetMarketContext()
    // EMA Slope (momentum)
    ctx.slopeH1 = GetEMASlope(PERIOD_H1, 20, 0.0);
 
+   // Calculate raw slope and distance for dashboard display
+   double ema20 = GetEMAValue(PERIOD_H1, 20, 0);
+   double ema20_prev = GetEMAValue(PERIOD_H1, 20, 2); // 2 bars ago for slope
+   
+   if (ema20 > 0 && ema20_prev > 0)
+      ctx.slopeValue = (ema20 - ema20_prev) / _Point;
+      
+   if (ema20 > 0)
+      ctx.emaDistance = (m_current_price - ema20) / _Point;
+
    // Trend Matrix (multi-TF alignment)
    ctx.trendMatrix = GetTrendMatrix(100, 200, 100, 200, 20, 50);
 
@@ -1457,8 +1473,34 @@ MarketContext CSignalEngine::GetMarketContext()
       if(dist < minDistance)
          minDistance = dist;
    }
-   ctx.distanceToNearestZone = minDistance;
-   ctx.nearStructuralLevel = (minDistance <= 50.0);  // 50 points default tolerance
+   // Calculate Space to Target (Room to Run)
+   double space = 0.0;
+   double minSpace = DBL_MAX;
+   bool targetFound = false;
+
+   if (ctx.trendMatrix.h1 == TREND_UP)
+   {
+      // Find nearest zone ABOVE price
+      for(int i=0; i<4; i++) {
+         if(zones[i] > m_current_price) {
+            double dist = (zones[i] - m_current_price) / _Point;
+            if(dist < minSpace) { minSpace = dist; targetFound = true; }
+         }
+      }
+   }
+   else if (ctx.trendMatrix.h1 == TREND_DOWN)
+   {
+      // Find nearest zone BELOW price
+      for(int i=0; i<4; i++) {
+         if(zones[i] < m_current_price) {
+            double dist = (m_current_price - zones[i]) / _Point;
+            if(dist < minSpace) { minSpace = dist; targetFound = true; }
+         }
+      }
+   }
+   
+   if(targetFound) ctx.spaceToTarget = minSpace;
+   else ctx.spaceToTarget = 0.0; // No target or Flat
 
    return ctx;
 }
@@ -1628,6 +1670,189 @@ ENUM_SIGNAL_TYPE CSignalEngine::GetSniperSignal(bool debug_mode = false,
    }
 
    return rawSignal;
+}
+
+//+====================================================================+
+//| HYBRID MODE: Sprint 6 - M15 Context + M5 Entry                    |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Get Active Signal for Specific Timeframe                           |
+//| Helper function to get PA signal on any timeframe                 |
+//+------------------------------------------------------------------+
+ENUM_SIGNAL_TYPE CSignalEngine::GetActiveSignalTF(ENUM_TIMEFRAMES tf)
+{
+   // Check for Price Action signals on specified timeframe
+   if(IsHammer(1, tf))
+      return SIGNAL_PA_BUY;
+
+   if(IsShootingStar(1, tf))
+      return SIGNAL_PA_SELL;
+
+   if(IsEngulfing(1, tf))
+   {
+      // Determine if bullish or bearish engulfing
+      double currClose = iClose(_Symbol, tf, 1);
+      double currOpen = iOpen(_Symbol, tf, 1);
+      if(currClose > currOpen)
+         return SIGNAL_PA_BUY;
+      else
+         return SIGNAL_PA_SELL;
+   }
+
+   return SIGNAL_NONE;
+}
+
+//+------------------------------------------------------------------+
+//| Get Hybrid Signal (M15 Context + M5 Entry)                        |
+//|                                                                   |
+//| Combines M15 context/permission with M5 entry timing.            |
+//|                                                                   |
+//| Filter Stack:                                                     |
+//|   1. M15 Trend Alignment (H4+H1+M15, min 2/3 agree)              |
+//|   2. M15 Market State (Skip CHOPPY)                              |
+//|   3. M15 Volatility (Minimum ATR check)                           |
+//|   4. M5 PA Trigger (Hammer/Engulfing/Shooting Star)               |
+//|   5. Location Filter (Price near M15 EMA - pullback to value)    |
+//|   6. Direction Alignment (Signal matches M15 bias)                |
+//|   7. Slope Safety (No falling knife for buys, no rocket for sell)|
+//|                                                                   |
+//| Returns:                                                          |
+//|   SIGNAL_PA_BUY  - Valid buy signal (M15 bullish + M5 trigger)    |
+//|   SIGNAL_PA_SELL - Valid sell signal (M15 bearish + M5 trigger)   |
+//|   SIGNAL_NONE    - No valid signal                                |
+//+------------------------------------------------------------------+
+ENUM_SIGNAL_TYPE CSignalEngine::GetHybridSignal(bool debugMode,
+                                                double emaMaxDist,
+                                                double minTrendScore)
+{
+   //───────────────────────────────────────
+   // STEP 1: M15 CONTEXT CHECK (Permission)
+   //───────────────────────────────────────
+
+   // 1a. Trend Alignment (H4 + H1 + M15)
+   TrendMatrix tm = GetTrendMatrix();
+   int trendScore = tm.h4 + tm.h1 + tm.m15;  // Range: -3 to +3
+
+   bool bullishContext = (trendScore >= (int)minTrendScore);   // At least 2/3 bullish
+   bool bearishContext = (trendScore <= -(int)minTrendScore);  // At least 2/3 bearish
+
+   if(!bullishContext && !bearishContext)
+   {
+      if(debugMode)
+         Print("HYBRID: No clear trend bias (score=", trendScore, ") - WAIT");
+      return SIGNAL_NONE;
+   }
+
+   // 1b. Market State (Skip CHOPPY markets)
+   ENUM_MARKET_STATE state = GetMarketState();
+   if(state == STATE_CHOPPY)
+   {
+      if(debugMode)
+         Print("HYBRID: Market is CHOPPY - wait");
+      return SIGNAL_NONE;
+   }
+
+   // 1c. Volatility Check (Need minimum movement)
+   double atrM15 = GetATRValue(14, PERIOD_M15);
+   if(atrM15 <= 0)
+   {
+      if(debugMode)
+         Print("HYBRID: Invalid ATR value");
+      return SIGNAL_NONE;
+   }
+
+   //───────────────────────────────────────
+   // STEP 2: M5 ENTRY TRIGGER
+   //───────────────────────────────────────
+
+   ENUM_SIGNAL_TYPE m5Signal = GetActiveSignalTF(PERIOD_M5);
+
+   if(m5Signal == SIGNAL_NONE)
+      return SIGNAL_NONE;
+
+   //───────────────────────────────────────
+   // STEP 3: LOCATION FILTER (Pullback to Value)
+   //───────────────────────────────────────
+
+   double priceM15 = iClose(_Symbol, PERIOD_M15, 0);
+   double emaM15 = GetEMAValue(PERIOD_M15, 20, 0);
+
+   if(emaM15 <= 0)
+   {
+      if(debugMode)
+         Print("HYBRID: Invalid EMA value");
+      return SIGNAL_NONE;
+   }
+
+   // Calculate distance from M15 EMA (in points)
+   double distFromEMA = MathAbs(priceM15 - emaM15) / _Point;
+   double maxAllowedDist = atrM15 * emaMaxDist;
+
+   bool atValue = (distFromEMA <= maxAllowedDist);
+
+   if(!atValue)
+   {
+      if(debugMode)
+         Print("HYBRID: Price too far from M15 EMA (", distFromEMA, " pts, max=",
+               maxAllowedDist, " pts) - WAIT FOR PULLBACK");
+      return SIGNAL_NONE;
+   }
+
+   //───────────────────────────────────────
+   // STEP 4: DIRECTION ALIGNMENT
+   //───────────────────────────────────────
+
+   if(m5Signal == SIGNAL_PA_BUY)
+   {
+      // Must have bullish M15 context
+      if(!bullishContext)
+      {
+         if(debugMode)
+            Print("HYBRID: BUY signal rejected - M15 context not bullish (score=", trendScore, ")");
+         return SIGNAL_NONE;
+      }
+
+      // Additional safety: Slope crash check (falling knife protection)
+      ENUM_SLOPE_DIRECTION slopeM15 = GetEMASlope(PERIOD_M15, 20);
+      if(slopeM15 == SLOPE_CRASH)
+      {
+         if(debugMode)
+            Print("HYBRID: BUY signal rejected - M15 slope is CRASH (falling knife)");
+         return SIGNAL_NONE;
+      }
+
+      if(debugMode)
+         Print("HYBRID: VALID BUY SIGNAL - M15 Bullish (score=", trendScore, ") + M5 Trigger @ ", priceM15);
+
+      return SIGNAL_PA_BUY;
+   }
+   else if(m5Signal == SIGNAL_PA_SELL)
+   {
+      // Must have bearish M15 context
+      if(!bearishContext)
+      {
+         if(debugMode)
+            Print("HYBRID: SELL signal rejected - M15 context not bearish (score=", trendScore, ")");
+         return SIGNAL_NONE;
+      }
+
+      // Additional safety: Slope rocket check
+      ENUM_SLOPE_DIRECTION slopeM15 = GetEMASlope(PERIOD_M15, 20);
+      if(slopeM15 == SLOPE_UP)
+      {
+         if(debugMode)
+            Print("HYBRID: SELL signal rejected - M15 slope is UP (rocket)");
+         return SIGNAL_NONE;
+      }
+
+      if(debugMode)
+         Print("HYBRID: VALID SELL SIGNAL - M15 Bearish (score=", trendScore, ") + M5 Trigger @ ", priceM15);
+
+      return SIGNAL_PA_SELL;
+   }
+
+   return SIGNAL_NONE;
 }
 
 //+------------------------------------------------------------------+

@@ -127,8 +127,21 @@ struct TradeRequest
     double            risk_percent; // Risk percentage for lot calculation
     string            comment;      // Order comment
 
+    // Hybrid Mode: Direct lot size specification (optional)
+    // If lot_size > 0, use this instead of calculating from risk_percent
+    double            lot_size;     // Direct lot size (for fixed lot mode)
+
+    // NOTE: MQL5 structs don't reliably support constructors
+    // Always initialize manually before use:
+    // TradeRequest req;
+    // req.type = ORDER_TYPE_BUY;
+    // req.price = 0; req.sl = 0; req.tp = 0;
+    // req.risk_percent = 1.0;
+    // req.comment = "";
+    // req.lot_size = 0.0;  // 0 means use risk calculation
+
     // Constructor for initialization
-    void TradeRequest()
+    TradeRequest()
     {
         type = ORDER_TYPE_BUY;
         price = 0.0;
@@ -136,6 +149,7 @@ struct TradeRequest
         tp = 0.0;
         risk_percent = 3.0;
         comment = "";
+        lot_size = 0.0;  // Default: use risk calculation
     }
 };
 

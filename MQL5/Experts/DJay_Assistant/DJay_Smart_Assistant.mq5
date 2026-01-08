@@ -388,6 +388,50 @@ void OnTick()
                   ExecuteSniperTrade(ORDER_TYPE_SELL);
             }
          }
+      }
+
+         // --- 5. HYBRID MODE (M15 Context + M5 Entry) - DISABLED when Sniper Mode is ON ---
+         if(g_hybrid_mode_enabled && !g_sniper_mode_enabled)
+         {
+            // Only check on new M5 bar (for efficiency)
+            static datetime lastM5BarTime = 0;
+            datetime currentM5BarTime = iTime(_Symbol, PERIOD_M5, 0);
+            bool newM5Bar = (currentM5BarTime != lastM5BarTime);
+
+            if(newM5Bar)
+            {
+               // Get Hybrid Signal (M15 context + M5 trigger)
+               ENUM_SIGNAL_TYPE hybridSignal = signalEngine.GetHybridSignal(
+                  Input_Hybrid_Debug_Mode,
+                  Input_Hybrid_EMA_MaxDist,
+                  Input_Hybrid_Trend_MinScore
+               );
+
+               // Execute trade on valid Hybrid signal
+               if(hybridSignal == SIGNAL_PA_BUY)
+               {
+                  // Create Hybrid arrow (Lime, code 241 - different from Sniper)
+                  double prevLow = iLow(_Symbol, PERIOD_M5, 1);
+                  CreateSignalArrow(currentM5BarTime, prevLow - 50*_Point, 241, clrLime, "HYBRID_Buy");
+
+                  // AUTO MODE execution
+                  if(g_tradingMode == MODE_AUTO)
+                     ExecuteHybridTrade(ORDER_TYPE_BUY);
+               }
+               else if(hybridSignal == SIGNAL_PA_SELL)
+               {
+                  // Create Hybrid arrow (Red, code 242)
+                  double prevHigh = iHigh(_Symbol, PERIOD_M5, 1);
+                  CreateSignalArrow(currentM5BarTime, prevHigh + 50*_Point, 242, clrRed, "HYBRID_Sell");
+
+                  // AUTO MODE execution
+                  if(g_tradingMode == MODE_AUTO)
+                     ExecuteHybridTrade(ORDER_TYPE_SELL);
+               }
+
+               lastM5BarTime = currentM5BarTime;
+            }
+         }
 
       lastBarTime = currentBarTime;
    }
@@ -499,16 +543,32 @@ void OnTimer()
    ENUM_ZONE_STATUS zoneStatus = signalEngine.GetCurrentZoneStatus();
    dashboardPanel.UpdateZoneStatus((int)zoneStatus);
 
-   // 3e-1. Hybrid Mode Smart State (Context-aware Visual Feedback) - Phase 2.5+
+   // 3e-1. Hybrid Mode Smart State (Context-aware Visual Feedback) - Sprint 6
    if(g_hybrid_mode_enabled)
    {
-      // TODO Phase 2.5: Calculate M15 context readiness
-      // TrendMatrix tm = signalEngine.GetTrendMatrix();
-      // int trendScore = tm.h4 + tm.h1 + tm.m15;
-      // bool contextReady = (trendScore >= 2 || trendScore <= -2);
-      // ENUM_TREND_BIAS bias = (trendScore >= 2) ? TREND_BIAS_BULLISH :
-      //                         (trendScore <= -2) ? TREND_BIAS_BEARISH : TREND_BIAS_NEUTRAL;
-      // dashboardPanel.UpdateHybridStatus(contextReady, bias);
+      // Calculate M15 context readiness
+      TrendMatrix tm = signalEngine.GetTrendMatrix();
+      int trendScore = tm.h4 + tm.h1 + tm.m15;
+
+      if(trendScore >= 2)
+      {
+         g_hybrid_bias = TREND_BIAS_BULLISH;
+         g_hybrid_context_ready = true;
+      }
+      else if(trendScore <= -2)
+      {
+         g_hybrid_bias = TREND_BIAS_BEARISH;
+         g_hybrid_context_ready = true;
+      }
+      else
+      {
+         g_hybrid_bias = TREND_BIAS_NEUTRAL;
+         g_hybrid_context_ready = false;
+      }
+
+      // Update dashboard with Hybrid status (if DashboardPanel has the function)
+      // Note: UpdateHybridStatus will be implemented in Phase 4 (Dashboard UI)
+      // dashboardPanel.UpdateHybridStatus(g_hybrid_context_ready, g_hybrid_bias);
    }
 
    // 3f. Advisor Message
@@ -1139,6 +1199,87 @@ void ExecuteSniperTrade(ENUM_ORDER_TYPE orderType)
    else
    {
       Print("SNIPER Order Failed");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Execute Hybrid Trade (M15 Context + M5 Entry)                     |
+//| Sprint 6: Hybrid Mode implementation                             |
+//+------------------------------------------------------------------+
+void ExecuteHybridTrade(ENUM_ORDER_TYPE orderType)
+{
+   // Risk Management Check
+   if(!IsTradingAllowed())
+      return;
+
+   // Calculate entry price
+   double entryPrice = (orderType == ORDER_TYPE_BUY) ?
+                        SymbolInfoDouble(_Symbol, SYMBOL_ASK) :
+                        SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   // Tight SL (smaller than standard strategies)
+   double sl = (orderType == ORDER_TYPE_BUY) ?
+               entryPrice - (Input_Hybrid_SL_Points * _Point) :
+               entryPrice + (Input_Hybrid_SL_Points * _Point);
+
+   // Quick TP (scalp target)
+   double tp = (orderType == ORDER_TYPE_BUY) ?
+               entryPrice + (Input_Hybrid_TP_Points * _Point) :
+               entryPrice - (Input_Hybrid_TP_Points * _Point);
+
+   //─────────────────────────────────────────────────────────────
+   // LOT SIZE CALCULATION (Based on User Selection)
+   //─────────────────────────────────────────────────────────────
+   double lotSize = 0.0;
+   double riskPercent = 0.0;
+
+   if(Input_Hybrid_Lot_Mode == LOT_MODE_FIXED_LOTS)
+   {
+      // Use fixed lot size (manual)
+      lotSize = Input_Hybrid_Fixed_Lots;
+      riskPercent = 0.0;  // Not applicable for fixed lots
+   }
+   else  // LOT_MODE_RISK_PERCENT (default)
+   {
+      // Calculate lot size based on risk percentage
+      riskPercent = Input_Hybrid_Risk_Percent;
+      lotSize = tradeManager.CalculateLotSize(entryPrice, sl, riskPercent);
+
+      if(lotSize <= 0)
+      {
+         Print("HYBRID: Failed to calculate lot size - trade aborted");
+         return;
+      }
+   }
+
+   // Build trade request
+   TradeRequest req;
+   req.type = orderType;
+   req.price = entryPrice;
+   req.sl = sl;
+   req.tp = tp;
+   req.risk_percent = riskPercent;
+   req.lot_size = lotSize;
+   req.comment = "HYBRID_" + (string)(orderType == ORDER_TYPE_BUY ? "BUY" : "SELL");
+
+   // Execute trade with custom lot size (validation happens in ExecuteOrderWithLot)
+   if(tradeManager.ExecuteOrderWithLot(req))
+   {
+      string lotInfo = (Input_Hybrid_Lot_Mode == LOT_MODE_FIXED_LOTS) ?
+                       StringFormat("%.2f (Fixed)", lotSize) :
+                       StringFormat("%.2f (%.1f%% Risk)", lotSize, riskPercent);
+
+      Print("HYBRID ", (orderType == ORDER_TYPE_BUY ? "BUY" : "SELL"),
+            " executed @ ", entryPrice,
+            " Lots: ", lotInfo,
+            " TP: ", Input_Hybrid_TP_Points, " pts",
+            " SL: ", Input_Hybrid_SL_Points, " pts",
+            " Context: ", g_hybrid_bias == TREND_BIAS_BULLISH ? "BULLISH" : "BEARISH");
+      dashboardPanel.UpdateLastAutoTrade("HYBRID", (orderType == ORDER_TYPE_BUY ? "BUY" : "SELL"), entryPrice);
+   }
+   else
+   {
+      Print("HYBRID Order Failed");
    }
 }
 

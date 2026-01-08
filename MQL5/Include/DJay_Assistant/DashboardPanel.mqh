@@ -57,6 +57,10 @@ private:
    //--- RR Multiplier Lookup Table (NEW)
    double            m_rr_multipliers[3];    // [1.0, 1.5, 2.0]
 
+   //--- Hybrid Mode Status (Sprint 6) - Phase 4
+   bool              m_hybrid_context_ready; // M15 context readiness
+   ENUM_TREND_BIAS   m_hybrid_bias;          // Current trend bias (BULLISH/BEARISH/NEUTRAL)
+
    // Helper: Convert relative Y (0 at top of panel) to absolute Y (distance from anchor)
    int Y(int relative_y) { return (m_base_y + m_panel_height) - relative_y; }
 
@@ -102,6 +106,7 @@ public:
    void UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool qs);
    void UpdateQuickScalpButton(bool isActive);
    void UpdateQuickScalpSmartState(bool isEnabled, ENUM_ZONE_STATUS zone, double adx, double adxThreshold);
+   void UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias);  // Sprint 6 - Hybrid Mode
    void UpdateConfirmButton(string text, bool enable);
 
    //--- Settings Methods (NEW)
@@ -1081,6 +1086,20 @@ void CDashboardPanel::UpdateQuickScalpSmartState(bool isEnabled, ENUM_ZONE_STATU
       else dotColor = clrRed;
    }
    SetColor("QS_Status_Dot", dotColor);
+}
+
+//+------------------------------------------------------------------+
+//| Update Hybrid Mode Status (Sprint 6 - Phase 4)                    |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias)
+{
+   // Store Hybrid Mode context state for dashboard tracking
+   m_hybrid_context_ready = contextReady;
+   m_hybrid_bias = bias;
+
+   // DEBUG: Print state changes for verification
+   Print("HYBRID Status Update: Ready=", contextReady ? "YES" : "NO",
+         " Bias=", EnumToString(bias));
 }
 
 //+------------------------------------------------------------------+
