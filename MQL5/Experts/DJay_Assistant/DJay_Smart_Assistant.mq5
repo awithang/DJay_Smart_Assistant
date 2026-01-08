@@ -1322,6 +1322,20 @@ void TestPrintHybridState()
    Print("    HYBRID MODE STATE DUMP");
    Print("========================================");
 
+   // DEBUG: Show actual price and EMA values
+   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double h4_ema50 = signalEngine.GetEMAValue(PERIOD_H4, 50, 0);
+   double h1_ema50 = signalEngine.GetEMAValue(PERIOD_H1, 50, 0);
+   double m15_ema50 = signalEngine.GetEMAValue(PERIOD_M15, 50, 0);
+   double m15_ema200 = signalEngine.GetEMAValue(PERIOD_M15, 200, 0);  // For comparison
+
+   Print("--- PRICE vs EMA 50 DEBUG ---");
+   Print("Current Price: ", currentPrice);
+   Print("H4 EMA 50: ", h4_ema50, " | Price ", (currentPrice > h4_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - h4_ema50) / _Point, 0));
+   Print("H1 EMA 50: ", h1_ema50, " | Price ", (currentPrice > h1_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - h1_ema50) / _Point, 0));
+   Print("M15 EMA 50: ", m15_ema50, " | Price ", (currentPrice > m15_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - m15_ema50) / _Point, 0));
+   Print("M15 EMA 200: ", m15_ema200, " | Price ", (currentPrice > m15_ema200 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - m15_ema200) / _Point, 0), " (old)");
+
    // Trend Matrix
    Print("--- TREND MATRIX ---");
    Print("H4 Trend: ",  EnumToString(tm.h4));

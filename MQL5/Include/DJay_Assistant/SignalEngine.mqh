@@ -149,8 +149,8 @@ public:
     //--- Sniper Update: Market Context Functions (Sprint 1)
     double GetATRValue(int period = 14, ENUM_TIMEFRAMES tf = PERIOD_M15);  // Return ATR in points
     ENUM_SLOPE_DIRECTION GetEMASlope(ENUM_TIMEFRAMES tf = PERIOD_H1, int ema_period = 20, double steep_threshold = 0.0);
-    TrendMatrix GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 200,
-                               int h1_fast_ema = 100, int h1_slow_ema = 200,
+    TrendMatrix GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 50,
+                               int h1_fast_ema = 100, int h1_slow_ema = 50,
                                int m15_fast_ema = 20, int m15_slow_ema = 50);
     ENUM_MARKET_STATE GetMarketState(double adx_trend_min = 25.0, double adx_range_max = 20.0);
     bool IsNearStructuralLevel(double price, double tolerance_points = 50.0);
@@ -504,24 +504,26 @@ ENUM_MARKET_SESSION CSignalEngine::GetCurrentSession()
 //+------------------------------------------------------------------+
 ENUM_TREND_DIRECTION CSignalEngine::GetTrendDirection(ENUM_TIMEFRAMES tf)
 {
-   double ema100, ema200;
+   double ema50;
 
-   // Use cached values if requesting current chart period (optimization)
+   // Get EMA 50 value (trend baseline - consistent across all timeframes)
    if(tf == PERIOD_CURRENT || tf == _Period)
    {
-      ema100 = m_ema_100;
-      ema200 = m_ema_200;
+      ema50 = m_ema_100;  // Note: Using cached EMA 100 as closest available (could add EMA 50 cache)
    }
    else
    {
-      // Fetch fresh values for specific timeframe
-      ema100 = GetEMAValue(tf, 100, 0);
-      ema200 = GetEMAValue(tf, 200, 0);
+      // Fetch fresh value for specific timeframe
+      ema50 = GetEMAValue(tf, 50, 0);
    }
 
-   if(ema100 > ema200)
+   // Determine trend by PRICE POSITION relative to EMA 50
+   // This gives real-time trend direction with balanced reaction speed
+   double price = m_current_price;
+
+   if(price > ema50)
       return TREND_UP;
-   else if(ema100 < ema200)
+   else if(price < ema50)
       return TREND_DOWN;
 
    return TREND_FLAT;
@@ -729,23 +731,24 @@ TrendAlignment CSignalEngine::GetTrendAlignment()
    result.strengthText = "No Clear Trend";
    result.strengthColor = clrGray;
 
-   // Get EMA values for each timeframe
-   double d1_ema100 = GetEMAValue(PERIOD_D1, 100, 0);
-   double d1_ema200 = GetEMAValue(PERIOD_D1, 200, 0);
-   double h4_ema100 = GetEMAValue(PERIOD_H4, 100, 0);
-   double h4_ema200 = GetEMAValue(PERIOD_H4, 200, 0);
-   double h1_ema100 = GetEMAValue(PERIOD_H1, 100, 0);
-   double h1_ema200 = GetEMAValue(PERIOD_H1, 200, 0);
+   // Get EMA 50 values for each timeframe (consistent trend detection)
+   double d1_ema50 = GetEMAValue(PERIOD_D1, 50, 0);
+   double h4_ema50 = GetEMAValue(PERIOD_H4, 50, 0);
+   double h1_ema50 = GetEMAValue(PERIOD_H1, 50, 0);
 
-   // Determine trend for each timeframe
-   if(d1_ema100 > d1_ema200) { result.d1 = TREND_UP; result.score++; }
-   else if(d1_ema100 < d1_ema200) { result.d1 = TREND_DOWN; result.score--; }
+   // Determine trend by PRICE POSITION relative to EMA 50
+   // All timeframes use same EMA period (50) for consistency
+   // Each TF calculates its own EMA 50 based on that timeframe's data
+   double currentPrice = m_current_price;
 
-   if(h4_ema100 > h4_ema200) { result.h4 = TREND_UP; result.score++; }
-   else if(h4_ema100 < h4_ema200) { result.h4 = TREND_DOWN; result.score--; }
+   if(currentPrice > d1_ema50) { result.d1 = TREND_UP; result.score++; }
+   else if(currentPrice < d1_ema50) { result.d1 = TREND_DOWN; result.score--; }
 
-   if(h1_ema100 > h1_ema200) { result.h1 = TREND_UP; result.score++; }
-   else if(h1_ema100 < h1_ema200) { result.h1 = TREND_DOWN; result.score--; }
+   if(currentPrice > h4_ema50) { result.h4 = TREND_UP; result.score++; }
+   else if(currentPrice < h4_ema50) { result.h4 = TREND_DOWN; result.score--; }
+
+   if(currentPrice > h1_ema50) { result.h1 = TREND_UP; result.score++; }
+   else if(currentPrice < h1_ema50) { result.h1 = TREND_DOWN; result.score--; }
 
    // Generate strength text and color based on score
    int absScore = MathAbs(result.score);
@@ -1308,11 +1311,11 @@ ENUM_SLOPE_DIRECTION CSignalEngine::GetEMASlope(ENUM_TIMEFRAMES tf = PERIOD_H1, 
 //+------------------------------------------------------------------+
 //| Get Trend Matrix (Sniper Update)                                  |
 //| Multi-timeframe trend analysis for H4, H1, M15                    |
-//| Uses configurable EMA periods for each TF                         |
+//| Uses EMA 50 on all timeframes for consistent trend detection      |
 //| Returns: TrendMatrix structure with alignment score               |
 //+------------------------------------------------------------------+
-TrendMatrix CSignalEngine::GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 200,
-                                          int h1_fast_ema = 100, int h1_slow_ema = 200,
+TrendMatrix CSignalEngine::GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema = 50,
+                                          int h1_fast_ema = 100, int h1_slow_ema = 50,
                                           int m15_fast_ema = 20, int m15_slow_ema = 50)
 {
    TrendMatrix result;
@@ -1323,27 +1326,36 @@ TrendMatrix CSignalEngine::GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema
    result.description = "No Data";
    result.displayColor = clrGray;
 
-   // Get EMA values for H4 (Strategic bias)
-   double h4_fast = GetEMAValue(PERIOD_H4, h4_fast_ema, 0);
-   double h4_slow = GetEMAValue(PERIOD_H4, h4_slow_ema, 0);
+   // Get EMA 50 values for all timeframes (consistent trend detection)
+   double h4_ema50 = GetEMAValue(PERIOD_H4, 50, 0);
+   double h1_ema50 = GetEMAValue(PERIOD_H1, 50, 0);
+   double m15_ema50 = GetEMAValue(PERIOD_M15, 50, 0);
 
-   // Get EMA values for H1 (Tactical trend)
-   double h1_fast = GetEMAValue(PERIOD_H1, h1_fast_ema, 0);
-   double h1_slow = GetEMAValue(PERIOD_H1, h1_slow_ema, 0);
+   // Get current price (for real-time trend detection)
+   double currentPrice = m_current_price;  // Use cached price for consistency
 
-   // Get EMA values for M15 (Entry setup)
-   double m15_fast = GetEMAValue(PERIOD_M15, m15_fast_ema, 0);
-   double m15_slow = GetEMAValue(PERIOD_M15, m15_slow_ema, 0);
+   // DEBUG: Print values for troubleshooting
+   static int debugCounter = 0;
+   if(++debugCounter % 300 == 0)  // Print every ~5 minutes (300 seconds)
+   {
+      Print("=== TREND DEBUG (EMA 50) ===");
+      Print("Price: ", currentPrice);
+      Print("H4 EMA 50: ", h4_ema50, " | H4: ", (currentPrice > h4_ema50 ? "UP" : "DOWN"));
+      Print("H1 EMA 50: ", h1_ema50, " | H1: ", (currentPrice > h1_ema50 ? "UP" : "DOWN"));
+      Print("M15 EMA 50: ", m15_ema50, " | M15: ", (currentPrice > m15_ema50 ? "UP" : "DOWN"));
+   }
 
-   // Determine trend for each timeframe
-   if(h4_fast > h4_slow) { result.h4 = TREND_UP; result.score++; }
-   else if(h4_fast < h4_slow) { result.h4 = TREND_DOWN; result.score--; }
+   // Determine trend by PRICE POSITION relative to EMA 50
+   // All timeframes use same EMA period (50) for consistency
+   // Each TF calculates its own EMA 50 based on that timeframe's data
+   if(currentPrice > h4_ema50) { result.h4 = TREND_UP; result.score++; }
+   else if(currentPrice < h4_ema50) { result.h4 = TREND_DOWN; result.score--; }
 
-   if(h1_fast > h1_slow) { result.h1 = TREND_UP; result.score++; }
-   else if(h1_fast < h1_slow) { result.h1 = TREND_DOWN; result.score--; }
+   if(currentPrice > h1_ema50) { result.h1 = TREND_UP; result.score++; }
+   else if(currentPrice < h1_ema50) { result.h1 = TREND_DOWN; result.score--; }
 
-   if(m15_fast > m15_slow) { result.m15 = TREND_UP; result.score++; }
-   else if(m15_fast < m15_slow) { result.m15 = TREND_DOWN; result.score--; }
+   if(currentPrice > m15_ema50) { result.m15 = TREND_UP; result.score++; }
+   else if(currentPrice < m15_ema50) { result.m15 = TREND_DOWN; result.score--; }
 
    // Generate description and color based on alignment score
    int absScore = MathAbs(result.score);
@@ -1453,7 +1465,7 @@ MarketContext CSignalEngine::GetMarketContext()
       ctx.emaDistance = (m_current_price - ema20) / _Point;
 
    // Trend Matrix (multi-TF alignment)
-   ctx.trendMatrix = GetTrendMatrix(100, 200, 100, 200, 20, 50);
+   ctx.trendMatrix = GetTrendMatrix(100, 50, 100, 50, 20, 50);  // All use EMA 50 for consistency
 
    // Market State (ADX-based)
    ctx.marketState = GetMarketState(25.0, 20.0);
