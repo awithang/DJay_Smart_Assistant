@@ -1812,7 +1812,7 @@ ENUM_SIGNAL_TYPE CSignalEngine::GetHybridSignal(bool debugMode,
 
    // 1a. Trend Alignment (H4 + H1 + M15)
    TrendMatrix tm = GetTrendMatrix();
-   int trendScore = tm.h4 + tm.h1 + tm.m15;  // Range: -3 to +3
+   int trendScore = tm.score;  // Use the calculated score, not enum values
 
    bool bullishContext = (trendScore >= (int)minTrendScore);   // At least 2/3 bullish
    bool bearishContext = (trendScore <= -(int)minTrendScore);  // At least 2/3 bearish
