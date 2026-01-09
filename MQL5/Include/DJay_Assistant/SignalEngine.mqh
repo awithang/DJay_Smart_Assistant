@@ -1413,17 +1413,6 @@ TrendMatrix CSignalEngine::GetTrendMatrix(int h4_fast_ema = 100, int h4_slow_ema
    // Get current price (for real-time trend detection)
    double currentPrice = m_current_price;  // Use cached price for consistency
 
-   // DEBUG: Print values for troubleshooting
-   static int debugCounter = 0;
-   if(++debugCounter % 300 == 0)  // Print every ~5 minutes (300 seconds)
-   {
-      Print("=== TREND DEBUG (EMA 50) ===");
-      Print("Price: ", currentPrice);
-      Print("H4 EMA 50: ", h4_ema50, " | H4: ", (currentPrice > h4_ema50 ? "UP" : "DOWN"));
-      Print("H1 EMA 50: ", h1_ema50, " | H1: ", (currentPrice > h1_ema50 ? "UP" : "DOWN"));
-      Print("M15 EMA 50: ", m15_ema50, " | M15: ", (currentPrice > m15_ema50 ? "UP" : "DOWN"));
-   }
-
    // Determine trend by PRICE POSITION relative to EMA 50
    // All timeframes use same EMA period (50) for consistency
    // Each TF calculates its own EMA 50 based on that timeframe's data

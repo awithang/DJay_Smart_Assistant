@@ -95,7 +95,7 @@ public:
    void UpdateLastAutoTrade(string strategy, string direction, double price);
 
    //--- Sniper Update: Sprint 3 - Market Intelligence Grid Update Methods
-   void UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal);
+   void UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal, ENUM_SIGNAL_TYPE m5Signal = SIGNAL_NONE);
    void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
    
    //--- Ghost Button Logic (v5.0)
@@ -152,13 +152,6 @@ public:
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
    bool IsStratQSClicked(string sparam) { return (sparam == m_prefix+"BtnStratQS"); }
-
-   //--- Test Button Click Handlers (Sprint 6) - Hybrid Mode Testing
-   bool IsTestStateClicked(string sparam)    { return (sparam == m_prefix+"BtnTestState"); }
-   bool IsTestSignalClicked(string sparam)   { return (sparam == m_prefix+"BtnTestSignal"); }
-   bool IsTestFiltersClicked(string sparam)  { return (sparam == m_prefix+"BtnTestFilters"); }
-   bool IsTestTradeClicked(string sparam)    { return (sparam == m_prefix+"BtnTestTrade"); }
-   bool IsTestLotsClicked(string sparam)     { return (sparam == m_prefix+"BtnTestLots"); }
 
    bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
    bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
@@ -230,7 +223,7 @@ void CDashboardPanel::Init(long chart_id, double initial_risk, int pl_trigger, i
    m_initial_pl_lock = pl_lock;
    m_initial_pl_step = pl_step;
 
-   Print("DEBUG: Dashboard Panel v5.0 Loaded. Target Width=", m_panel_width); // Verify update
+   // Print("DEBUG: Dashboard Panel v5.0 Loaded. Target Width=", m_panel_width); // Verify update
 
    CreatePanel();
 }
@@ -304,18 +297,24 @@ void CDashboardPanel::CreatePanel()
 
    // --- COLUMN 2: MOMENTUM ---
    CreateLabel("Mom_T", col2_x, row1_y, "MOMENTUM", C'100,200,255', 8, "Arial Bold");
-   CreateLabel("PA_T2", col2_x, row2_y, "M15 PA:", clrGray, 8);
-   CreateLabel("PA_V2", col2_x + 45, row2_y, "NONE", clrGray, 8, "Arial Bold");
 
-   CreateLabel("RSI_T", col2_x, row3_y, "RSI:", clrGray, 8);
-   CreateLabel("RSI_V", col2_x + 25, row3_y, "--", clrGray, 8);
+   // M15 PA (compact) - same font size as RSI/Stoch
+   CreateLabel("PA_T2", col2_x, row2_y, "M15:", clrGray, 8);
+   CreateLabel("PA_V2", col2_x + 30, row2_y, "NONE", clrGray, 8, "Arial Bold");
 
-   CreateLabel("Stoch_T", col2_x, row4_y, "Stoch:", clrGray, 8);
-   CreateLabel("Stoch_V", col2_x + 30, row4_y, "--", clrGray, 8);
+   // M5 PA (compact) - on separate row to avoid overlap
+   CreateLabel("M5_PA_T", col2_x, row2_y + 16, "M5:", clrGray, 8);
+   CreateLabel("M5_PA_V", col2_x + 30, row2_y + 16, "--", clrGray, 8, "Arial Bold");
 
-   CreateLabel("Slope_T", col2_x, row5_y, "Slope H1:", clrGray, 8);
-   CreateLabel("Slope_V", col2_x + 45, row5_y, "FLAT", clrGray, 7);
-   CreateLabel("Slope_Warn", col2_x, row6_y, " ", clrRed, 7, "Arial Bold");
+   // Shift other rows down
+   CreateLabel("RSI_T", col2_x, row4_y, "RSI:", clrGray, 8);
+   CreateLabel("RSI_V", col2_x + 25, row4_y, "--", clrGray, 8);
+
+   CreateLabel("Stoch_T", col2_x, row5_y, "Stoch:", clrGray, 8);
+   CreateLabel("Stoch_V", col2_x + 30, row5_y, "--", clrGray, 8);
+
+   CreateLabel("Slope_T", col2_x, row6_y - 3, "Slope H1:", clrGray, 8);
+   CreateLabel("Slope_V", col2_x + 45, row6_y - 3, "FLAT", clrGray, 8);
 
    // --- COLUMN 3: RISK ---
    CreateLabel("Risk_T", col3_x, row1_y, "RISK", C'100,200,255', 8, "Arial Bold");
@@ -325,8 +324,8 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Dist_T", col3_x, row3_y, "EMA Dist:", clrGray, 8);
    CreateLabel("Dist_V", col3_x + 45, row3_y, "--", clrGray, 8);
 
-   CreateLabel("Space_T", col3_x, row4_y, "Space:", clrGray, 8);
-   CreateLabel("Space_V", col3_x + 35, row4_y, "--", clrGray, 8);
+   CreateLabel("Hybrid_T", col3_x, row4_y, "HYBRID:", clrGray, 8);
+   CreateLabel("Hybrid_V", col3_x + 40, row4_y, "OFF", clrGray, 7, "Arial Bold");
 
    CreateLabel("Struct_T", col3_x, row5_y, "To Zone:", clrGray, 8);
    CreateLabel("Struct_V", col3_x + 40, row5_y, "--", clrGray, 8);
@@ -626,25 +625,7 @@ void CDashboardPanel::CreatePanel()
                         CreateLabel("QS_Status_Dot", right_x + 85, right_y, "●", clrGray, 10);
                         CreateButton("BtnStratQS", right_x + 100, right_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
 
-                        // === TEST HELPERS SECTION (Sprint 6) ===
                         right_y += 30;
-                        CreateLabel("L_Test_Label", right_x + 10, right_y, "TEST TOOLS:", m_header_color, 9, "Arial Bold");
-
-                        // Test button row 1
-                        right_y += 20;
-                        CreateButton("BtnTestState", right_x + 10, right_y, 70, 18, "STATE", C'40,60,80', clrWhite, 7);
-                        CreateButton("BtnTestSignal", right_x + 85, right_y, 70, 18, "SIGNAL", C'40,60,80', clrWhite, 7);
-
-                        // Test button row 2
-                        right_y += 22;
-                        CreateButton("BtnTestFilters", right_x + 10, right_y, 70, 18, "FILTERS", C'40,60,80', clrWhite, 7);
-                        CreateButton("BtnTestTrade", right_x + 85, right_y, 70, 18, "TRADE", C'40,60,80', clrWhite, 7);
-
-                        // Test button row 3
-                        right_y += 22;
-                        CreateButton("BtnTestLots", right_x + 10, right_y, 145, 18, "LOT CALC", C'40,60,80', clrWhite, 7);
-
-                        right_y += 25;
 
 
 
@@ -1759,7 +1740,7 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
 //| Update Market Intelligence Grid (3-Column Layout)                   |
 //| Populates the new dashboard grid with market context data           |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal)
+void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal, ENUM_SIGNAL_TYPE m5Signal)
 {
    //===========================================================
    // COLUMN 1: CONTEXT (Trend Matrix, Bias, Market State)
@@ -1835,6 +1816,28 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
 
    SetText("PA_V2", paText);
    SetColor("PA_V2", paColor);
+
+   // 1.5. M5 PA Signal (Hybrid Mode Entry Trigger)
+   string m5PaText = "--";
+   color m5PaColor = clrGray;
+
+   if(m5Signal == SIGNAL_PA_BUY)
+   {
+      m5PaText = "BUY";
+      m5PaColor = m_buy_color;
+   }
+   else if(m5Signal == SIGNAL_PA_SELL)
+   {
+      m5PaText = "SELL";
+      m5PaColor = m_sell_color;
+   }
+   else if(m5Signal == SIGNAL_NONE)
+   {
+      m5PaText = "NONE";
+   }
+
+   SetText("M5_PA_V", m5PaText);
+   SetColor("M5_PA_V", m5PaColor);
 
    // 2. RSI Value
    string rsiText = (rsi > 0) ? StringFormat("%.0f", rsi) : "--";
@@ -1924,9 +1927,46 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
    SetText("Dist_V", distText + " pts");
    SetColor("Dist_V", distColor);
 
-   // 3. Space to Run (Distance to next target)
-   string spaceText = (ctx.spaceToTarget > 0) ? StringFormat("%.0f", ctx.spaceToTarget) : "--";
-   SetText("Space_V", spaceText + " pts");
+   // 3. HYBRID Status (M15 Trend + M5 PA alignment check)
+   string hybridText = "OFF";
+   color hybridColor = clrGray;
+
+   // Check if Hybrid mode conditions are met
+   bool trendAligned = (MathAbs(ctx.trendMatrix.score) >= 1); // At least 2/3 TFs aligned
+   bool m5TriggerReady = (m5Signal != SIGNAL_NONE);
+   bool biasValid = (ctx.trendMatrix.score != 0); // Not neutral
+
+   // Hybrid READY when: Trend aligned + M5 has signal + bias matches
+   if(trendAligned && m5TriggerReady && biasValid)
+   {
+      // Check if M5 signal direction matches the trend bias
+      bool buyMatch = (ctx.trendMatrix.score > 0 && m5Signal == SIGNAL_PA_BUY);
+      bool sellMatch = (ctx.trendMatrix.score < 0 && m5Signal == SIGNAL_PA_SELL);
+
+      if(buyMatch || sellMatch)
+      {
+         hybridText = "READY";
+         hybridColor = clrLime;
+      }
+      else
+      {
+         hybridText = "MISMATCH";
+         hybridColor = C'255,165,0'; // Orange
+      }
+   }
+   else if(trendAligned && !m5TriggerReady)
+   {
+      hybridText = "WAIT M5";
+      hybridColor = C'255,255,0'; // Yellow
+   }
+   else if(!trendAligned)
+   {
+      hybridText = "NO TREND";
+      hybridColor = clrRed;
+   }
+
+   SetText("Hybrid_V", hybridText);
+   SetColor("Hybrid_V", hybridColor);
 
    // 4. Structure Distance (Distance to nearest zone)
    string structText = (ctx.distanceToNearestZone > 0 && ctx.distanceToNearestZone < 1000000) ? 

@@ -30,7 +30,7 @@ input double Input_Hybrid_EMA_MaxDist    = 0.5;    // Max EMA distance (ATR mult
 input bool   Input_Hybrid_UseTrendFilter = true;   // Require M15 trend alignment (strict)
 input int    Input_Hybrid_MinATR         = 50;     // Minimum M15 ATR (volatility filter)
 input bool   Input_Hybrid_Debug_Mode     = false;  // Enable debug logging (development)
-input double Input_Hybrid_Trend_MinScore = 2.0;    // Minimum trend score (2=2/3 TFs aligned)
+input double Input_Hybrid_Trend_MinScore = 1.0;    // Minimum trend score (1=2/3 TFs aligned, 3=all aligned)
 
 //--- Lot Size Calculation Mode
 input ENUM_LOT_SIZE_MODE Input_Hybrid_Lot_Mode    = LOT_MODE_RISK_PERCENT;  // Lot size: Risk% or Fixed
@@ -376,6 +376,9 @@ void OnTick()
          // --- 4. SNIPER MODE (M15 3-Filter Signals) ---
          if(g_sniper_mode_enabled)
          {
+            // Refresh indicator data BEFORE calculating Sniper signal
+            signalEngine.RefreshData();
+
             // Get Sniper Signal (M15-based with 3-filter stack)
             ENUM_SIGNAL_TYPE sniperSignal = signalEngine.GetSniperSignal(
                Input_Sniper_Debug_Mode,
@@ -427,6 +430,9 @@ void OnTick()
 
             if(newM5Bar)
             {
+               // Refresh indicator data BEFORE calculating Hybrid signal
+               signalEngine.RefreshData();
+
                // Get Hybrid Signal (M15 context + M5 trigger)
                ENUM_SIGNAL_TYPE hybridSignal = signalEngine.GetHybridSignal(
                   Input_Hybrid_Debug_Mode,
@@ -677,9 +683,10 @@ void OnTimer()
    double rsiForGrid = signalEngine.GetRSIValue(PERIOD_M15, 14, 0);
    double stochForGrid = signalEngine.GetStochKValue(PERIOD_M15, 14, 3, 0);
    ENUM_SIGNAL_TYPE m15Signal = signalEngine.GetActiveSignal();
+   ENUM_SIGNAL_TYPE m5Signal = signalEngine.GetActiveSignalTF(PERIOD_M5);  // Hybrid Mode M5 trigger
 
-   // Update the Market Intelligence Grid with all context data
-   dashboardPanel.UpdateMarketIntelligenceGrid(g_marketContext, rsiForGrid, stochForGrid, m15Signal);
+   // Update the Market Intelligence Grid with all context data (including M5 PA for Hybrid)
+   dashboardPanel.UpdateMarketIntelligenceGrid(g_marketContext, rsiForGrid, stochForGrid, m15Signal, m5Signal);
 
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;

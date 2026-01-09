@@ -230,8 +230,8 @@ double CTradeManager::CalculateLotSize(double entry_price, double sl_price, doub
    }
 
    double finalLot = NormalizeDouble(lotSize, 2);
-   Print("Calculated lot size: ", finalLot, " (Balance: $", accountBalance,
-         ", Risk: ", risk_percent, "%, SL Distance: ", priceDiff / _Point, " points)");
+   // Print("Calculated lot size: ", finalLot, " (Balance: $", accountBalance,
+   //       ", Risk: ", risk_percent, "%, SL Distance: ", priceDiff / _Point, " points)");
 
    return finalLot;
 }
@@ -408,7 +408,7 @@ bool CTradeManager::ExecuteBuy(double price, double sl, double tp, double lot, s
    // Execute buy order
    if(m_trade.Buy(lot, _Symbol, price, sl, tp, comment))
    {
-      Print("Buy order executed: Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
+      // Print("Buy order executed: Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
       return true;
    }
    else
@@ -454,7 +454,7 @@ bool CTradeManager::ExecuteSell(double price, double sl, double tp, double lot, 
    // Execute sell order
    if(m_trade.Sell(lot, _Symbol, price, sl, tp, comment))
    {
-      Print("Sell order executed: Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
+      // Print("Sell order executed: Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
       return true;
    }
    else
@@ -503,7 +503,7 @@ bool CTradeManager::ExecutePending(ENUM_ORDER_TYPE type, double price, double sl
    // Execute pending order
    if(m_trade.OrderOpen(_Symbol, type, lot, price, price, sl, tp, ORDER_TIME_GTC, 0, comment))
    {
-      Print("Pending order placed: Type=", EnumToString(type), " Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
+      // Print("Pending order placed: Type=", EnumToString(type), " Lot=", lot, " Price=", price, " SL=", sl, " TP=", tp);
       return true;
    }
    else
