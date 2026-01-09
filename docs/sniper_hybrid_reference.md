@@ -29,7 +29,34 @@
 
 ## Bug Fixes
 
-### ✅ Fixed: Hybrid Trend Score Bug (2025-01-10)
+### ✅ Fixed: Trend Score Calculation Bug (CRITICAL - 2025-01-10)
+
+**Problem**: Cockpit showed `Trend Matrix: ↑↑↑` but Hybrid said `"No clear trend bias (score=0)"`
+
+**Root Cause**: Hybrid calculated trend score by summing **enum values** instead of using the **calculated score**.
+
+```cpp
+// WRONG - Adding enum values (TREND_UP = 0 as first enum value)
+int trendScore = tm.h4 + tm.h1 + tm.m15;  // 0 + 0 + 0 = 0
+
+// CORRECT - Using calculated score
+int trendScore = tm.score;  // 3 (when all 3 TFs are UP)
+```
+
+**Why it failed**: The `ENUM_TREND_DIRECTION` enum has:
+- `TREND_UP = 0` (first enum value)
+- `TREND_DOWN = 1`
+- `TREND_FLAT = 2`
+
+When all 3 timeframes were UP, adding enum values gave `0+0+0=0` instead of the correct score of `3`.
+
+**Impact**: Hybrid was **completely broken** - could never detect trend alignment regardless of market conditions.
+
+**File**: `MQL5/Include/DJay_Assistant/SignalEngine.mqh:1815`
+
+---
+
+### ✅ Fixed: Hybrid Trend Score Requirement (2025-01-10)
 
 **Problem**: Trend score requirement was impossible to reach.
 
@@ -54,7 +81,7 @@ After:  Input_Hybrid_Trend_MinScore = 1.0
 
 ### ✅ Fixed: Stale Indicator Data Bug (2025-01-10)
 
-**Problem**: Cockpit showed `Trend Matrix: ↑↑↑ (score +3)` but Experts log said `"No clear trend bias (score=0)"`
+**Problem**: Cockpit and Hybrid were using different indicator data at different times.
 
 **Root Cause**: Hybrid and Sniper calculated trend matrices using **stale indicator data**. The cockpit was updated every 1 second with fresh data, but Hybrid/Sniper used old cached indicator values.
 
