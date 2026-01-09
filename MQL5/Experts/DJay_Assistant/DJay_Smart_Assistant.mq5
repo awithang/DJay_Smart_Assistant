@@ -371,9 +371,6 @@ void OnTick()
          {
             g_last_m15_bar_time = currentM15BarTime;
             g_sniper_executed_this_cycle = false;
-
-            if(g_sniper_mode_enabled && g_hybrid_mode_enabled)
-               Print("[COORD] New M15 cycle - Sniper priority reset");
          }
 
          // --- 4. SNIPER MODE (M15 3-Filter Signals) ---
@@ -437,11 +434,8 @@ void OnTick()
                   Input_Hybrid_Trend_MinScore
                );
 
-               // Minimal logging: Only log if Hybrid signal is blocked due to Sniper execution
-               if(g_sniper_mode_enabled && hybridSignal != SIGNAL_NONE && g_sniper_executed_this_cycle)
-               {
-                  Print("[COORD] Hybrid signal BLOCKED - Sniper already executed this M15 cycle");
-               }
+               // Coordination: Hybrid blocked if Sniper already executed this cycle
+               // No logging - happens frequently during normal operation
 
                // Execute trade on valid Hybrid signal
                if(hybridSignal == SIGNAL_PA_BUY)
@@ -734,23 +728,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
-      ulong start_total = GetMicrosecondCount();
-      Print("[TIMING] ========== BUTTON CLICK START ==========");
-      Print("[TIMING] Clicked object: ", sparam);
-
       // Forward event to dashboard for handling (e.g. Dragging)
-      ulong t1 = GetMicrosecondCount();
       dashboardPanel.OnEvent(id, lparam, dparam, sparam);
-      ulong t2 = GetMicrosecondCount();
-      Print("[TIMING] 1. OnEvent took: ", (t2 - t1) / 1000.0, " ms");
 
-      // Button handler timing
-      ulong t3 = GetMicrosecondCount();
       bool handled = false;
 
       if(dashboardPanel.IsBuyButtonClicked(sparam))
       {
-         ulong tb1 = GetMicrosecondCount();
          // Check if trading is allowed BEFORE attempting execution
          if(!IsTradingAllowed())
          {
@@ -763,13 +747,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ExecuteBuyTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
-         ulong tb2 = GetMicrosecondCount();
-         Print("[TIMING] Buy button took: ", (tb2 - tb1) / 1000.0, " ms");
          handled = true;
       }
       else if(dashboardPanel.IsSellButtonClicked(sparam))
       {
-         ulong tb1 = GetMicrosecondCount();
          // Check if trading is allowed BEFORE attempting execution
          if(!IsTradingAllowed())
          {
@@ -782,8 +763,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ExecuteSellTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
-         ulong tb2 = GetMicrosecondCount();
-         Print("[TIMING] Sell button took: ", (tb2 - tb1) / 1000.0, " ms");
          handled = true;
       }
       else if(dashboardPanel.IsModeButtonClicked(sparam))
@@ -792,8 +771,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          // Print("DEBUG: Auto button clicked! Before toggle: g_tradingMode=", (int)g_tradingMode, " (0=OFF, 1=ON)");
          g_tradingMode = (g_tradingMode == MODE_MANUAL) ? MODE_AUTO : MODE_MANUAL;
          dashboardPanel.UpdateTradingMode((int)g_tradingMode);
-         string modeStr = (g_tradingMode == MODE_AUTO) ? "AUTO ON (Manual + Auto trading)" : "AUTO OFF (Manual only)";
-         Print("Trading Mode: ", modeStr);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
       }
       else if(dashboardPanel.IsOpenSettingsClicked(sparam))
@@ -976,65 +953,29 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       // Strategy Toggles
       else if(dashboardPanel.IsStratArrowClicked(sparam))
       {
-         ulong ts1 = GetMicrosecondCount();
          g_strat_arrow = !g_strat_arrow;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         ulong ts2 = GetMicrosecondCount();
-         Print("[TIMING] StratArrow toggle took: ", (ts2 - ts1) / 1000.0, " ms");
          handled = true;
       }
       else if(dashboardPanel.IsStratRevClicked(sparam))
       {
-         ulong ts1 = GetMicrosecondCount();
          g_strat_rev = !g_strat_rev;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         ulong ts2 = GetMicrosecondCount();
-         Print("[TIMING] StratRev toggle took: ", (ts2 - ts1) / 1000.0, " ms");
          handled = true;
       }
       else if(dashboardPanel.IsStratBreakClicked(sparam))
       {
-         ulong ts1 = GetMicrosecondCount();
          g_strat_break = !g_strat_break;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         ulong ts2 = GetMicrosecondCount();
-         Print("[TIMING] StratBreak toggle took: ", (ts2 - ts1) / 1000.0, " ms");
          handled = true;
       }
       else if(dashboardPanel.IsStratQSClicked(sparam))
       {
          g_hybrid_mode_enabled = !g_hybrid_mode_enabled;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         Print("Hybrid Mode: ", g_hybrid_mode_enabled ? "ENABLED" : "DISABLED");
-      }
-      // === TEST HELPERS (Sprint 6) - Hybrid Mode Testing ===
-      else if(dashboardPanel.IsTestStateClicked(sparam))
-      {
-         TestPrintHybridState();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-      }
-      else if(dashboardPanel.IsTestSignalClicked(sparam))
-      {
-         TestHybridSignal();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-      }
-      else if(dashboardPanel.IsTestFiltersClicked(sparam))
-      {
-         TestPrintFilters();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-      }
-      else if(dashboardPanel.IsTestTradeClicked(sparam))
-      {
-         TestTradeCalculation();
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-      }
-      else if(dashboardPanel.IsTestLotsClicked(sparam))
-      {
-         TestLotSizeCalculation();
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
       // Settings Buttons (handled in DashboardPanel - RR, Trailing, and Profit Lock)
@@ -1086,18 +1027,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          }
       }
 
-      ulong t4 = GetMicrosecondCount();
-      Print("[TIMING] 2. Button handlers took: ", (t4 - t3) / 1000.0, " ms");
-
-      // ChartRedraw timing
-      ulong t5 = GetMicrosecondCount();
       ChartRedraw(0);
-      ulong t6 = GetMicrosecondCount();
-      Print("[TIMING] 3. ChartRedraw took: ", (t6 - t5) / 1000.0, " ms");
-
-      ulong total = GetMicrosecondCount() - start_total;
-      Print("[TIMING] TOTAL OnChartEvent took: ", total / 1000.0, " ms");
-      Print("[TIMING] ========== BUTTON CLICK END ==========");
    }
 }
 
@@ -1449,235 +1379,6 @@ void ExecuteHybridTrade(ENUM_ORDER_TYPE orderType)
    {
       Print("HYBRID Order Failed");
    }
-}
-
-//+------------------------------------------------------------------+
-//| TEST HELPER: Print Hybrid Mode State (Sprint 6)                   |
-//| Usage: Click "STATE" button on dashboard                          |
-//+------------------------------------------------------------------+
-void TestPrintHybridState()
-{
-   TrendMatrix tm = signalEngine.GetTrendMatrix();
-   MarketContext ctx = signalEngine.GetMarketContext();
-
-   Print("========================================");
-   Print("    HYBRID MODE STATE DUMP");
-   Print("========================================");
-
-   // DEBUG: Show actual price and EMA values
-   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double h4_ema50 = signalEngine.GetEMAValue(PERIOD_H4, 50, 0);
-   double h1_ema50 = signalEngine.GetEMAValue(PERIOD_H1, 50, 0);
-   double m15_ema50 = signalEngine.GetEMAValue(PERIOD_M15, 50, 0);
-   double m15_ema200 = signalEngine.GetEMAValue(PERIOD_M15, 200, 0);  // For comparison
-
-   Print("--- PRICE vs EMA 50 DEBUG ---");
-   Print("Current Price: ", currentPrice);
-   Print("H4 EMA 50: ", h4_ema50, " | Price ", (currentPrice > h4_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - h4_ema50) / _Point, 0));
-   Print("H1 EMA 50: ", h1_ema50, " | Price ", (currentPrice > h1_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - h1_ema50) / _Point, 0));
-   Print("M15 EMA 50: ", m15_ema50, " | Price ", (currentPrice > m15_ema50 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - m15_ema50) / _Point, 0));
-   Print("M15 EMA 200: ", m15_ema200, " | Price ", (currentPrice > m15_ema200 ? ">" : "<"), " EMA | Diff: ", DoubleToString((currentPrice - m15_ema200) / _Point, 0), " (old)");
-
-   // Trend Matrix
-   Print("--- TREND MATRIX ---");
-   Print("H4 Trend: ",  EnumToString(tm.h4));
-   Print("H1 Trend: ",  EnumToString(tm.h1));
-   Print("M15 Trend: ", EnumToString(tm.m15));
-   Print("Trend Score: ", tm.score, " (Range: -3 to +3)");
-
-   // Market Context
-   Print("--- MARKET CONTEXT ---");
-   Print("Market State: ", EnumToString(ctx.marketState));
-   Print("ADX Value: ", ctx.adxValue);
-   Print("ATR M15: ", ctx.atrM15, " points");
-   Print("ATR M5: ", ctx.atrM5, " points");
-
-   // Slope Analysis
-   Print("--- SLOPE ANALYSIS ---");
-   Print("H1 Slope: ", EnumToString(ctx.slopeH1));
-   Print("Slope Value: ", ctx.slopeValue);
-   Print("EMA Distance: ", ctx.emaDistance, " points");
-
-   // Hybrid Mode State
-   Print("--- HYBRID STATE ---");
-   Print("Context Ready: ", g_hybrid_context_ready ? "YES" : "NO");
-   Print("Trend Bias: ", EnumToString(g_hybrid_bias));
-   Print("Hybrid Mode: ", g_hybrid_mode_enabled ? "ENABLED" : "DISABLED");
-   Print("Sniper Mode: ", g_sniper_mode_enabled ? "ENABLED" : "DISABLED");
-
-   Print("========================================");
-}
-
-//+------------------------------------------------------------------+
-//| TEST HELPER: Test Hybrid Signal Detection (Sprint 6)             |
-//| Usage: Click "SIGNAL" button on dashboard                         |
-//+------------------------------------------------------------------+
-void TestHybridSignal()
-{
-   Print("========================================");
-   Print("    TESTING HYBRID SIGNAL DETECTION");
-   Print("========================================");
-
-   ENUM_SIGNAL_TYPE signal = signalEngine.GetHybridSignal(
-      true,   // Debug mode ON
-      Input_Hybrid_EMA_MaxDist,
-      Input_Hybrid_Trend_MinScore
-   );
-
-   Print("SIGNAL RESULT: ", EnumToString(signal));
-
-   if(signal == SIGNAL_PA_BUY)
-      Print("✅ HYBRID BUY signal detected - READY TO TRADE");
-   else if(signal == SIGNAL_PA_SELL)
-      Print("✅ HYBRID SELL signal detected - READY TO TRADE");
-   else
-      Print("❌ NO SIGNAL - See logs for rejection reason");
-
-   Print("========================================");
-}
-
-//+------------------------------------------------------------------+
-//| TEST HELPER: Print Filter Status (Sprint 6)                       |
-//| Usage: Click "FILTERS" button on dashboard                        |
-//+------------------------------------------------------------------+
-void TestPrintFilters()
-{
-   TrendMatrix tm = signalEngine.GetTrendMatrix();
-   MarketContext ctx = signalEngine.GetMarketContext();
-   double priceM15 = iClose(_Symbol, PERIOD_M15, 0);
-   double emaM15 = signalEngine.GetEMAValue(PERIOD_M15, 20, 0);
-   double distFromEMA = MathAbs(priceM15 - emaM15) / _Point;
-   double maxAllowedDist = ctx.atrM15 * Input_Hybrid_EMA_MaxDist;
-
-   Print("========================================");
-   Print("    HYBRID FILTER STATUS");
-   Print("========================================");
-
-   // Filter 1: Trend Alignment
-   bool trendPass = (tm.score >= (int)Input_Hybrid_Trend_MinScore ||
-                     tm.score <= -(int)Input_Hybrid_Trend_MinScore);
-   Print("[1] TREND FILTER: ", trendPass ? "✅ PASS" : "❌ FAIL",
-         " | Score: ", tm.score, " (Need ±", Input_Hybrid_Trend_MinScore, "+)");
-
-   // Filter 2: Market State
-   bool statePass = (ctx.marketState != STATE_CHOPPY);
-   Print("[2] MARKET STATE: ", statePass ? "✅ PASS" : "❌ FAIL",
-         " | ", EnumToString(ctx.marketState));
-
-   // Filter 3: Volatility
-   bool volPass = (ctx.atrM15 >= Input_Hybrid_MinATR);
-   Print("[3] VOLATILITY: ", volPass ? "✅ PASS" : "❌ FAIL",
-         " | ATR: ", ctx.atrM15, " (Min: ", Input_Hybrid_MinATR, ")");
-
-   // Filter 4: Location (Distance from EMA)
-   bool locPass = (distFromEMA <= maxAllowedDist);
-   Print("[4] LOCATION: ", locPass ? "✅ PASS" : "❌ FAIL",
-         " | Dist: ", (int)distFromEMA, " pts (Max: ", (int)maxAllowedDist, " pts)");
-
-   // Filter 5: Slope Safety
-   bool slopeBuyPass = (ctx.slopeH1 != SLOPE_CRASH);
-   bool slopeSellPass = (ctx.slopeH1 != SLOPE_ROCKET);
-   Print("[5] SLOPE SAFETY:");
-   Print("    Buy Protection: ", slopeBuyPass ? "✅ PASS" : "❌ FAIL",
-         " | ", EnumToString(ctx.slopeH1));
-   Print("    Sell Protection: ", slopeSellPass ? "✅ PASS" : "❌ FAIL",
-         " | ", EnumToString(ctx.slopeH1));
-
-   // Overall Status
-   bool allPass = trendPass && statePass && volPass && locPass;
-   Print("---");
-   Print("OVERALL: ", allPass ? "✅ ALL FILTERS PASS" : "❌ FILTERS BLOCKING");
-   Print("========================================");
-}
-
-//+------------------------------------------------------------------+
-//| TEST HELPER: Test Trade Calculation (Sprint 6)                   |
-//| Usage: Click "TRADE" button on dashboard                          |
-//+------------------------------------------------------------------+
-void TestTradeCalculation()
-{
-   Print("========================================");
-   Print("    TRADE CALCULATION TEST");
-   Print("========================================");
-
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-
-   // Test BUY trade
-   Print("--- BUY TRADE ---");
-   Print("Entry: ", ask);
-   double buySL = ask - (Input_Hybrid_SL_Points * _Point);
-   double buyTP = ask + (Input_Hybrid_TP_Points * _Point);
-   Print("SL: ", buySL, " (Distance: -", Input_Hybrid_SL_Points, " pts)");
-   Print("TP: ", buyTP, " (Distance: +", Input_Hybrid_TP_Points, " pts)");
-   Print("Risk:Reward: 1:", StringFormat("%.1f", (double)Input_Hybrid_TP_Points / Input_Hybrid_SL_Points));
-
-   // Test SELL trade
-   Print("\n--- SELL TRADE ---");
-   Print("Entry: ", bid);
-   double sellSL = bid + (Input_Hybrid_SL_Points * _Point);
-   double sellTP = bid - (Input_Hybrid_TP_Points * _Point);
-   Print("SL: ", sellSL, " (Distance: +", Input_Hybrid_SL_Points, " pts)");
-   Print("TP: ", sellTP, " (Distance: -", Input_Hybrid_TP_Points, " pts)");
-   Print("Risk:Reward: 1:", StringFormat("%.1f", (double)Input_Hybrid_TP_Points / Input_Hybrid_SL_Points));
-
-   // Lot Size Info
-   Print("\n--- LOT SIZE MODE ---");
-   if(Input_Hybrid_Lot_Mode == LOT_MODE_FIXED_LOTS)
-      Print("Mode: FIXED LOTS | Size: ", Input_Hybrid_Fixed_Lots);
-   else
-      Print("Mode: RISK PERCENT | Risk: ", Input_Hybrid_Risk_Percent, "%");
-
-   Print("========================================");
-}
-
-//+------------------------------------------------------------------+
-//| TEST HELPER: Test Lot Size Calculation (Sprint 6)                |
-//| Usage: Click "LOT CALC" button on dashboard                      |
-//+------------------------------------------------------------------+
-void TestLotSizeCalculation()
-{
-   Print("========================================");
-   Print("    LOT SIZE CALCULATION TEST");
-   Print("========================================");
-
-   double entry = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double sl = entry - (Input_Hybrid_SL_Points * _Point);
-   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-
-   // Symbol limits
-   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-   double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
-   double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
-
-   Print("--- SYMBOL LIMITS ---");
-   Print("Min Lot: ", minLot);
-   Print("Max Lot: ", maxLot);
-   Print("Lot Step: ", lotStep);
-   Print("Current Balance: $", balance);
-
-   // Test Risk Percent Mode
-   Print("\n--- RISK PERCENT MODE ---");
-   for(double risk = 0.5; risk <= 3.0; risk += 0.5)
-   {
-      double lots = tradeManager.CalculateLotSize(entry, sl, risk);
-      Print("Risk ", risk, "%: ", StringFormat("%.2f", lots), " lots");
-   }
-
-   // Test Fixed Lot Mode
-   Print("\n--- FIXED LOT MODE ---");
-   Print("Configured: ", Input_Hybrid_Fixed_Lots, " lots");
-
-   // Validate fixed lot
-   double validatedLot = Input_Hybrid_Fixed_Lots;
-   if(validatedLot < minLot) validatedLot = minLot;
-   if(validatedLot > maxLot) validatedLot = maxLot;
-   if(validatedLot > 10.0) validatedLot = 10.0; // Safety cap
-   validatedLot = MathFloor(validatedLot / lotStep) * lotStep;
-
-   Print("Validated: ", validatedLot, " lots");
-
-   Print("========================================");
 }
 
 //+------------------------------------------------------------------+
