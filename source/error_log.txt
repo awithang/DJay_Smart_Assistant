@@ -1,3 +1,2 @@
-variable already defined	DJay_Smart_Assistant.mq5	543	11
-   see declaration of variable '"void OnTimer()"::paText'	DJay_Smart_Assistant.mq5	421	11
+function 'CSignalEngine::GetCurrentSession' must have a body	SignalEngine.mqh	127	26
 1 errors, 0 warnings		1	0

@@ -1,0 +1,16 @@
+EK	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK START ==========
+EI	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] Clicked object: DJ_BtnMode
+HL	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 1. OnEvent took: 0.019 ms
+GN	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	Trading Mode: AUTO ON (Manual + Auto trading)
+CJ	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 2. Button handlers took: 0.004 ms
+CH	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 3. ChartRedraw took: 0.003 ms
+RL	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] TOTAL OnChartEvent took: 0.045 ms
+RN	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK END ==========
+RJ	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK START ==========
+QD	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] Clicked object: DJ_BtnStratQS
+NL	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 1. OnEvent took: 0.001 ms
+NS	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	Hybrid Mode: ENABLED
+NG	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 2. Button handlers took: 0.006 ms
+OM	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 3. ChartRedraw took: 0.006 ms
+EP	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] TOTAL OnChartEvent took: 0.036 ms
+IJ	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK END ==========

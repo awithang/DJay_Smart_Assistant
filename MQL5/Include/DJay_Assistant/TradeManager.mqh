@@ -86,6 +86,7 @@ void CTradeManager::Init(int magic_number)
    m_magic_number = magic_number;
    m_trade.SetExpertMagicNumber(m_magic_number);
    m_trade.SetDeviationInPoints(10); // Allow 10 points slippage
+   m_trade.SetAsyncMode(true);       // OPTIMIZATION: Async mode for instant UI response
    m_point = _Point;
 }
 

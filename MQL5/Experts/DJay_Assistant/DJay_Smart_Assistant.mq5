@@ -164,8 +164,8 @@ int OnInit()
    dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
 
    EventSetTimer(1);
-   ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // Enable Mouse Events for Dragging
-
+   // ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // OPTIMIZATION: Disabled to prevent event queue flooding
+   
    Print("DJAY Smart Assistant initialized successfully.");
    return(INIT_SUCCEEDED);
 }
@@ -245,7 +245,8 @@ void OnTick()
    // totalProfit already calculated above
    int currentPositionsCount = PositionsTotal();
 
-   if(MathAbs(totalProfit - lastTotalProfit) > 0.01 || currentPositionsCount != lastPositionsCount)
+   // OPTIMIZATION: Increased threshold from 0.01 to 0.05 to reduce redraws
+   if(MathAbs(totalProfit - lastTotalProfit) > 0.05 || currentPositionsCount != lastPositionsCount)
    {
       long orderTickets[20];
       double orderPrices[20];
@@ -277,6 +278,7 @@ void OnTick()
       lastTotalProfit = totalProfit;
       lastPositionsCount = currentPositionsCount;
    }
+
 
    // Check for PA signals (only on new bar)
    static datetime lastBarTime = 0;
@@ -501,22 +503,22 @@ void OnTimer()
    if(g_last_rev_entry.isValid && !g_has_captured_rev) {
       g_captured_rev_entry = g_last_rev_entry;
       g_has_captured_rev = true;
-      Print("DEBUG: Captured Reversal entry - ", g_captured_rev_entry.direction, " @ ", g_captured_rev_entry.price, " (", g_captured_rev_entry.zone, ")");
+      // Print("DEBUG: Captured Reversal entry - ", g_captured_rev_entry.direction, " @ ", g_captured_rev_entry.price, " (", g_captured_rev_entry.zone, ")");
    }
    // Reset capture when signal becomes invalid (using isValid flag, not description string)
    if(!g_last_rev_entry.isValid && g_has_captured_rev) {
-      Print("DEBUG: Resetting captured Reversal entry - signal invalid");
+      // Print("DEBUG: Resetting captured Reversal entry - signal invalid");
       g_has_captured_rev = false;
    }
 
    if(g_last_brk_entry.isValid && !g_has_captured_brk) {
       g_captured_brk_entry = g_last_brk_entry;
       g_has_captured_brk = true;
-      Print("DEBUG: Captured Breakout entry - ", g_captured_brk_entry.direction, " @ ", g_captured_brk_entry.price, " (", g_captured_brk_entry.zone, ")");
+      // Print("DEBUG: Captured Breakout entry - ", g_captured_brk_entry.direction, " @ ", g_captured_brk_entry.price, " (", g_captured_brk_entry.zone, ")");
    }
    // Reset capture when signal becomes invalid (using isValid flag, not description string)
    if(!g_last_brk_entry.isValid && g_has_captured_brk) {
-      Print("DEBUG: Resetting captured Breakout entry - signal invalid");
+      // Print("DEBUG: Resetting captured Breakout entry - signal invalid");
       g_has_captured_brk = false;
    }
 
@@ -673,10 +675,9 @@ void OnTimer()
    }
 
    // 4. Panel Updates
-   // dashboardPanel.UpdateAccountInfo(); // Removed
-
    // Price and Orders are now updated in OnTick for real-time responsiveness
 
+   // OPTIMIZATION: Moved heavy zone updates here from OnTick
    double d1Open = signalEngine.GetD1Open();
    dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
    currentPrice = signalEngine.GetCurrentPrice();
@@ -697,13 +698,25 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   // Forward event to dashboard for handling (e.g. Dragging)
-   dashboardPanel.OnEvent(id, lparam, dparam, sparam);
-
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
+      ulong start_total = GetMicrosecondCount();
+      Print("[TIMING] ========== BUTTON CLICK START ==========");
+      Print("[TIMING] Clicked object: ", sparam);
+
+      // Forward event to dashboard for handling (e.g. Dragging)
+      ulong t1 = GetMicrosecondCount();
+      dashboardPanel.OnEvent(id, lparam, dparam, sparam);
+      ulong t2 = GetMicrosecondCount();
+      Print("[TIMING] 1. OnEvent took: ", (t2 - t1) / 1000.0, " ms");
+
+      // Button handler timing
+      ulong t3 = GetMicrosecondCount();
+      bool handled = false;
+
       if(dashboardPanel.IsBuyButtonClicked(sparam))
       {
+         ulong tb1 = GetMicrosecondCount();
          // Check if trading is allowed BEFORE attempting execution
          if(!IsTradingAllowed())
          {
@@ -716,9 +729,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ExecuteBuyTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
+         ulong tb2 = GetMicrosecondCount();
+         Print("[TIMING] Buy button took: ", (tb2 - tb1) / 1000.0, " ms");
+         handled = true;
       }
       else if(dashboardPanel.IsSellButtonClicked(sparam))
       {
+         ulong tb1 = GetMicrosecondCount();
          // Check if trading is allowed BEFORE attempting execution
          if(!IsTradingAllowed())
          {
@@ -731,11 +748,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ExecuteSellTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
          }
+         ulong tb2 = GetMicrosecondCount();
+         Print("[TIMING] Sell button took: ", (tb2 - tb1) / 1000.0, " ms");
+         handled = true;
       }
       else if(dashboardPanel.IsModeButtonClicked(sparam))
       {
          // Toggle AUTO mode (ON/OFF) - Manual always available
-         Print("DEBUG: Auto button clicked! Before toggle: g_tradingMode=", (int)g_tradingMode, " (0=OFF, 1=ON)");
+         // Print("DEBUG: Auto button clicked! Before toggle: g_tradingMode=", (int)g_tradingMode, " (0=OFF, 1=ON)");
          g_tradingMode = (g_tradingMode == MODE_MANUAL) ? MODE_AUTO : MODE_MANUAL;
          dashboardPanel.UpdateTradingMode((int)g_tradingMode);
          string modeStr = (g_tradingMode == MODE_AUTO) ? "AUTO ON (Manual + Auto trading)" : "AUTO OFF (Manual only)";
@@ -922,21 +942,33 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       // Strategy Toggles
       else if(dashboardPanel.IsStratArrowClicked(sparam))
       {
+         ulong ts1 = GetMicrosecondCount();
          g_strat_arrow = !g_strat_arrow;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ulong ts2 = GetMicrosecondCount();
+         Print("[TIMING] StratArrow toggle took: ", (ts2 - ts1) / 1000.0, " ms");
+         handled = true;
       }
       else if(dashboardPanel.IsStratRevClicked(sparam))
       {
+         ulong ts1 = GetMicrosecondCount();
          g_strat_rev = !g_strat_rev;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ulong ts2 = GetMicrosecondCount();
+         Print("[TIMING] StratRev toggle took: ", (ts2 - ts1) / 1000.0, " ms");
+         handled = true;
       }
       else if(dashboardPanel.IsStratBreakClicked(sparam))
       {
+         ulong ts1 = GetMicrosecondCount();
          g_strat_break = !g_strat_break;
          dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ulong ts2 = GetMicrosecondCount();
+         Print("[TIMING] StratBreak toggle took: ", (ts2 - ts1) / 1000.0, " ms");
+         handled = true;
       }
       else if(dashboardPanel.IsStratQSClicked(sparam))
       {
@@ -1019,7 +1051,19 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
          }
       }
+
+      ulong t4 = GetMicrosecondCount();
+      Print("[TIMING] 2. Button handlers took: ", (t4 - t3) / 1000.0, " ms");
+
+      // ChartRedraw timing
+      ulong t5 = GetMicrosecondCount();
       ChartRedraw(0);
+      ulong t6 = GetMicrosecondCount();
+      Print("[TIMING] 3. ChartRedraw took: ", (t6 - t5) / 1000.0, " ms");
+
+      ulong total = GetMicrosecondCount() - start_total;
+      Print("[TIMING] TOTAL OnChartEvent took: ", total / 1000.0, " ms");
+      Print("[TIMING] ========== BUTTON CLICK END ==========");
    }
 }
 

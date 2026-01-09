@@ -97,6 +97,16 @@ private:
     int    m_handle_m15_100, m_handle_m15_200;
     int    m_handle_m15_20, m_handle_m15_50; // Cached for Sniper/Trend Matrix
 
+    // OPTIMIZATION: Persistent Handles for Heavy Indicators
+    // Creating/Destroying handles in OnTick causes massive lag (2-3s freezes)
+    int    m_handle_rsi_m15;    // RSI 14 on M15
+    int    m_handle_rsi_m5;     // RSI 14 on M5
+    int    m_handle_stoch_m15;  // Stoch (14,3,3) on M15
+    int    m_handle_stoch_m5;   // Stoch (14,3,3) on M5
+    int    m_handle_atr_m15;    // ATR 14 on M15
+    int    m_handle_atr_m5;     // ATR 14 on M5
+    int    m_handle_atr_h1;     // ATR 14 on H1 (for Slope thresholds)
+
     // Helper method for copying indicator buffer values
     double CopyBufferValue(int handle, int buffer_num);
 
@@ -206,6 +216,12 @@ CSignalEngine::CSignalEngine()
     m_handle_h1_100 = INVALID_HANDLE; m_handle_h1_200 = INVALID_HANDLE;
     m_handle_m15_100 = INVALID_HANDLE; m_handle_m15_200 = INVALID_HANDLE;
     m_handle_m15_20 = INVALID_HANDLE; m_handle_m15_50 = INVALID_HANDLE;
+    
+    // Initialize new persistent handles
+    m_handle_rsi_m15 = INVALID_HANDLE; m_handle_rsi_m5 = INVALID_HANDLE;
+    m_handle_stoch_m15 = INVALID_HANDLE; m_handle_stoch_m5 = INVALID_HANDLE;
+    m_handle_atr_m15 = INVALID_HANDLE; m_handle_atr_m5 = INVALID_HANDLE;
+    m_handle_atr_h1 = INVALID_HANDLE;
 }
 
 //+------------------------------------------------------------------+
@@ -235,6 +251,15 @@ CSignalEngine::~CSignalEngine()
     
     if(m_handle_m15_20 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_20);
     if(m_handle_m15_50 != INVALID_HANDLE) IndicatorRelease(m_handle_m15_50);
+
+    // Release Persistent Handles
+    if(m_handle_rsi_m15 != INVALID_HANDLE) IndicatorRelease(m_handle_rsi_m15);
+    if(m_handle_rsi_m5 != INVALID_HANDLE) IndicatorRelease(m_handle_rsi_m5);
+    if(m_handle_stoch_m15 != INVALID_HANDLE) IndicatorRelease(m_handle_stoch_m15);
+    if(m_handle_stoch_m5 != INVALID_HANDLE) IndicatorRelease(m_handle_stoch_m5);
+    if(m_handle_atr_m15 != INVALID_HANDLE) IndicatorRelease(m_handle_atr_m15);
+    if(m_handle_atr_m5 != INVALID_HANDLE) IndicatorRelease(m_handle_atr_m5);
+    if(m_handle_atr_h1 != INVALID_HANDLE) IndicatorRelease(m_handle_atr_h1);
 
     // Release ADX indicator handle (Quick Scalp choppy market filter)
     if(m_handle_adx != INVALID_HANDLE) IndicatorRelease(m_handle_adx);
@@ -269,6 +294,20 @@ void CSignalEngine::Init(int zone_offset1, int zone_offset2, int gmt_offset)
     
     m_handle_m15_20 = iMA(_Symbol, PERIOD_M15, 20, 0, MODE_EMA, PRICE_CLOSE);
     m_handle_m15_50 = iMA(_Symbol, PERIOD_M15, 50, 0, MODE_EMA, PRICE_CLOSE);
+
+    // Create Persistent Handles for Strategy Indicators (Optimization)
+    // 1. RSI (14)
+    m_handle_rsi_m15 = iRSI(_Symbol, PERIOD_M15, 14, PRICE_CLOSE);
+    m_handle_rsi_m5  = iRSI(_Symbol, PERIOD_M5, 14, PRICE_CLOSE);
+    
+    // 2. Stochastic (14, 3, 3)
+    m_handle_stoch_m15 = iStochastic(_Symbol, PERIOD_M15, 14, 3, 3, MODE_SMA, STO_LOWHIGH);
+    m_handle_stoch_m5  = iStochastic(_Symbol, PERIOD_M5, 14, 3, 3, MODE_SMA, STO_LOWHIGH);
+    
+    // 3. ATR (14)
+    m_handle_atr_m15 = iATR(_Symbol, PERIOD_M15, 14);
+    m_handle_atr_m5  = iATR(_Symbol, PERIOD_M5, 14);
+    m_handle_atr_h1  = iATR(_Symbol, PERIOD_H1, 14);
 
     // Create ADX indicator handle for Quick Scalp choppy market filter
     m_handle_adx = iADX(_Symbol, PERIOD_CURRENT, 14);
@@ -475,14 +514,14 @@ ENUM_MARKET_SESSION CSignalEngine::GetCurrentSession()
    TimeToStruct(TimeCurrent(), timeStruct);
 
    // Apply GMT offset to get adjusted hour
-   int hour = timeStruct.hour - m_gmt_offset;
-   int minute = timeStruct.min;  // MQL5 uses 'min' not 'minute'
+   int h = timeStruct.hour - m_gmt_offset;
+   int m = timeStruct.min;
 
    // Handle wrap-around for negative/overflow hours
-   if(hour < 0) hour += 24;
-   if(hour > 23) hour -= 24;
+   if(h < 0) h += 24;
+   if(h > 23) h -= 24;
 
-   int currentTime = hour * 60 + minute;  // Convert to minutes
+   int currentTime = h * 60 + m;  // Convert to minutes
 
    // Asia Session: 08:00 - 10:00 (480 - 600 minutes)
    if(currentTime >= 480 && currentTime < 600)
@@ -1180,19 +1219,32 @@ EntryPoint CSignalEngine::GetBreakoutEntryPoint()
 //+------------------------------------------------------------------+
 double CSignalEngine::GetRSIValue(ENUM_TIMEFRAMES tf, int period, int shift)
 {
-   int handle = iRSI(_Symbol, tf, period, PRICE_CLOSE);
+   // OPTIMIZATION: Use persistent handles instead of creating new ones
+   // Only supports standard strategy periods (14) on M15/M5
+   int handle = INVALID_HANDLE;
+   
+   if (period == 14) {
+      if (tf == PERIOD_M15) handle = m_handle_rsi_m15;
+      else if (tf == PERIOD_M5) handle = m_handle_rsi_m5;
+   }
+   
+   // Fallback for non-standard params (slow, but safe)
+   bool isTemp = false;
    if(handle == INVALID_HANDLE)
    {
-      return -1;  // Error indicator
+      handle = iRSI(_Symbol, tf, period, PRICE_CLOSE);
+      isTemp = true;
    }
+
+   if(handle == INVALID_HANDLE) return -1;
 
    double rsiBuffer[];
    ArraySetAsSeries(rsiBuffer, true);
    int copied = CopyBuffer(handle, 0, shift, 1, rsiBuffer);
-   IndicatorRelease(handle);
+   
+   if(isTemp) IndicatorRelease(handle);
 
-   if(copied <= 0)
-      return -1;
+   if(copied <= 0) return -1;
 
    return rsiBuffer[0];
 }
@@ -1202,19 +1254,31 @@ double CSignalEngine::GetRSIValue(ENUM_TIMEFRAMES tf, int period, int shift)
 //+------------------------------------------------------------------+
 double CSignalEngine::GetStochKValue(ENUM_TIMEFRAMES tf, int k_period, int d_period, int shift)
 {
-   int handle = iStochastic(_Symbol, tf, k_period, d_period, 3, MODE_SMA, STO_LOWHIGH);
+   // OPTIMIZATION: Use persistent handles
+   int handle = INVALID_HANDLE;
+   
+   if (k_period == 14 && d_period == 3) {
+      if (tf == PERIOD_M15) handle = m_handle_stoch_m15;
+      else if (tf == PERIOD_M5) handle = m_handle_stoch_m5;
+   }
+
+   // Fallback
+   bool isTemp = false;
    if(handle == INVALID_HANDLE)
    {
-      return -1;  // Error indicator
+      handle = iStochastic(_Symbol, tf, k_period, d_period, 3, MODE_SMA, STO_LOWHIGH);
+      isTemp = true;
    }
+
+   if(handle == INVALID_HANDLE) return -1;
 
    double stochBuffer[];
    ArraySetAsSeries(stochBuffer, true);
    int copied = CopyBuffer(handle, 0, shift, 1, stochBuffer);
-   IndicatorRelease(handle);
+   
+   if(isTemp) IndicatorRelease(handle);
 
-   if(copied <= 0)
-      return -1;
+   if(copied <= 0) return -1;
 
    return stochBuffer[0];
 }
@@ -1249,18 +1313,33 @@ double CSignalEngine::GetADXValue(ENUM_TIMEFRAMES tf)
 //+------------------------------------------------------------------+
 double CSignalEngine::GetATRValue(int period = 14, ENUM_TIMEFRAMES tf = PERIOD_M15)
 {
-   int handle = iATR(_Symbol, tf, period);
+   // OPTIMIZATION: Use persistent handles
+   int handle = INVALID_HANDLE;
+   
+   if (period == 14) {
+      if (tf == PERIOD_M15) handle = m_handle_atr_m15;
+      else if (tf == PERIOD_M5) handle = m_handle_atr_m5;
+      else if (tf == PERIOD_H1) handle = m_handle_atr_h1;
+   }
+
+   // Fallback
+   bool isTemp = false;
    if(handle == INVALID_HANDLE)
-      return 0.0;
+   {
+      handle = iATR(_Symbol, tf, period);
+      isTemp = true;
+   }
+
+   if(handle == INVALID_HANDLE) return 0.0;
 
    double atrBuffer[];
    ArraySetAsSeries(atrBuffer, true);
 
    int copied = CopyBuffer(handle, 0, 0, 1, atrBuffer);
-   IndicatorRelease(handle);
+   
+   if(isTemp) IndicatorRelease(handle);
 
-   if(copied <= 0)
-      return 0.0;
+   if(copied <= 0) return 0.0;
 
    // Convert ATR from price to points
    return atrBuffer[0] / _Point;

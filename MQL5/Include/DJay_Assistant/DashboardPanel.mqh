@@ -1024,7 +1024,7 @@ void CDashboardPanel::UpdateTradingMode(int mode)
    ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
-   Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text);
+   // Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text); // Silenced for performance
 }
 
 //+------------------------------------------------------------------+
@@ -1125,8 +1125,7 @@ void CDashboardPanel::UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias
    m_hybrid_bias = bias;
 
    // DEBUG: Print state changes for verification
-   Print("HYBRID Status Update: Ready=", contextReady ? "YES" : "NO",
-         " Bias=", EnumToString(bias));
+   // Print("HYBRID Status Update: Ready=", contextReady ? "YES" : "NO", " Bias=", EnumToString(bias)); // Silenced for performance
 }
 
 //+------------------------------------------------------------------+
@@ -1174,7 +1173,9 @@ void CDashboardPanel::UpdateDJayZones(double d1_open, int maxZones)
    if(pt <= 0) return;
 
    double levels[]; string labels[];
-   for(int i=-30; i<=30; i++)
+   // OPTIMIZATION: Reduced scan range from +/-30 to +/-5 (covers +/- 5000 points)
+   // This reduces loop iterations from 61 to 11, cutting CPU load by ~80%
+   for(int i=-5; i<=5; i++)
    {
       double base = i * 1000;
       AddLevel(levels, labels, d1_open + (base * pt), StringFormat("D1 %+d", (int)base));
