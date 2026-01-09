@@ -129,6 +129,10 @@ double   g_daily_start_balance = 0; // Balance at start of trading day
 MarketContext g_marketContext;       // Current market intelligence (Sprint 1)
 bool g_sniper_mode_enabled = false;  // Track if Sniper Mode is active
 
+//--- Sniper+Hybrid Coordination State
+datetime g_last_m15_bar_time = 0;           // Track current M15 cycle for coordination
+bool g_sniper_executed_this_cycle = false;  // Track if Sniper executed in current M15 cycle
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -358,6 +362,20 @@ void OnTick()
             if(paSignal == SIGNAL_PA_SELL) ExecuteSellTrade("BREAK");
          }
 
+         // --- M15 Cycle Detection for Sniper+Hybrid Coordination ---
+         datetime currentM15BarTime = iTime(_Symbol, PERIOD_M15, 0);
+         bool newM15Bar = (currentM15BarTime != g_last_m15_bar_time);
+
+         // Reset coordination state on new M15 bar
+         if(newM15Bar)
+         {
+            g_last_m15_bar_time = currentM15BarTime;
+            g_sniper_executed_this_cycle = false;
+
+            if(g_sniper_mode_enabled && g_hybrid_mode_enabled)
+               Print("[COORD] New M15 cycle - Sniper priority reset");
+         }
+
          // --- 4. SNIPER MODE (M15 3-Filter Signals) ---
          if(g_sniper_mode_enabled)
          {
@@ -377,7 +395,10 @@ void OnTick()
 
                // AUTO MODE execution with Dynamic SL
                if(g_tradingMode == MODE_AUTO)
+               {
                   ExecuteSniperTrade(ORDER_TYPE_BUY);
+                  g_sniper_executed_this_cycle = true;  // Mark Sniper executed
+               }
             }
             else if(sniperSignal == SIGNAL_PA_SELL)
             {
@@ -387,13 +408,20 @@ void OnTick()
 
                // AUTO MODE execution with Dynamic SL
                if(g_tradingMode == MODE_AUTO)
+               {
                   ExecuteSniperTrade(ORDER_TYPE_SELL);
+                  g_sniper_executed_this_cycle = true;  // Mark Sniper executed
+               }
             }
          }
       }
 
-         // --- 5. HYBRID MODE (M15 Context + M5 Entry) - DISABLED when Sniper Mode is ON ---
-         if(g_hybrid_mode_enabled && !g_sniper_mode_enabled)
+         // --- 5. HYBRID MODE (M15 Context + M5 Entry) - Coordination with Sniper Mode ---
+         // Hybrid Mode: Enable gap-filling when Sniper hasn't executed in current M15 cycle
+         bool hybridAllowed = !g_sniper_mode_enabled ||
+                              (g_sniper_mode_enabled && !g_sniper_executed_this_cycle);
+
+         if(g_hybrid_mode_enabled && hybridAllowed)
          {
             // Only check on new M5 bar (for efficiency)
             static datetime lastM5BarTime = 0;
@@ -408,6 +436,12 @@ void OnTick()
                   Input_Hybrid_EMA_MaxDist,
                   Input_Hybrid_Trend_MinScore
                );
+
+               // Minimal logging: Only log if Hybrid signal is blocked due to Sniper execution
+               if(g_sniper_mode_enabled && hybridSignal != SIGNAL_NONE && g_sniper_executed_this_cycle)
+               {
+                  Print("[COORD] Hybrid signal BLOCKED - Sniper already executed this M15 cycle");
+               }
 
                // Execute trade on valid Hybrid signal
                if(hybridSignal == SIGNAL_PA_BUY)
@@ -1093,6 +1127,17 @@ void ExecuteBuyTrade(string strategy="MANUAL")
          Print("[AUTO_BLOCK] Buy blocked by H1 Downtrend (Trend Filter ON)");
          return;
       }
+
+      // 3. Zone Filter Check (BLOCK buy in Sell Zones)
+      ENUM_ZONE_STATUS currentZone = signalEngine.GetCurrentZoneStatus();
+      if(dashboardPanel.IsZoneFilterOn())
+      {
+         if(currentZone == ZONE_STATUS_IN_SELL1 || currentZone == ZONE_STATUS_IN_SELL2)
+         {
+            Print("[ZONE FILTER] BUY blocked - In Sell Zone");
+            return;
+         }
+      }
    }
 
    // Duplicate Prevention: Check if position with same strategy comment already exists
@@ -1153,6 +1198,17 @@ void ExecuteSellTrade(string strategy="MANUAL")
       {
          Print("[AUTO_BLOCK] Sell blocked by H1 Uptrend (Trend Filter ON)");
          return;
+      }
+
+      // 3. Zone Filter Check (BLOCK sell in Buy Zones)
+      ENUM_ZONE_STATUS currentZone = signalEngine.GetCurrentZoneStatus();
+      if(dashboardPanel.IsZoneFilterOn())
+      {
+         if(currentZone == ZONE_STATUS_IN_BUY1 || currentZone == ZONE_STATUS_IN_BUY2)
+         {
+            Print("[ZONE FILTER] SELL blocked - In Buy Zone");
+            return;
+         }
       }
    }
 
@@ -1215,6 +1271,16 @@ void ExecuteSniperTrade(ENUM_ORDER_TYPE orderType)
             Print("[SNIPER_BLOCK] Buy blocked by H1 Downtrend");
             return;
          }
+         // 3. Zone Filter Check
+         ENUM_ZONE_STATUS currentZone = signalEngine.GetCurrentZoneStatus();
+         if(dashboardPanel.IsZoneFilterOn())
+         {
+            if(currentZone == ZONE_STATUS_IN_SELL1 || currentZone == ZONE_STATUS_IN_SELL2)
+            {
+               Print("[SNIPER] BUY blocked by Zone Filter - In Sell Zone");
+               return;
+            }
+         }
       }
       else // SELL
       {
@@ -1229,6 +1295,16 @@ void ExecuteSniperTrade(ENUM_ORDER_TYPE orderType)
          {
             Print("[SNIPER_BLOCK] Sell blocked by H1 Uptrend");
             return;
+         }
+         // 3. Zone Filter Check
+         ENUM_ZONE_STATUS currentZone = signalEngine.GetCurrentZoneStatus();
+         if(dashboardPanel.IsZoneFilterOn())
+         {
+            if(currentZone == ZONE_STATUS_IN_BUY1 || currentZone == ZONE_STATUS_IN_BUY2)
+            {
+               Print("[SNIPER] SELL blocked by Zone Filter - In Buy Zone");
+               return;
+            }
          }
       }
    }
@@ -1281,6 +1357,28 @@ void ExecuteHybridTrade(ENUM_ORDER_TYPE orderType)
    // Risk Management Check
    if(!IsTradingAllowed())
       return;
+
+   // Zone Filter Check for Hybrid Mode
+   ENUM_ZONE_STATUS currentZone = signalEngine.GetCurrentZoneStatus();
+   if(dashboardPanel.IsZoneFilterOn())
+   {
+      if(orderType == ORDER_TYPE_BUY)
+      {
+         if(currentZone == ZONE_STATUS_IN_SELL1 || currentZone == ZONE_STATUS_IN_SELL2)
+         {
+            Print("[HYBRID] BUY blocked by Zone Filter - In Sell Zone");
+            return;
+         }
+      }
+      else if(orderType == ORDER_TYPE_SELL)
+      {
+         if(currentZone == ZONE_STATUS_IN_BUY1 || currentZone == ZONE_STATUS_IN_BUY2)
+         {
+            Print("[HYBRID] SELL blocked by Zone Filter - In Buy Zone");
+            return;
+         }
+      }
+   }
 
    // Calculate entry price
    double entryPrice = (orderType == ORDER_TYPE_BUY) ?
