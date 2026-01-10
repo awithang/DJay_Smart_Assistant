@@ -97,7 +97,11 @@ public:
    //--- Sniper Update: Sprint 3 - Market Intelligence Grid Update Methods
    void UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal, ENUM_SIGNAL_TYPE m5Signal = SIGNAL_NONE);
    void UpdateActiveOrders(int count, long &tickets[], double &prices[], double &profits[], double &lots[], int &types[], double total_profit);
-   
+
+   //--- Sprint 7: Trade Strategy Recommendation Update
+   void UpdateTradeStrategy(TradeRecommendation &rec);
+   string GetRecommendationIcon(string code);
+
    //--- Ghost Button Logic (v5.0)
    void UpdateExecutionButtons(MarketContext &ctx);
 
@@ -332,6 +336,41 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("ADX_T2", col3_x, row6_y, "ADX:", clrGray, 8);
    CreateLabel("ADX_V2", col3_x + 25, row6_y, "--", clrGray, 8);
+
+   // ============================================
+   // SPRINT 7: TRADE STRATEGY SECTION
+   // ============================================
+
+   int strat_y_start = 250;  // Start below Market Intelligence
+   int strat_row_h = 18;     // Row height
+
+   CreateLabel("Strategy_Header", left_x, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
+
+   // Row 1: Market State
+   CreateLabel("Strategy_State_Label", left_x + 5, strat_y_start + strat_row_h, "State:", clrGray, 8);
+   CreateLabel("Strategy_State", left_x + 35, strat_y_start + strat_row_h, "--", clrGray, 8);
+
+   // Row 2: Recommendation
+   CreateLabel("Strategy_Rec_Label", left_x + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 8);
+   CreateLabel("Strategy_Rec_Code", left_x + 30, strat_y_start + strat_row_h * 2, "⏳", clrGray, 10);
+   CreateLabel("Strategy_Rec_Text", left_x + 45, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 8, "Arial Bold");
+
+   // Row 3: Reasoning
+   CreateLabel("Strategy_Reasoning", left_x + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 7);
+
+   // Row 4: Entry
+   CreateLabel("Strategy_Entry_Label", left_x + 5, strat_y_start + strat_row_h * 4, "📌 ENTRY:", clrGray, 8);
+   CreateLabel("Strategy_Entry_Type", left_x + 55, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
+   CreateLabel("Strategy_Entry_Price", left_x + 100, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
+
+   // Row 5: Targets
+   CreateLabel("Strategy_Targets", left_x + 5, strat_y_start + strat_row_h * 5, "TP: -- | SL: --", clrGray, 8);
+
+   // Row 6: Alternatives
+   CreateLabel("Strategy_Alt_Label", left_x + 5, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+   CreateLabel("Strategy_Alt_Text", left_x + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+
+   // ============================================
 
    // 3. Daily Zones Table (Panel A)
    CreateLabel("LblZ", left_x + pad, 320, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
@@ -1992,6 +2031,73 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
    
    // Apply to Main Background
    ObjectSetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_BORDER_COLOR, mainBorder);
+}
+
+//+------------------------------------------------------------------+
+//| Update Trade Strategy Recommendation                               |
+//| Display natural language trading recommendations for manual       |
+//| traders in the cockpit.                                          |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateTradeStrategy(TradeRecommendation &rec)
+{
+   // Note: UI elements for Trade Strategy section will be created in CreatePanel()
+   // This function updates the existing elements with new data
+
+   // Update market state
+   SetText("Strategy_State", rec.marketStateText);
+
+   // Update recommendation code with icon
+   SetText("Strategy_Rec_Code", GetRecommendationIcon(rec.recommendationCode));
+   SetColor("Strategy_Rec_Code", rec.recommendationColor);
+
+   // Update recommendation text
+   SetText("Strategy_Rec_Text", rec.recommendationText);
+   SetColor("Strategy_Rec_Text", rec.recommendationColor);
+
+   // Update reasoning
+   SetText("Strategy_Reasoning", rec.reasoning);
+
+   // Update entry details - format as "BUY LIMIT @ 1.0850" or "--" if no entry
+   if(rec.entryType != "")
+   {
+      SetText("Strategy_Entry_Type", rec.entryType + " @");
+      SetText("Strategy_Entry_Price", rec.entryPriceText);
+      SetText("Strategy_Targets", rec.targetsText);
+   }
+   else
+   {
+      SetText("Strategy_Entry_Type", "");
+      SetText("Strategy_Entry_Price", "--");
+      SetText("Strategy_Targets", "");
+   }
+
+   // Update targets (already set above, but kept for clarity)
+   // SetText("Strategy_Targets", rec.targetsText);
+
+   // Update alternatives if present
+   if(rec.alternatives != "")
+   {
+      SetText("Strategy_Alt_Label", "Alt:");
+      SetText("Strategy_Alt_Text", rec.alternatives);
+   }
+   else
+   {
+      SetText("Strategy_Alt_Label", "");
+      SetText("Strategy_Alt_Text", "");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Get Recommendation Icon                                           |
+//| Convert recommendation code to visual icon                        |
+//+------------------------------------------------------------------+
+string CDashboardPanel::GetRecommendationIcon(string code)
+{
+   if(code == "BUY" || code == "SELL") return "✅";
+   if(code == "WAIT_PULLBACK" || code == "WAIT_ZONE") return "⚠️";
+   if(code == "STAY_OUT" || code == "CHOPPY" || code == "NO_TREND") return "🔴";
+   if(code == "WAIT") return "⏳";
+   return "⏳";  // Default
 }
 
 //+------------------------------------------------------------------+

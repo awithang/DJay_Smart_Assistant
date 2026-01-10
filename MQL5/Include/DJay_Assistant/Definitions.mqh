@@ -254,3 +254,47 @@ struct MarketContext
 };
 
 //+------------------------------------------------------------------+
+//| Trade Recommendation for Manual Traders                           |
+//+------------------------------------------------------------------+
+struct TradeRecommendation
+{
+    bool isValid;                    // Is there a valid recommendation?
+    string recommendationCode;       // "BUY", "SELL", "WAIT_PULLBACK", "STAY_OUT", etc.
+    string recommendationText;       // Natural language description
+    string marketStateText;          // Formatted market state summary
+
+    // Entry details
+    string entryType;                // "MARKET", "LIMIT", "STOP"
+    double entryPrice;               // Recommended entry price
+    string entryPriceText;           // Formatted entry price text
+
+    // Targets
+    double takeProfit;               // Take profit price
+    double stopLoss;                 // Stop loss price
+    string targetsText;              // Formatted TP/SL text
+
+    // Context
+    string reasoning;                // Why this recommendation
+    string alternatives;             // Alternative approaches
+    color recommendationColor;       // Visual indicator color
+
+    // Constructor
+    void TradeRecommendation()
+    {
+        isValid = false;
+        recommendationCode = "";
+        recommendationText = "";
+        marketStateText = "";
+        entryType = "";
+        entryPrice = 0.0;
+        entryPriceText = "";
+        takeProfit = 0.0;
+        stopLoss = 0.0;
+        targetsText = "";
+        reasoning = "";
+        alternatives = "";
+        recommendationColor = clrGray;
+    }
+};
+
+//+------------------------------------------------------------------+

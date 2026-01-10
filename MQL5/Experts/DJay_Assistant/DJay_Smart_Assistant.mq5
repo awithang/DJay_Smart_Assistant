@@ -688,6 +688,29 @@ void OnTimer()
    // Update the Market Intelligence Grid with all context data (including M5 PA for Hybrid)
    dashboardPanel.UpdateMarketIntelligenceGrid(g_marketContext, rsiForGrid, stochForGrid, m15Signal, m5Signal);
 
+   // SPRINT 7: Get Trade Recommendation for Manual Traders
+   TradeRecommendation tradeRec = signalEngine.GetTradeRecommendation();
+
+   // DEBUG: Print recommendation to Experts log (remove after testing)
+   static datetime lastPrintTime = 0;
+   if(TimeCurrent() - lastPrintTime > 60)  // Print every 60 seconds
+   {
+      lastPrintTime = TimeCurrent();
+      Print("=== TRADE RECOMMENDATION ===");
+      Print("Code: ", tradeRec.recommendationCode);
+      Print("Text: ", tradeRec.recommendationText);
+      Print("Market State: ", tradeRec.marketStateText);
+      Print("Entry: ", tradeRec.entryType, " @ ", tradeRec.entryPriceText);
+      Print("Targets: ", tradeRec.targetsText);
+      Print("Reason: ", tradeRec.reasoning);
+      if(tradeRec.alternatives != "")
+         Print("Alternatives: ", tradeRec.alternatives);
+      Print("============================");
+   }
+
+   // Update Trade Strategy UI
+   dashboardPanel.UpdateTradeStrategy(tradeRec);
+
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
    double recPrice, recSL, recTP;

@@ -166,6 +166,12 @@ public:
     bool IsNearStructuralLevel(double price, double tolerance_points = 50.0);
     MarketContext GetMarketContext();  // Get complete market context in one call
 
+    //--- Trade Recommendation for Manual Traders (Sprint 7)
+    TradeRecommendation GetTradeRecommendation();  // Get natural language trading recommendation
+    string FormatMarketState(MarketContext &ctx, ENUM_ZONE_STATUS zone, double rsi, double stoch);
+    string FormatPrice(double price);
+    string GetZoneText(ENUM_ZONE_STATUS zone);
+
     //--- Sniper Update: Sprint 2 - Sniper Filter Functions
     ENUM_SIGNAL_TYPE GetSniperSignal(bool debug_mode = false,  // M15-based filtered signals
                                      double atr_multiplier = 1.0,      // Volume filter multiplier
@@ -1553,6 +1559,8 @@ MarketContext CSignalEngine::GetMarketContext()
       if(dist < minDistance)
          minDistance = dist;
    }
+   ctx.distanceToNearestZone = minDistance;  // FIX: Assign calculated distance to context
+
    // Calculate Space to Target (Room to Run)
    double space = 0.0;
    double minSpace = DBL_MAX;
@@ -1583,6 +1591,204 @@ MarketContext CSignalEngine::GetMarketContext()
    else ctx.spaceToTarget = 0.0; // No target or Flat
 
    return ctx;
+}
+
+//+====================================================================+
+//| TRADE RECOMMENDATION: Natural Language Trading Guidance            |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Get Trade Recommendation                                          |
+//| Generate natural language trading recommendations for manual      |
+//| traders based on current market conditions.                       |
+//|                                                                   |
+//| Analyzes 5 factors:                                               |
+//|   1. Trend Strength (score: ±3, ±1, 0)                           |
+//|   2. Market State (ADX: trending/ranging/choppy)                 |
+//|   3. Zone Location (Buy1/Buy2/Middle/Sell1/Sell2)                |
+//|   4. Momentum State (RSI/Stoch: OB/OS/neutral)                   |
+//|   5. Price Extension (distance from EMA 20)                      |
+//|                                                                   |
+//| Returns: TradeRecommendation with natural language guidance      |
+//+------------------------------------------------------------------+
+TradeRecommendation CSignalEngine::GetTradeRecommendation()
+{
+   TradeRecommendation rec;
+   MarketContext ctx = GetMarketContext();
+
+   // Get additional data
+   double rsi = GetRSIValue(PERIOD_M15, 14, 0);
+   double stoch = GetStochKValue(PERIOD_M15, 14, 3, 0);
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   double ema20 = GetEMAValue(PERIOD_M15, 20, 0);
+   double currentPrice = m_current_price;
+   double atr = ctx.atrM15;
+   double emaDistance = (currentPrice - ema20) / _Point;
+
+   // Scenario detection flags
+   bool strongTrend = (MathAbs(ctx.trendMatrix.score) >= 3);
+   bool moderateTrend = (MathAbs(ctx.trendMatrix.score) >= 1);
+   bool isTrending = (ctx.adxValue > 25);
+   bool isChoppy = (ctx.adxValue < 20);
+   bool isOB = (rsi > 70 || stoch > 80);
+   bool isOS = (rsi < 30 || stoch < 20);
+   bool inBuyZone = (zone == ZONE_STATUS_IN_BUY1 || zone == ZONE_STATUS_IN_BUY2);
+   bool inSellZone = (zone == ZONE_STATUS_IN_SELL1 || zone == ZONE_STATUS_IN_SELL2);
+   bool atValue = (MathAbs(emaDistance) <= atr * 0.5);
+
+   // SCENARIO 1: Strong Trend + Favorable Zone + Momentum OK = FOLLOW TREND
+   if(strongTrend && isTrending && inBuyZone && !isOB && ctx.trendMatrix.score > 0)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "BUY";
+      rec.recommendationText = "BUY (Market Order)";
+      rec.entryType = "BUY MARKET";
+      rec.entryPrice = currentPrice;
+      rec.takeProfit = currentPrice + (atr * 1.5 * _Point);
+      rec.stopLoss = currentPrice - (atr * 1.0 * _Point);
+      rec.reasoning = "Strong uptrend with price at value zone. Momentum supports continuation.";
+      rec.recommendationColor = clrLime;
+   }
+   // SCENARIO 2: Strong Trend + Favorable Zone + Momentum OB = WAIT FOR PULLBACK
+   else if(strongTrend && isTrending && inBuyZone && isOB && ctx.trendMatrix.score > 0)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "WAIT_PULLBACK";
+      rec.recommendationText = "WAIT FOR PULLBACK";
+      rec.entryType = "BUY LIMIT";
+      rec.entryPrice = ema20;  // Or current - 0.5*ATR
+      rec.takeProfit = rec.entryPrice + (atr * 1.5 * _Point);
+      rec.stopLoss = rec.entryPrice - (atr * 1.0 * _Point);
+      rec.reasoning = "Strong uptrend but price is overbought and extended. Wait for pullback to EMA 20.";
+      rec.alternatives = "Wait for RSI drop below 60 or Stoch drop below 70";
+      rec.recommendationColor = C'255,165,0';  // Orange
+   }
+   // SCENARIO 3: Strong Trend + Unfavorable Zone = WAIT FOR PULLBACK TO BUY ZONE
+   else if(strongTrend && isTrending && !inBuyZone && ctx.trendMatrix.score > 0)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "WAIT_ZONE";
+      rec.recommendationText = "WAIT FOR PULLBACK TO BUY ZONE";
+      rec.entryType = "BUY LIMIT";
+      rec.entryPrice = ema20 - (atr * 0.3 * _Point);
+      rec.takeProfit = rec.entryPrice + (atr * 1.5 * _Point);
+      rec.stopLoss = rec.entryPrice - (atr * 1.0 * _Point);
+      rec.reasoning = "Strong uptrend but price is too extended. Wait for pullback to buy zone.";
+      rec.alternatives = "Do NOT chase the move";
+      rec.recommendationColor = C'255,255,0';  // Yellow
+   }
+   // SCENARIO 4: Strong Trend + Unfavorable Zone + Momentum OB = STAY OUT OR REVERSAL
+   else if(strongTrend && isTrending && !inBuyZone && isOB && ctx.trendMatrix.score > 0)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "STAY_OUT";
+      rec.recommendationText = "STAY OUT (High Risk)";
+      rec.entryType = "";
+      rec.reasoning = "Price is severely extended and overbought in uptrend. Risk of sharp pullback is very high.";
+      rec.alternatives = "Wait for pullback to BUY zone (safer)";
+      rec.recommendationColor = clrRed;
+   }
+   // SCENARIO 5: Strong Downtrend + Favorable Zone + Momentum OK = FOLLOW DOWNTREND
+   else if(strongTrend && isTrending && inSellZone && !isOS && ctx.trendMatrix.score < 0)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "SELL";
+      rec.recommendationText = "SELL (Market Order)";
+      rec.entryType = "SELL MARKET";
+      rec.entryPrice = currentPrice;
+      rec.takeProfit = currentPrice - (atr * 1.5 * _Point);
+      rec.stopLoss = currentPrice + (atr * 1.0 * _Point);
+      rec.reasoning = "Strong downtrend with price at value zone. Momentum supports continuation.";
+      rec.recommendationColor = clrLime;
+   }
+   // SCENARIO 6: No Clear Trend = RANGE TRADE OR STAY OUT
+   else if(!moderateTrend)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "NO_TREND";
+      rec.recommendationText = "STAY OUT (No Trend)";
+      rec.entryType = "";
+      rec.reasoning = "No clear directional bias. Market is ranging.";
+      rec.alternatives = "Consider range trading at zone boundaries";
+      rec.recommendationColor = clrGray;
+   }
+   // SCENARIO 7: Choppy Market = STAY OUT
+   else if(isChoppy)
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "CHOPPY";
+      rec.recommendationText = "STAY OUT (Market is CHOPPY)";
+      rec.entryType = "";
+      rec.reasoning = "Market is CHOPPY (ADX < 20). Low volatility, high whipsaw risk.";
+      rec.alternatives = "Wait for ADX > 20 before trading";
+      rec.recommendationColor = clrRed;
+   }
+   // DEFAULT: Wait
+   else
+   {
+      rec.isValid = true;
+      rec.recommendationCode = "WAIT";
+      rec.recommendationText = "WAIT";
+      rec.entryType = "";
+      rec.reasoning = "Market conditions unclear. Wait for clearer setup.";
+      rec.recommendationColor = clrGray;
+   }
+
+   // Format text outputs
+   rec.marketStateText = FormatMarketState(ctx, zone, rsi, stoch);
+   rec.entryPriceText = FormatPrice(rec.entryPrice);
+   rec.targetsText = StringFormat("TP: %s | SL: %s",
+                                   FormatPrice(rec.takeProfit),
+                                   FormatPrice(rec.stopLoss));
+
+   return rec;
+}
+
+//+------------------------------------------------------------------+
+//| Format Market State Text                                         |
+//| Create a formatted string describing current market conditions  |
+//+------------------------------------------------------------------+
+string CSignalEngine::FormatMarketState(MarketContext &ctx, ENUM_ZONE_STATUS zone, double rsi, double stoch)
+{
+   string trendText = (ctx.trendMatrix.score > 0) ? "UPTREND" :
+                      (ctx.trendMatrix.score < 0) ? "DOWNTREND" : "NEUTRAL";
+   string score = StringFormat("%+d", ctx.trendMatrix.score);
+   string arrows = StringFormat("(%s%s%s)",
+                                (ctx.trendMatrix.h4 == TREND_UP) ? "↑" : (ctx.trendMatrix.h4 == TREND_DOWN) ? "↓" : "→",
+                                (ctx.trendMatrix.h1 == TREND_UP) ? "↑" : (ctx.trendMatrix.h1 == TREND_DOWN) ? "↓" : "→",
+                                (ctx.trendMatrix.m15 == TREND_UP) ? "↑" : (ctx.trendMatrix.m15 == TREND_DOWN) ? "↓" : "→");
+
+   string zoneText = GetZoneText(zone);
+   string obOsText = (rsi > 70) ? "OB" : (rsi < 30) ? "OS" : "Neutral";
+
+   return StringFormat("Trend: %s %s %s  ADX: %.1f  Zone: %s  RSI: %.0f (%s)",
+                      trendText, score, arrows, ctx.adxValue, zoneText, rsi, obOsText);
+}
+
+//+------------------------------------------------------------------+
+//| Format Price with Proper Precision                                |
+//| Convert price to string with correct decimal places              |
+//+------------------------------------------------------------------+
+string CSignalEngine::FormatPrice(double price)
+{
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   return DoubleToString(price, digits);
+}
+
+//+------------------------------------------------------------------+
+//| Get Zone Text                                                     |
+//| Convert zone enum to readable string                             |
+//+------------------------------------------------------------------+
+string CSignalEngine::GetZoneText(ENUM_ZONE_STATUS zone)
+{
+   switch(zone)
+   {
+      case ZONE_STATUS_IN_BUY1: return "BUY1";
+      case ZONE_STATUS_IN_BUY2: return "BUY2";
+      case ZONE_STATUS_IN_SELL1: return "SELL1";
+      case ZONE_STATUS_IN_SELL2: return "SELL2";
+      default: return "MIDDLE";
+   }
 }
 
 //+====================================================================+
@@ -1638,33 +1844,52 @@ ENUM_SIGNAL_TYPE CSignalEngine::GetSniperSignal(bool debug_mode = false,
    }
 
    //====================================================================
-   // FILTER 1: PULLBACK CHECK (Price at Value)
+   // FILTER 1: PULLBACK CHECK (Price at Value) - ADAPTIVE
    // Buy: Price should be below or near EMA (discounted)
    // Sell: Price should be above or near EMA (extended)
    //====================================================================
    double emaDistance = (currentPrice - ema20) / _Point;  // Points from EMA
 
+   // ADAPTIVE LOCATION FILTER: Adjust tolerance based on ADX
+   double adx = GetADXValue(PERIOD_H1);
+   double baseMultiplier = 0.5;  // Default base multiplier
+   double adaptiveMultiplier = baseMultiplier;
+
+   if(adx < 20) {
+      adaptiveMultiplier = baseMultiplier * 0.6;  // 0.5 → 0.3 (tighter in choppy)
+   } else if(adx >= 20 && adx < 25) {
+      adaptiveMultiplier = baseMultiplier;  // 0.5 (standard)
+   } else if(adx >= 25 && adx < 30) {
+      adaptiveMultiplier = baseMultiplier * 2.0;  // 0.5 → 1.0 (trending)
+   } else {
+      adaptiveMultiplier = baseMultiplier * 3.0;  // 0.5 → 1.5 (strong trend)
+   }
+
    bool pullbackOK = false;
    if(rawSignal == SIGNAL_PA_BUY)
    {
       // For buy: Price should be at or below EMA (buying the dip)
-      // Allow small tolerance of ATR * 0.5 above EMA
-      pullbackOK = (emaDistance <= atrM15 * 0.5);
+      // Allow adaptive tolerance based on market conditions
+      pullbackOK = (emaDistance <= atrM15 * adaptiveMultiplier);
 
       if(debug_mode && !pullbackOK)
-         Print(StringFormat("[Sniper Filter] REJECTED (Buy): Price %d pts ABOVE EMA (not at value)",
-                          (int)emaDistance));
+         Print(StringFormat("[Sniper Filter] REJECTED (Buy): Price %d pts ABOVE EMA (max %d pts, ADX=%.1f, mult=%.2f)",
+                          (int)emaDistance, (int)(atrM15 * adaptiveMultiplier), adx, adaptiveMultiplier));
    }
    else if(rawSignal == SIGNAL_PA_SELL)
    {
       // For sell: Price should be at or above EMA (selling the rally)
-      // Allow small tolerance of ATR * 0.5 below EMA
-      pullbackOK = (emaDistance >= -atrM15 * 0.5);
+      // Allow adaptive tolerance based on market conditions
+      pullbackOK = (emaDistance >= -atrM15 * adaptiveMultiplier);
 
       if(debug_mode && !pullbackOK)
-         Print(StringFormat("[Sniper Filter] REJECTED (Sell): Price %d pts BELOW EMA (not at value)",
-                          (int)MathAbs(emaDistance)));
+         Print(StringFormat("[Sniper Filter] REJECTED (Sell): Price %d pts BELOW EMA (max %d pts, ADX=%.1f, mult=%.2f)",
+                          (int)MathAbs(emaDistance), (int)(atrM15 * adaptiveMultiplier), adx, adaptiveMultiplier));
    }
+
+   if(debug_mode && pullbackOK)
+      Print(StringFormat("[Sniper Filter] Pullback OK: %d pts (max %d pts, ADX=%.1f, mult=%.2f)",
+                       (int)emaDistance, (int)(atrM15 * adaptiveMultiplier), adx, adaptiveMultiplier));
 
    if(!pullbackOK)
       return SIGNAL_NONE;
@@ -1867,7 +2092,26 @@ ENUM_SIGNAL_TYPE CSignalEngine::GetHybridSignal(bool debugMode,
 
    // Calculate distance from M15 EMA (in points)
    double distFromEMA = MathAbs(priceM15 - emaM15) / _Point;
-   double maxAllowedDist = atrM15 * emaMaxDist;
+
+   // ADAPTIVE LOCATION FILTER: Adjust max distance based on ADX (market volatility)
+   double adx = GetADXValue(PERIOD_H1);
+   double adaptiveMultiplier = emaMaxDist;  // Default/base multiplier
+
+   if(adx < 20) {
+      // Choppy/Ranging market → Use tighter filter (safer entries)
+      adaptiveMultiplier = emaMaxDist * 0.6;  // 0.5 → 0.3
+   } else if(adx >= 20 && adx < 25) {
+      // Transition zone → Use standard filter
+      adaptiveMultiplier = emaMaxDist;  // 0.5
+   } else if(adx >= 25 && adx < 30) {
+      // Trending market → Relax filter (catch moves)
+      adaptiveMultiplier = emaMaxDist * 2.0;  // 0.5 → 1.0
+   } else {
+      // Strong trend (ADX >= 30) → Much looser filter (allow extended entries)
+      adaptiveMultiplier = emaMaxDist * 3.0;  // 0.5 → 1.5
+   }
+
+   double maxAllowedDist = atrM15 * adaptiveMultiplier;
 
    bool atValue = (distFromEMA <= maxAllowedDist);
 
@@ -1875,9 +2119,12 @@ ENUM_SIGNAL_TYPE CSignalEngine::GetHybridSignal(bool debugMode,
    {
       if(debugMode)
          Print("HYBRID: Price too far from M15 EMA (", distFromEMA, " pts, max=",
-               maxAllowedDist, " pts) - WAIT FOR PULLBACK");
+               maxAllowedDist, " pts, ADX=", adx, ", mult=", adaptiveMultiplier, ") - WAIT FOR PULLBACK");
       return SIGNAL_NONE;
    }
+
+   if(debugMode)
+      Print("HYBRID: Location OK (", distFromEMA, " pts / ", maxAllowedDist, " pts max, ADX=", adx, ", mult=", adaptiveMultiplier, ")");
 
    //───────────────────────────────────────
    // STEP 4: DIRECTION ALIGNMENT
