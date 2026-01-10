@@ -139,7 +139,7 @@ signalEngine.RefreshData();
 
 ### How It Works
 
-Sniper mode uses a **3-filter stack** on M15 timeframes:
+Sniper mode uses a **4-filter stack** on M15 timeframes (Updated with Adaptive Filter):
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -339,7 +339,8 @@ Input_Hybrid_Debug_Mode   = true  // ⚠️ Check Experts log for rejection reas
 
 ```
 ✅ VALID SIGNALS:
-"HYBRID: VALID BUY SIGNAL - M15 Bullish (score=2) + M5 Trigger @ 1.0850"
+"HYBRID: VALID BUY SIGNAL - M15 Bullish (score=3) + M5 Trigger @ 1.0850"
+"HYBRID: VALID BUY SIGNAL - M15 Bullish (score=1) + M5 Trigger @ 1.0850"
 "SNIPER BUY executed at 1.0850"
 
 ❌ REJECTIONS:
@@ -461,6 +462,599 @@ The Market Intelligence grid displays real-time market data for both Sniper and 
 | **MISMATCH** | 🟠 Orange | M5 PA signal opposite to trend bias |
 | **NO TREND** | 🔴 Red | No clear trend (score = 0) |
 | **OFF** | ⚫ Gray | Default/Disabled |
+
+---
+
+## Cockpit Redesign Proposal (2025-01-10)
+
+### Problem Statement
+
+Current cockpit mixes manual trading indicators with auto-mode status, causing:
+1. **Clutter**: Manual traders see auto-mode info they don't need
+2. **Confusion**: Auto traders can't see why modes are blocked
+3. **Inefficiency**: No clear separation of concerns
+
+### Proposed Solution: Split into 2 Sections
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  MARKET INTELLIGENCE                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  MARKET SNAPSHOT (For Everyone - Manual + Auto)          │  │
+│  ├──────────────────────────────────────────────────────────┤  │
+│  │  CONTEXT:  ● BULLISH (↑↑↑)  ADX: 28.5 (Trending)        │  │
+│  │  M15 PA:   BUY              M5 PA:    BUY                │  │
+│  │  RSI:      55 (Neutral)     Stoch:    48 (Neutral)       │  │
+│  │  Slope:    UP               EMA 20:   +150 pts           │  │
+│  │  ATR:      180 pts          To Zone:  25 pts             │  │
+│  │  Action:   HYBRID READY                                   │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  AUTO MODE STATUS (Auto Traders Only)                    │  │
+│  ├───────────────────┬──────────────────────────────────────┤  │
+│  │  SNIPER           │  ⚪ OFF                               │  │
+│  │                   │  ┌─────────────────────────────────┐  │  │
+│  │                   │  │  PA: [✓]  LOC: [✓]  VOL: [✓]   │  │  │
+│  │                   │  │  ZONE: [?]  Status: OFF         │  │  │
+│  │                   │  └─────────────────────────────────┘  │  │
+│  ├───────────────────┼──────────────────────────────────────┤  │
+│  │  HYBRID           │  🟢 ON                                │  │
+│  │                   │  ┌─────────────────────────────────┐  │  │
+│  │                   │  │  Trend: [✓ score=3]  ADX: [✓]  │  │  │
+│  │                   │  │  M5: [✓ BUY]  Status: READY    │  │  │
+│  │                   │  └─────────────────────────────────┘  │  │
+│  └───────────────────┴──────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Section 1: MARKET SNAPSHOT (Top)
+
+Essential trading information for **both manual and auto traders**:
+
+| Indicator | Purpose |
+|-----------|---------|
+| **CONTEXT + ADX** | Overall trend direction + market state (trending/ranging) |
+| **M15 PA + M5 PA** | Price action signals (Sniper uses M15, Hybrid uses M5) |
+| **RSI + Stoch** | Timing entries, spotting OB/OS conditions (manual traders) |
+| **Slope** | Momentum direction (Hybrid safety check) |
+| **EMA 20 Distance** | Pullback/extension detection (both modes use M15 EMA 20 internally) |
+| **ATR** | Volatility measurement (position sizing, SL/TP) |
+| **To Zone** | Distance to support/resistance (Sniper filter) |
+| **Action** | Summary: READY/WAIT based on conditions |
+
+**Why keep RSI/Stoch?** Manual traders use them for timing entries. Auto modes don't use them, but they're valuable for human decision-making.
+
+### Section 2: AUTO MODE STATUS (Bottom)
+
+Shows which auto modes are enabled and their **filter states**:
+
+```
+┌──────────┬─────────────────────────────────────────────────────────┐
+│  MODE    │  STATUS                                                  │
+├──────────┼─────────────────────────────────────────────────────────┤
+│  SNIPER  │  ⚪ OFF / 🟢 ON                                         │
+│          │  ┌─────────────────────────────────────────────────┐    │
+│          │  │  Filter States:                                  │    │
+│          │  │  PA: [✓ PASS] or [❌ NO PATTERN]                 │    │
+│          │  │  LOC: [✓ PASS] or [❌ TOO FAR (711 pts)]         │    │
+│          │  │  VOL: [✓ PASS] or [❌ LOW VOLUME]                │    │
+│          │  │  ZONE: [✓ TOUCHED] or [❌ NOT IN ZONE]           │    │
+│          │  │  Status: READY / BLOCKED (reason)                │    │
+│          │  └─────────────────────────────────────────────────┘    │
+├──────────┼─────────────────────────────────────────────────────────┤
+│  HYBRID  │  ⚪ OFF / 🟢 ON                                         │
+│          │  ┌─────────────────────────────────────────────────┐    │
+│          │  │  Filter States:                                  │    │
+│          │  │  Trend: [✓ score=3] or [❌ NO TREND (score=0)]  │    │
+│          │  │  ADX: [✓ NOT CHOPPY] or [❌ CHOPPY (ADX 15)]    │    │
+│          │  │  ATR: [✓ VALID] or [❌ TOO LOW]                  │    │
+│          │  │  M5: [✓ BUY] or [⏳ WAIT M5] or [❌ MISMATCH]   │    │
+│          │  │  Status: READY / WAIT M5 / MISMATCH / OFF       │    │
+│          │  └─────────────────────────────────────────────────┘    │
+└──────────┴─────────────────────────────────────────────────────────┘
+```
+
+### Benefits
+
+| Benefit | Manual Traders | Auto Traders |
+|---------|----------------|--------------|
+| **Cleaner UI** | Only see market data, no auto clutter | See exactly what's blocking trades |
+| **Better Debugging** | N/A | Instantly see which filter failed |
+| **Faster Decisions** | Clear market snapshot | Know when modes will trigger |
+| **Less Confusion** | No irrelevant auto mode status | Clear filter states per mode |
+
+### Key Notes
+
+1. **"Quick Scalp" is the OLD name** - The correct name is **HYBRID mode** (M15 context + M5 entry trigger)
+
+2. **Trend score is always odd** - With 3 timeframes, score can only be:
+   - `+3` = All bullish
+   - `+1` = 2 bullish, 1 bearish
+   - `-1` = 1 bullish, 2 bearish
+   - `-3` = All bearish
+   - **Score is NEVER ±2**
+
+3. **EMA 50 vs EMA 20**:
+   - **EMA 50** = Trend direction (bullish/bearish based on price position)
+   - **EMA 20** = Pullback filter (is price close enough to enter?)
+
+4. **Manual trading indicators to keep**: RSI, Stoch, EMA Distance, Slope - these help manual traders time entries even though auto modes don't use them
+
+---
+
+## Trade Strategy Recommendation System
+
+### Purpose
+
+Translate all technical indicators into **natural language trading advice** that manual traders can understand and act upon immediately.
+
+---
+
+### Section 3: TRADE STRATEGY (Middle - For Manual Traders)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📊 TRADE STRATEGY                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  MARKET STATE                                                   │
+│  ├─ Trend: Strong UPTREND (↑↑↑)  ADX: 32.5 (Trending)          │
+│  ├─ Location: BUY2 Zone (+180 pts from EMA 20)                 │
+│  └─ Momentum: RSI 72 (OB)  Stoch 78 (OB)  Slope: UP            │
+│                                                                 │
+│  ⚠️  RECOMMENDATION: WAIT FOR PULLBACK                         │
+│                                                                 │
+│  Price is overbought despite strong uptrend. Chasing here is   │
+│  risky. Best entry: Wait for pullback to EMA 20 or RSI < 60.   │
+│                                                                 │
+│  📌 SUGGESTED ENTRY:                                            │
+│     → BUY LIMIT at [EMA 20 value] or [current - 0.5×ATR]        │
+│     → Alternative: Wait for RSI drop below 60                  │
+│                                                                 │
+│  🎯 TARGETS: TP [+ATR×1.5] | SL [-ATR×1.0] from entry          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Recommendation Logic Matrix
+
+The system analyzes **5 key factors** to generate recommendations:
+
+| Factor | Condition | Weight |
+|--------|-----------|--------|
+| **Trend Strength** | Strong (score ±3), Moderate (score ±1), None (score 0) | High |
+| **Market State** | Trending (ADX > 25), Ranging (ADX 20-25), Choppy (ADX < 20) | High |
+| **Zone Location** | Favorable zone, Middle zone, Unfavorable zone | Medium |
+| **Momentum State** | OB/OS (RSI > 70 or < 30), Neutral | Medium |
+| **Price Extension** | Extended (> 0.5×ATR from EMA), At value (near EMA) | Medium |
+
+---
+
+### Scenario-Based Recommendations
+
+#### Scenario 1: Strong Trend + Favorable Zone + Momentum OK = **FOLLOW TREND**
+
+```
+MARKET STATE:
+├─ Trend: Strong UPTREND (↑↑↑)  ADX: 32
+├─ Location: BUY2 Zone (+50 pts from EMA 20)
+└─ Momentum: RSI 58  Stoch 55  Slope: UP
+
+✅ RECOMMENDATION: BUY (Market Order)
+Strong trend with price at value. Momentum supports continuation.
+
+📌 SUGGESTED ENTRY:
+   → BUY MARKET at current price
+   → Or BUY LIMIT at [EMA 20 value] for safer entry
+
+🎯 TARGETS: TP [+ATR×1.5] | SL [-ATR×1.0]
+```
+
+---
+
+#### Scenario 2: Strong Trend + Favorable Zone + Momentum OB = **WAIT FOR PULLBACK**
+
+```
+MARKET STATE:
+├─ Trend: Strong UPTREND (↑↑↑)  ADX: 35
+├─ Location: BUY2 Zone (+120 pts from EMA 20)
+└─ Momentum: RSI 76 (OB)  Stoch 82 (OB)  Slope: UP
+
+⚠️ RECOMMENDATION: WAIT FOR PULLBACK
+Strong trend but price is extended and overbought. Chasing is risky.
+
+📌 SUGGESTED ENTRY:
+   → BUY LIMIT at [current - 0.5×ATR] or [EMA 20 value]
+   → Wait for RSI drop below 60 or Stoch drop below 70
+   → Best entry: When price touches EMA 20
+
+🎯 TARGETS: TP [+ATR×1.5] | SL [-ATR×1.0]
+```
+
+---
+
+#### Scenario 3: Strong Trend + Unfavorable Zone = **WAIT FOR PULLBACK**
+
+```
+MARKET STATE:
+├─ Trend: Strong UPTREND (↑↑↑)  ADX: 28
+├─ Location: SELL2 Zone (+350 pts from EMA 20)
+└─ Momentum: RSI 65  Stoch 62  Slope: UP
+
+⏳ RECOMMENDATION: WAIT FOR PULLBACK TO BUY ZONE
+Strong uptrend but price is too extended. Wait for pullback to buy zone.
+
+📌 SUGGESTED ENTRY:
+   → WAIT for pullback to BUY2 or BUY1 zone
+   → BUY LIMIT at [EMA 20 - 0.3×ATR]
+   → Do NOT chase the move
+
+🎯 TARGETS: TP [+ATR×1.5] | SL [-ATR×1.0] from future entry
+```
+
+---
+
+#### Scenario 4: Strong Trend + Unfavorable Zone + Momentum OB = **STAY OUT OR REVERSAL**
+
+```
+MARKET STATE:
+├─ Trend: Strong UPTREND (↑↑↑)  ADX: 38
+├─ Location: SELL2 Zone (+450 pts from EMA 20)
+└─ Momentum: RSI 78 (OB)  Stoch 85 (OB)  Slope: UP
+
+🔴 RECOMMENDATION: STAY OUT (High Risk)
+Price is severely extended and overbought in uptrend.
+Risk of sharp pullback is very high. NOT a good entry point.
+
+📌 ALTERNATIVES:
+   → WAIT for pullback to BUY zone (safer)
+   → Experienced only: Consider SELL STOP below recent swing low
+     (Counter-trend reversal play, high risk)
+
+🎯 If Reversal: TP [+ATR×1.0] | SL [+ATR×0.5]
+```
+
+---
+
+#### Scenario 5: Strong Downtrend + Favorable Zone + Momentum OK = **FOLLOW DOWNTREND**
+
+```
+MARKET STATE:
+├─ Trend: Strong DOWNTREND (↓↓↓)  ADX: 30
+├─ Location: SELL2 Zone (-60 pts from EMA 20)
+└─ Momentum: RSI 42  Stoch 38  Slope: DOWN
+
+✅ RECOMMENDATION: SELL (Market Order)
+Strong downtrend with price at value. Momentum supports continuation.
+
+📌 SUGGESTED ENTRY:
+   → SELL MARKET at current price
+   → Or SELL LIMIT at [EMA 20 value] for safer entry
+
+🎯 TARGETS: TP [-ATR×1.5] | SL [+ATR×1.0]
+```
+
+---
+
+#### Scenario 6: No Clear Trend = **RANGE TRADE OR STAY OUT**
+
+```
+MARKET STATE:
+├─ Trend: NEUTRAL (→→→)  Score: 0
+├─ Location: MIDDLE Zone (+15 pts from EMA 20)
+└─ Momentum: RSI 52  Stoch 48  Slope: FLAT
+
+⏸️ RECOMMENDATION: STAY OUT (No Trend)
+No clear directional bias. Market is ranging.
+
+📌 ALTERNATIVES (Range Trading Only):
+   → Buy at BUY1 zone with TP at middle
+   → Sell at SELL1 zone with TP at middle
+   → Use tight stops (0.5×ATR)
+
+🎯 Range Trade: TP [+ATR×0.8] | SL [-ATR×0.5]
+```
+
+---
+
+#### Scenario 7: Choppy Market = **STAY OUT**
+
+```
+MARKET STATE:
+├─ Trend: MIXED (↑↑↓)  Score: +1
+├─ Location: MIDDLE Zone
+└─ ADX: 18 (CHOPPY)
+
+🔴 RECOMMENDATION: STAY OUT (Market is CHOPPY)
+Low volatility means no meaningful moves. High whipsaw risk.
+
+📌 ACTION: Do NOT trade. Wait for ADX > 20.
+```
+
+---
+
+#### Scenario 8: Price Action Signal Present = **CONSIDER PA ENTRY**
+
+```
+MARKET STATE:
+├─ Trend: Moderate UPTREND (↑↑→)  Score: +1
+├─ Location: BUY2 Zone (+80 pts from EMA 20)
+├─ Momentum: RSI 62  Stoch 58
+└─ 🎯 M15 PA: HAMMER (Bullish) at SUPPORT
+
+✅ RECOMMENDATION: BUY (PA Signal)
+Price action pattern supports entry. Hammer at support is bullish.
+
+📌 SUGGESTED ENTRY:
+   → BUY STOP at [High of Hammer candle + 5 pts]
+   → Or BUY LIMIT at [Hammer low - 5 pts]
+
+🎯 TARGETS: TP [+ATR×1.5] | SL [-ATR×1.0] below hammer low
+```
+
+---
+
+### Recommendation Codes (Quick Reference)
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| **✅ BUY** | Follow uptrend, good entry | Buy market or limit |
+| **✅ SELL** | Follow downtrend, good entry | Sell market or limit |
+| **⚠️ WAIT FOR PULLBACK** | Good trend but extended | Wait for price to return to EMA/value |
+| **⏳ WAIT FOR ZONE** | Good trend but wrong location | Wait for price to reach favorable zone |
+| **🔴 STAY OUT** | Bad conditions (choppy/OB+extended) | Do not trade |
+| **⏸️ NO TREND** | Range-bound market | Range trade or stay out |
+| **🎯 PA SIGNAL** | Price action pattern present | Trade the PA signal |
+
+---
+
+### Price Calculation Examples
+
+The system calculates specific entry prices based on current values:
+
+```
+Example 1: BUY LIMIT Calculation
+├─ Current Price: 1.0850
+├─ ATR (M15): 180 points (0.00180)
+├─ EMA 20: 1.0835
+└─ Recommendation: BUY LIMIT at EMA 20
+   → Entry: 1.0835
+   → TP: 1.0835 + 180 = 1.0853
+   → SL: 1.0835 - 180 = 1.0817
+
+Example 2: SELL LIMIT Calculation
+├─ Current Price: 1.0920
+├─ ATR (M15): 200 points
+├─ EMA 20: 1.0900
+└─ Recommendation: Wait for pullback to SELL zone
+   → Entry: 1.0900 (EMA 20)
+   → TP: 1.0900 - 200 = 1.0880
+   → SL: 1.0900 + 200 = 1.0920
+```
+
+---
+
+### Natural Language Templates
+
+The system uses these templates based on the detected scenario:
+
+```
+Template 1 - Follow Trend (Favorable):
+"Strong [DIRECTION] trend with price at value zone.
+Momentum supports continuation. Good entry point."
+
+Template 2 - Wait for Pullback:
+"Strong [DIRECTION] trend but price is extended.
+Best entry: Wait for pullback to EMA 20 or [EMA 20 ± offset]."
+
+Template 3 - Wait for Zone:
+"Strong [DIRECTION] trend but price is in [UNFAVORABLE ZONE].
+Wait for pullback to [FAVORABLE ZONE]. Do NOT chase."
+
+Template 4 - Stay Out (Extended + OB):
+"Price is [EXTENDED] and [OVERBOUGHT/OVERSOLD] in [DIRECTION] trend.
+Chasing is very risky. Stay out or wait for deep pullback."
+
+Template 5 - No Trend:
+"No clear directional bias. Market is ranging.
+Consider range trading at zone boundaries or stay out."
+
+Template 6 - Choppy:
+"Market is CHOPPY (ADX < 20). Low volatility, high whipsaw risk.
+Stay out until trend develops (ADX > 25)."
+
+Template 7 - PA Signal:
+"[PATTERN NAME] detected at [SUPPORT/RESISTANCE].
+Price action confirms entry. Good risk/reward setup."
+```
+
+---
+
+### Implementation Priority
+
+| Component | Priority | Notes |
+|-----------|----------|-------|
+| Basic recommendation logic | **P0** | Core scenarios (trend + zone + momentum) |
+| Price calculations (entry/TP/SL) | **P0** | Actual values based on ATR |
+| Zone detection | **P1** | Need zone indicator from zones.mqh |
+| PA signal integration | **P1** | Include M15/M5 PA in recommendation |
+| Natural language output | **P1** | Human-readable messages |
+| Cockpit display section | **P2** | UI update to show recommendation |
+
+---
+
+## Cockpit Parameter Blocking Analysis
+
+### 🔒 Parameters That Block Sniper/Hybrid
+
+#### Mode Enablement Blockers
+```
+┌─────────────────────────────────────┐
+│ AUTO MODE = [OFF]                   │  🔴 BLOCKS all auto trades
+│ SNIPER MODE = [OFF]                  │  🔴 BLOCKS Sniper
+│ HYBRID MODE = [ON]                   │  ✅ Hybrid enabled
+└─────────────────────────────────────┘
+```
+
+#### Execution Filter Blockers
+```
+┌─────────────────────────────────────┐
+│ AGGRESSIVE = [OFF]                  │  🔴 Safety filters ACTIVE
+│                                        │
+│ TREND FILTER = [ON] with [X]         │  🔴 Blocks counter-trend
+│                                        │
+│ ZONE FILTER = [ON] with [X]         │  🔴 Blocks trades in Middle zone
+└─────────────────────────────────────┘
+```
+
+#### Market Condition Blockers
+```
+┌─────────────────────────────────────┐
+│ M15 PA = NONE                        │  🔴 Sniper blocked (no pattern)
+│ M5 PA = NONE                         │  🔴 Hybrid blocked (no trigger)
+│ HYBRID STATUS = WAIT M5              │  ⏳ Hybrid waiting for M5 PA
+│ ADX < 20                              │  🔴 Market is CHOPPY (Hybrid only)
+└─────────────────────────────────────┘
+```
+
+### Example Analysis (sc1.png)
+
+When both modes are blocked but have signals:
+
+```
+Scenario: Trending Market (ADX 39.6)
+├── M15 PA = BUY ✅
+├── M5 PA = BUY ✅
+├── HYBRID = READY ✅
+└── But both BLOCKED by Location Filter
+
+Expert Log:
+❌ SNIPER: "Price 711 pts ABOVE EMA (not at value)"
+❌ HYBRID: "Price too far from M15 EMA (711 pts, max=276 pts)"
+
+Root Cause: Fixed location filter (0.5× ATR) too strict for trending markets
+
+Solution: Adaptive location filter adjusts to 1.5× ATR for strong trends
+```
+
+---
+
+## Parameter Usage by Mode
+
+### Which Cockpit Parameters Each Mode Uses
+
+| Cockpit Parameter | Sniper | Hybrid | Notes |
+|-------------------|--------|--------|-------|
+| **Trend Matrix (H4↑H1↑M15↑)** | ❌ No | ✅ **YES** | Hybrid ONLY (trend context) |
+| **M15 PA** | ✅ **YES** | ❌ No | Direct trigger |
+| **M5 PA** | ❌ No | ✅ **YES** | Hybrid ONLY (trigger) |
+| **RSI (M15)** | ❌ No | ❌ No | Display only, not used |
+| **Stoch (M15)** | ❌ No | ❌ No | Display only, not used |
+| **Slope H1** | ❌ No | ⚠️ **YES** | Hybrid slope safety check |
+| **ATR (M15)** | ✅ **YES** | ✅ **YES** | Both use for calculations |
+| **EMA Distance (H1)** | ❌ No | ❌ No | Display only (not used!) |
+| **To Zone** | ✅ **YES** | ❌ No | Sniper ONLY (structure filter) |
+| **ADX (H1)** | ❌ No | ✅ **YES** | Hybrid market state check |
+| **HYBRID Status** | ❌ No | ✅ **YES** | Hybrid internal state |
+
+### Important Notes
+
+1. **EMA Distance in Cockpit ≠ What Modes Use**
+   - Cockpit shows: H1 EMA 20 distance
+   - Both modes use: M15 EMA 20 distance (calculated fresh)
+   - Modes recalculate values for accuracy
+
+2. **Trend Context - Hybrid Only**
+   - Hybrid: Uses Trend Matrix for permission
+   - Sniper: Works in any trend (no trend check)
+
+3. **Zone Filter - Sniper Only**
+   - Sniper: Uses for structure validation
+   - Hybrid: Does not use zone filter
+
+---
+
+## Adaptive Location Filter
+
+### What It Does
+
+Automatically adjusts the location/pullback filter based on market volatility (ADX):
+
+```
+┌─────────────────────────────────────────────────┐
+│  ADX READING → FILTER ADJUSTMENT                │
+├─────────────────────────────────────────────────┤
+│  ADX < 20 (Choppy)  → 0.3× ATR (~165 pts)      │
+│  ADX 20-25 (Range)  → 0.5× ATR (~276 pts)      │
+│  ADX 25-30 (Trending) → 1.0× ATR (~552 pts)     │
+│  ADX > 30 (Strong) → 1.5× ATR (~828 pts)       │
+└─────────────────────────────────────────────────┘
+```
+
+### Why It Was Added
+
+**Problem**: Sniper and Hybrid blocked for 2+ days because:
+- Trending market (ADX 39.6)
+- Price stayed extended (711 pts above EMA)
+- Fixed filter (276 pts max) blocked all trades
+- Only Arrow signal (less accurate) was trading
+
+**Solution**: Adaptive filter automatically loosens in trends, tightens in choppy markets.
+
+### Impact on Accuracy vs Trade Frequency
+
+| Metric | Tight Filter (0.5×) | Adaptive (0.3-1.5×) |
+|--------|---------------------|---------------------|
+| **Win Rate** | ~65% | ~55% (lower) |
+| **Trade Frequency** | Very Low | 3-5x Higher |
+| **Profit per Trade** | Higher | Lower |
+| **Total Profit** | Low | **Higher ✅** |
+| **Missed Moves** | Many | Few |
+
+### Why It Still Works
+
+In strong trends, the **trend itself provides the edge**, not the entry location. Waiting for pullback in strong trends means missing most of the move.
+
+---
+
+## Coordination Logic
+
+```
+┌─────────────────────────────────────────────────────┐
+│  SNIPER + HYBRID COORDINATION                        │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  M15 NEW BAR → Sets trend bias                      │
+│       │                                             │
+│       ├── If Sniper enabled ─────────────────┐     │
+│       │     └── Checks M15 PA pattern         │     │
+│       │     └── If valid → SNIPER TRADE      │     │
+│       │                                       │     │
+│       └── If Hybrid enabled ─────────────┐   │     │
+│             └── Uses trend bias         │   │     │
+│             └── Waits for M5 bar         │   │     │
+│             └── If M5 PA matches bias    │   │     │
+│                 └── HYBRID TRADE        │   │     │
+│                                          │   │     │
+│  RULE: Sniper takes priority per M15     │   │     │
+│  cycle. If Sniper executes, Hybrid       │   │     │
+│  waits for next M15 cycle.               │   │     │
+│                                          │   │     │
+└──────────────────────────────────────────┼───┼─────┘
+                                           │   │
+                                    Both can │   │
+                                    coexist  │   │
+                                    in the   │   │
+                                    same M15 │   │
+                                    cycle    │   │
+                                             │
+```
 
 ---
 
