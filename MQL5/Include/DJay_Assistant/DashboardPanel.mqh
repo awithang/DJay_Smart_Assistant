@@ -243,11 +243,17 @@ void CDashboardPanel::CreatePanel()
 
    int x = m_base_x;
    int pad = 10;
-   
-   // NEW WIDER LAYOUT
-   int half_width = 310;  // 310 + 310 + 10 padding + 20 margin = 650
+
+   // NEW LAYOUT - Full width for Market Intelligence
+   int full_width = m_panel_width - 10;  // Use full panel width
    int left_x = x + 5;
-   int right_x = x + 5 + half_width + 10; 
+   int bottom_half_width = (full_width / 2) - 10;  // Split bottom sections
+   int bottom_left_x = left_x;
+   int bottom_right_x = left_x + bottom_half_width + 20;
+
+   // TEMPORARY: For compatibility with old code during transition
+   int half_width = bottom_half_width;  // Alias for bottom_half_width
+   int right_x = bottom_right_x;       // Alias for bottom_right_x
 
    // ============================================
    // MAIN BACKGROUND
@@ -255,32 +261,50 @@ void CDashboardPanel::CreatePanel()
    CreateRect("MainBG", x, 0, m_panel_width, m_panel_height, m_bg_color, true, clrWhite);
 
    // ============================================
-   // LEFT PANEL (Panel A)
+   // HEADER ROW 1: DJAY Smart Assistant Title
    // ============================================
-
-      // 1. Header Section (Market Status)
-      CreateLabel("Title", left_x + (half_width / 2) - 65, 15, "DJAY Smart Assistant", C'255,223,0', 11, "Arial Bold");
-      CreateLabel("LblSesTitle", left_x + pad, 35, "SESSION:", m_text_color, 9);
-      CreateLabel("LblSesValue", left_x + pad + 60, 35, "--", clrGray, 9, "Arial");
-      CreateLabel("LblTime", left_x + half_width - pad, 35, "M5: --:--", clrOrange, 9, "Arial", "right");
-
-      CreateLabel("LblRunTimeTitle", left_x + pad, 48, "STATUS:", m_text_color, 9);
-      CreateLabel("LblRunTime", left_x + pad + 60, 48, "SIDEWAY", clrGray, 9, "Arial");
-
-      CreateLabel("LblZoneStatTitle", left_x + pad, 61, "ZONE:", m_text_color, 9);
-      CreateLabel("LblZoneStat", left_x + pad + 60, 61, "NEUTRAL", clrGray, 9, "Arial");
+   CreateLabel("Title", left_x + (full_width / 2) - 70, 12, "DJAY Smart Assistant", C'255,223,0', 12, "Arial Bold");
 
    // ============================================
-   // SECTION 1: MARKET SNAPSHOT (For Everyone)
+   // HEADER ROW 2: Region, Status, Zone, M5 Time
    // ============================================
-   CreateLabel("LblSig", left_x + pad, 80, "MARKET SNAPSHOT", m_header_color, 10, "Arial Bold");
-   CreateRect("InfoBG", left_x, 95, half_width, 75, C'5,5,15', true, C'45,45,60');
+   int header_row2_y = 35;
 
-   // Compact 2-column layout
+   // Left side: Region, Status, Zone
+   CreateLabel("LblSesTitle", left_x + pad, header_row2_y, "REGION:", m_text_color, 9);
+   CreateLabel("LblSesValue", left_x + pad + 60, header_row2_y, "US", clrGray, 9, "Arial");
+
+   CreateLabel("LblRunTimeTitle", left_x + pad + 100, header_row2_y, "STATUS:", m_text_color, 9);
+   CreateLabel("LblRunTime", left_x + pad + 160, header_row2_y, "SIDEWAY", clrGray, 9, "Arial");
+
+   CreateLabel("LblZoneStatTitle", left_x + pad + 230, header_row2_y, "ZONE:", m_text_color, 9);
+   CreateLabel("LblZoneStat", left_x + pad + 280, header_row2_y, "NEUTRAL", clrGray, 9, "Arial");
+
+   // Right side: M5 Time
+   CreateLabel("LblTime", left_x + full_width - pad, header_row2_y, "M5: --:--", clrOrange, 9, "Arial", "right");
+
+   // ============================================
+   // MARKET INTELLIGENCE (Full Width - Panel A + B merged)
+   // ============================================
+   int mi_y_start = 58;  // Start below header (35 + 18 + 5 gap)
+
+   // Header with price and icons
+   CreateLabel("LblSig", left_x + pad, mi_y_start, "MARKET INTELLIGENCE", m_header_color, 10, "Arial Bold");
+   CreateLabel("LblPrice", left_x + full_width - 100, mi_y_start, "0.00000", C'255,223,0', 12, "Arial Bold", "right");
+   CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
+   CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, mi_y_start + 200, C'5,5,15', true, C'45,45,60');
+
+   // ============================================
+   // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
+   // ============================================
+   int snap_y_start = mi_y_start + 28;
+
+   // Compact 2-column layout (full width)
    int snap_col1_x = left_x + 10;   // Left column labels
-   int snap_col2_x = left_x + 115;  // Right column labels
-   int snap_row1_y = 108;
-   int snap_row_h = 13;
+   int snap_col2_x = left_x + 180;  // Right column labels (more space for full width)
+   int snap_row1_y = snap_y_start + 5;
+   int snap_row_h = 14;
 
    // Row 1: Context + ADX
    CreateLabel("Ctx_Label", snap_col1_x, snap_row1_y, "Context:", clrGray, 8);
@@ -314,84 +338,65 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Struct_V", snap_col2_x + 45, snap_row1_y + snap_row_h * 4, "--", clrGray, 8);
 
    // ============================================
-   // SECTION 2: TRADE STRATEGY (For Manual Traders)
+   // SUBSECTION 2: TRADE STRATEGY (For Manual Traders)
    // ============================================
 
-   int strat_y_start = 180;  // Start below Market Snapshot (ends at 170)
+   int strat_y_start = snap_y_start + snap_row_h * 5 + 15;  // After Market Snapshot
    int strat_row_h = 18;     // Row height
 
-   CreateRect("StrategyBG", left_x, strat_y_start + 15, half_width, strat_row_h * 6 + 5, C'5,5,15', true, C'60,50,40');
-   CreateLabel("Strategy_Header", left_x, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
+   CreateLabel("Strategy_Header", left_x + pad, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
 
    // Row 1: Market State
-   CreateLabel("Strategy_State_Label", left_x + 5, strat_y_start + strat_row_h, "State:", clrGray, 8);
-   CreateLabel("Strategy_State", left_x + 35, strat_y_start + strat_row_h, "--", clrGray, 8);
+   CreateLabel("Strategy_State_Label", left_x + pad + 5, strat_y_start + strat_row_h, "State:", clrGray, 8);
+   CreateLabel("Strategy_State", left_x + pad + 45, strat_y_start + strat_row_h, "--", clrGray, 8);
 
    // Row 2: Recommendation
-   CreateLabel("Strategy_Rec_Label", left_x + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 8);
-   CreateLabel("Strategy_Rec_Code", left_x + 30, strat_y_start + strat_row_h * 2, "⏳", clrGray, 10);
-   CreateLabel("Strategy_Rec_Text", left_x + 45, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 8, "Arial Bold");
+   CreateLabel("Strategy_Rec_Label", left_x + pad + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 8);
+   CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 10);
+   CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 8, "Arial Bold");
 
    // Row 3: Reasoning
-   CreateLabel("Strategy_Reasoning", left_x + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 7);
+   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 7);
 
    // Row 4: Entry
-   CreateLabel("Strategy_Entry_Label", left_x + 5, strat_y_start + strat_row_h * 4, "📌 ENTRY:", clrGray, 8);
-   CreateLabel("Strategy_Entry_Type", left_x + 55, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
-   CreateLabel("Strategy_Entry_Price", left_x + 100, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
+   CreateLabel("Strategy_Entry_Label", left_x + pad + 5, strat_y_start + strat_row_h * 4, "📌 ENTRY:", clrGray, 8);
+   CreateLabel("Strategy_Entry_Type", left_x + pad + 65, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
+   CreateLabel("Strategy_Entry_Price", left_x + pad + 120, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
 
    // Row 5: Targets
-   CreateLabel("Strategy_Targets", left_x + 5, strat_y_start + strat_row_h * 5, "TP: -- | SL: --", clrGray, 8);
+   CreateLabel("Strategy_Targets", left_x + pad + 5, strat_y_start + strat_row_h * 5, "TP: -- | SL: --", clrGray, 8);
 
    // Row 6: Alternatives
-   CreateLabel("Strategy_Alt_Label", left_x + 5, strat_y_start + strat_row_h * 6, "", clrGray, 8);
-   CreateLabel("Strategy_Alt_Text", left_x + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+   CreateLabel("Strategy_Alt_Label", left_x + pad + 5, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+   CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
 
    // ============================================
-   // SECTION 3: AUTO MODE STATUS (For Auto Traders)
+   // SUBSECTION 3: AUTO MODE STATUS (For Auto Traders)
    // ============================================
 
-   int auto_y_start = strat_y_start + strat_row_h * 7 + 10;  // Start after Trade Strategy
+   int auto_y_start = strat_y_start + strat_row_h * 7 + 10;  // After Trade Strategy
 
-   CreateRect("AutoBG", left_x, auto_y_start + 15, half_width, 85, C'5,5,15', true, C'40,60,50');
-   CreateLabel("Auto_Header", left_x, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
+   CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
 
    // Sniper row
-   CreateLabel("Auto_Sniper_Label", left_x + 5, auto_y_start + 18, "SNIPER:", clrGray, 8);
-   CreateLabel("Auto_Sniper_Status", left_x + 55, auto_y_start + 18, "⚪ OFF", clrGray, 8, "Arial Bold");
-   CreateLabel("Auto_Sniper_Filters", left_x + 5, auto_y_start + 36, "PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
+   CreateLabel("Auto_Sniper_Label", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER:", clrGray, 8);
+   CreateLabel("Auto_Sniper_Status", left_x + pad + 60, auto_y_start + strat_row_h, "⚪ OFF", clrGray, 8, "Arial Bold");
+   CreateLabel("Auto_Sniper_Filters", left_x + pad + 5, auto_y_start + strat_row_h * 2, "PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
 
    // Hybrid row
-   CreateLabel("Auto_Hybrid_Label", left_x + 5, auto_y_start + 54, "HYBRID:", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Status", left_x + 55, auto_y_start + 54, "⚪ OFF", clrGray, 8, "Arial Bold");
-   CreateLabel("Auto_Hybrid_Filters", left_x + 5, auto_y_start + 72, "Trend:[ ]  ADX:[ ]  M5:[ ]", clrGray, 7);
+   CreateLabel("Auto_Hybrid_Label", left_x + pad + 5, auto_y_start + strat_row_h * 3, "HYBRID:", clrGray, 8);
+   CreateLabel("Auto_Hybrid_Status", left_x + pad + 60, auto_y_start + strat_row_h * 3, "⚪ OFF", clrGray, 8, "Arial Bold");
+   CreateLabel("Auto_Hybrid_Filters", left_x + pad + 5, auto_y_start + strat_row_h * 4, "Trend:[ ]  ADX:[ ]  M5:[ ]", clrGray, 7);
 
    // ============================================
-
-   // SECTION 4: DAILY ZONES TABLE (Panel A) - Moved to bottom
-   int zones_y_start = auto_y_start + 90;  // After Auto Mode Status (~Y=410)
-   CreateLabel("LblZ", left_x + pad, zones_y_start, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
-   CreateRect("TableBG", left_x, zones_y_start + 20, half_width, 140, C'5,5,15', true, C'45,45,60');
-
-   CreateLabel("H_Z", left_x + 10, zones_y_start + 30, "ZONE", clrGray, 8);
-   CreateLabel("H_P", left_x + 120, zones_y_start + 30, "PRICE", clrGray, 8);
-   CreateLabel("H_D", left_x + 220, zones_y_start + 30, "DIST", clrGray, 8);
-
-   for(int i = 0; i < 6; i++)
-   {
-      string id = IntegerToString(i);
-      int ry = zones_y_start + 45 + (i * 18);
-      CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
-      CreateLabel("L_P_" + id, left_x + 120, ry, "0.00", m_text_color, 9);
-      CreateLabel("L_D_" + id, left_x + 220, ry, "0 pts", clrGray, 9);
-   }
-
+   // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
+   // ============================================
+   int bottom_y_start = auto_y_start + strat_row_h * 5 + 15;  // After Auto Mode Status
 
    // ============================================
-
-   // RIGHT PANEL (Panel B)
-
+   // LEFT PANEL: Settings, Smart Filters, Auto Strategy
    // ============================================
+   int left_y = bottom_y_start;
 
 
 
