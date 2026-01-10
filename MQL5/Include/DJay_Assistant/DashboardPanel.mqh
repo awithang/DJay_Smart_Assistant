@@ -2144,7 +2144,7 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
 
    // Hybrid Status
    string hybridStatus = hybridEnabled ? "🟢 ON" : "⚪ OFF";
-   string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? '✓' : '⚠') : '⏳';
+   string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
    string hybridFilters = StringFormat("Trend:[%c score=%+d] ADX:[%c] M5:[%c]",
                                        hybridStates.Trend ? '✓' : '❌',
                                        hybridStates.TrendScore,
