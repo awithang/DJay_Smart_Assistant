@@ -401,37 +401,186 @@ void CDashboardPanel::CreatePanel()
    int left_y = bottom_y_start;
    int left_x_pos = bottom_left_x;
 
+   // ============================================
+   // LEFT PANEL SECTION 1: SETTINGS
+   // ============================================
+   CreateLabel("LblSettings", left_x_pos + pad, left_y, "SETTINGS", m_header_color, 10, "Arial Bold");
+   left_y += row_h;
 
+   CreateRect("SettingsBG", left_x_pos, left_y, bottom_half_width, 75, C'5,5,15', true, C'45,45,60');
+   left_y += 10;
 
-            // RIGHT PANEL (Panel B) - REORDERED V5
+   // Row 1: RR Ratio + Risk %
+   int rrBtnW = 40;
+   int rrGap = 2;
 
+   CreateLabel("L_RR_Title", left_x_pos + 10, left_y + 3, "RR:", clrGray, 8);
+   CreateButton("BtnRR1", left_x_pos + 35, left_y, rrBtnW, 20, "1:1", clrGray, clrWhite, 8);
+   CreateButton("BtnRR15", left_x_pos + 35 + rrBtnW + rrGap, left_y, rrBtnW, 20, "1:1.5", clrGray, clrWhite, 8);
+   CreateButton("BtnRR2", left_x_pos + 35 + (rrBtnW + rrGap)*2, left_y, rrBtnW, 20, "1:2", m_buy_color, clrWhite, 8);
 
+   CreateLabel("L_Risk", left_x_pos + bottom_half_width - 70, left_y + 3, "Risk:", clrGray, 8);
+   CreateEdit("EditRisk", left_x_pos + bottom_half_width - 40, left_y, 30, 20, DoubleToString(m_initial_risk, 1));
 
-            // ============================================
+   // Row 2: PL Toggle
+   left_y += 25;
+   CreateLabel("L_Trail", left_x_pos + 10, left_y + 3, "PL:", clrGray, 8);
+   CreateButton("BtnTrailToggle", left_x_pos + 35, left_y, 35, 20, "ON", m_buy_color, clrWhite, 8);
 
+   // PL Inputs (horizontal layout)
+   int plX = left_x_pos + 80;
+   CreateLabel("L_TP_Trail", plX, left_y + 3, "T:", clrGray, 8);
+   CreateEdit("EditTrailTP", plX + 15, left_y, 30, 20, IntegerToString(m_trailing_tp));
+   CreateLabel("L_SL_Trail", plX + 50, left_y + 3, "L:", clrGray, 8);
+   CreateEdit("EditTrailSL", plX + 65, left_y, 30, 20, IntegerToString(m_trailing_sl));
+   CreateLabel("L_Step_Trail", plX + 100, left_y + 3, "S:", clrGray, 8);
+   CreateEdit("EditTrailStep", plX + 115, left_y, 30, 20, IntegerToString(m_trailing_step));
 
+   left_y += 40;
+   left_y += gap;
 
-         
+   // ============================================
+   // LEFT PANEL SECTION 2: SMART FILTERS
+   // ============================================
+   CreateLabel("LblFilters", left_x_pos + pad, left_y, "SMART FILTERS", m_header_color, 10, "Arial Bold");
+   left_y += row_h;
 
+   CreateRect("FilterBG", left_x_pos, left_y, bottom_half_width, 60, C'5,5,15', true, C'45,45,60');
+   left_y += 10;
 
+   // Row 1: Trend Filter + Zone Filter
+   CreateButton("BtnFilterTrend", left_x_pos + 10, left_y, 15, 15, "X", m_buy_color, clrWhite, 8);
+   CreateLabel("L_F_Trend", left_x_pos + 30, left_y, "Trend Filter", clrWhite, 8);
+   CreateButton("BtnFilterZone", left_x_pos + 150, left_y, 15, 15, "X", m_buy_color, clrWhite, 8);
+   CreateLabel("L_F_Zone", left_x_pos + 170, left_y, "Zone Filter", clrWhite, 8);
 
-            int right_y = 15;
+   // Row 2: Aggressive
+   left_y += 25;
+   CreateButton("BtnFilterAggr", left_x_pos + 10, left_y, 15, 15, "", clrGray, clrWhite, 8);
+   CreateLabel("L_F_Aggr", left_x_pos + 30, left_y, "Aggressive (Ignore All)", C'255,100,100', 8);
 
+   left_y += 40;
+   left_y += gap;
 
+   // ============================================
+   // LEFT PANEL SECTION 3: AUTO STRATEGY
+   // ============================================
+   CreateLabel("LblStratTitle", left_x_pos + pad, left_y + 3, "AUTO STRATEGY", m_header_color, 10, "Arial Bold");
+   CreateButton("BtnMode", left_x_pos + bottom_half_width - 65, left_y + 3, 60, row_h, "OFF", clrGray, clrWhite, 9);
+   left_y += row_h;
 
-            int row_h = 20;
+   CreateRect("StratBG", left_x_pos, left_y, bottom_half_width, 65, C'5,5,15', true, C'45,45,60');
+   left_y += 10;
 
+   // Row 1: Arrow, Rev, Break
+   CreateButton("BtnStratArrow", left_x_pos + 10, left_y, 15, 15, "", clrGray);
+   CreateLabel("L_Arrow", left_x_pos + 30, left_y, "Arrow", clrCyan, 9, "Arial Bold");
+   CreateButton("BtnStratRev", left_x_pos + 85, left_y, 15, 15, "", clrGray);
+   CreateLabel("L_Rev", left_x_pos + 105, left_y, "Rev", clrCyan, 9, "Arial Bold");
+   CreateButton("BtnStratBreak", left_x_pos + 155, left_y, 15, 15, "", clrGray);
+   CreateLabel("L_Break", left_x_pos + 175, left_y, "Break", clrCyan, 9, "Arial Bold");
 
+   // Row 2: Quick Scalp
+   left_y += 25;
+   CreateLabel("L_QS_Label", left_x_pos + 10, left_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
+   CreateLabel("QS_Status_Dot", left_x_pos + 85, left_y, "●", clrGray, 10);
+   CreateButton("BtnStratQS", left_x_pos + 100, left_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
+   CreateLabel("LblLastAuto", left_x_pos + 10, left_y + 32, "Last: ---", C'80,80,80', 8);
 
-            int gap_y = 10; // Reduced gap
+   left_y += 55;
 
+   // ============================================
+   // RIGHT PANEL: Manual Trade + Daily Zones
+   // ============================================
+   int right_y = bottom_y_start;
+   int right_x_pos = bottom_right_x;
 
+   // ============================================
+   // RIGHT PANEL SECTION 1: MANUAL TRADE
+   // ============================================
+   CreateLabel("LblCtrl", right_x_pos + pad, right_y, "MANUAL TRADE", C'255,140,0', 10, "Arial Bold");
+   right_y += row_h;
 
-         
+   int btnW = (bottom_half_width - 30) / 2;
+   CreateButton("BtnBuy", right_x_pos + 10, right_y, btnW, 35, "BUY", m_buy_color, clrWhite, 9);
+   CreateButton("BtnSell", right_x_pos + bottom_half_width - 10 - btnW, right_y, btnW, 35, "SELL", m_sell_color, clrWhite, 9);
 
+   right_y += 45;
+   right_y += gap;
 
+   // ============================================
+   // RIGHT PANEL SECTION 2: DAILY ZONES
+   // ============================================
+   CreateLabel("LblZ", right_x_pos + pad, right_y, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
+   right_y += row_h;
 
-                        // 4. Manual Execution (TOP PRIORITY)
+   CreateRect("TableBG", right_x_pos, right_y, bottom_half_width, 130, C'5,5,15', true, C'45,45,60');
+
+   CreateLabel("H_Z", right_x_pos + 10, right_y + 10, "ZONE", clrGray, 8);
+   CreateLabel("H_P", right_x_pos + 100, right_y + 10, "PRICE", clrGray, 8);
+   CreateLabel("H_D", right_x_pos + 200, right_y + 10, "DIST", clrGray, 8);
+
+   for(int i = 0; i < 6; i++)
+   {
+      string id = IntegerToString(i);
+      int ry = right_y + 25 + (i * 18);
+      CreateLabel("L_N_" + id, right_x_pos + 10, ry, "--", clrWhite, 9);
+      CreateLabel("L_P_" + id, right_x_pos + 100, ry, "0.00", m_text_color, 9);
+      CreateLabel("L_D_" + id, right_x_pos + 200, ry, "0 pts", clrGray, 9);
+   }
+
+   // ============================================
+   // ACTIVE ORDERS Section (Bottom Anchor)
+   // ============================================
+   int orderY = m_panel_height - 130;
+
+   CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", m_header_color, 10, "Arial Bold");
+   CreateLabel("LblBalance", x + 150, orderY, "Balance: $--", clrWhite, 9, "Arial Bold");
+   CreateLabel("LblTotalProfit", x + 280, orderY, "Profit: $0.00", clrGray, 9, "Arial Bold");
+   CreateButton("BtnCloseAll", x + m_panel_width - 75, orderY - 2, 65, 18, "CLOSE ALL", m_sell_color, clrWhite, 8);
+
+   CreateRect("OrderListBG", x + 5, orderY + 20, m_panel_width - 20, 105, C'5,5,15', true, C'45,45,60');
+
+   // Scroll buttons for Active Orders
+   CreateButton("BtnScrollUp", x + m_panel_width - 30, orderY + 25, 15, 15, "▲", clrGray, clrWhite, 10);
+   CreateButton("BtnScrollDown", x + m_panel_width - 30, orderY + 45, 15, 15, "▼", clrGray, clrWhite, 10);
+
+   // Active Order Rows
+   for(int i=0; i<4; i++)
+   {
+      string sid = IntegerToString(i);
+      int rowY = (orderY + 38) + (i * 24);
+
+      CreateLabel("ActOrder_L_"+sid, -200, rowY, "", clrCyan, 9);
+      CreateLabel("ActOrder_M_"+sid, -200, rowY, "", clrWhite, 9);
+      CreateLabel("ActOrder_R_"+sid, -200, rowY, "", clrWhite, 9);
+      CreateButton("BtnCloseOrder_"+sid, -100, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
+   }
+
+   // PENDING ALERTS Section - REMOVED PER USER REQUEST
+
+   ChartRedraw(m_chart_id);
+}
+
+//+------------------------------------------------------------------+
+//| Update Trading Mode                                              |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateTradingMode(int mode)
+{
+   // mode 0 = AUTO OFF (manual only), mode 1 = AUTO ON (manual + auto)
+   string text = (mode == 0) ? "OFF" : "ON";
+   color bg = (mode == 0) ? clrGray : m_buy_color;   // Gray when OFF, Green when ON
+   color txt = clrWhite; // Always White for better contrast
+
+   ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
+
+   // Update mode label
+   ObjectSetString(m_chart_id, m_prefix+"LblMode", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"LblMode", OBJPROP_COLOR, bg);
+}
+
 
 
 
@@ -1041,6 +1190,16 @@ void CDashboardPanel::UpdateTradingMode(int mode)
    string text = (mode == 0) ? "OFF" : "ON";
    color bg = (mode == 0) ? clrGray : m_buy_color;   // Gray when OFF, Green when ON
    color txt = clrWhite; // Always White for better contrast
+
+   ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
+
+   // Update mode label
+   ObjectSetString(m_chart_id, m_prefix+"LblMode", OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart_id, m_prefix+"LblMode", OBJPROP_COLOR, bg);
+}
+
    
    ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
