@@ -270,85 +270,57 @@ void CDashboardPanel::CreatePanel()
       CreateLabel("LblZoneStatTitle", left_x + pad, 61, "ZONE:", m_text_color, 9);
       CreateLabel("LblZoneStat", left_x + pad + 60, 61, "NEUTRAL", clrGray, 9, "Arial");
 
-   // 2. MARKET INTELLIGENCE GRID (Panel A) - WIDENED 3-COL LAYOUT
-   CreateLabel("LblSig", left_x + pad, 80, "MARKET INTELLIGENCE", m_header_color, 10, "Arial Bold");
-   CreateRect("InfoBG", left_x, 100, half_width, 210, C'5,5,15', true, C'45,45,60');
+   // ============================================
+   // SECTION 1: MARKET SNAPSHOT (For Everyone)
+   // ============================================
+   CreateLabel("LblSig", left_x + pad, 80, "MARKET SNAPSHOT", m_header_color, 10, "Arial Bold");
+   CreateRect("InfoBG", left_x, 95, half_width, 75, C'5,5,15', true, C'45,45,60');
 
-   // New Spacious Column Positions (~100px each)
-   int col1_x = left_x + 10;   // CONTEXT
-   int col2_x = left_x + 110;  // MOMENTUM (Shifted Right)
-   int col3_x = left_x + 210;  // RISK (Shifted Right)
+   // Compact 2-column layout
+   int snap_col1_x = left_x + 10;   // Left column labels
+   int snap_col2_x = left_x + 115;  // Right column labels
+   int snap_row1_y = 108;
+   int snap_row_h = 13;
 
-   // Row positions
-   int row1_y = 110;
-   int row2_y = 135;
-   int row3_y = 158;
-   int row4_y = 181;
-   int row5_y = 204;
-   int row6_y = 227;
+   // Row 1: Context + ADX
+   CreateLabel("Ctx_Label", snap_col1_x, snap_row1_y, "Context:", clrGray, 8);
+   CreateLabel("Bias_Light", snap_col1_x + 50, snap_row1_y, "●", clrGray, 10);
+   CreateLabel("Bias_Label", snap_col1_x + 62, snap_row1_y, "NEUTRAL", clrGray, 8);
+   CreateLabel("ADX_Label2", snap_col2_x, snap_row1_y, "ADX:", clrGray, 8);
+   CreateLabel("ADX_V2", snap_col2_x + 30, snap_row1_y, "--", clrGray, 8);
 
-   // --- COLUMN 1: CONTEXT ---
-   CreateLabel("Ctx_T", col1_x, row1_y, "CONTEXT", C'100,200,255', 8, "Arial Bold");
-   CreateLabel("Bias_Light", col1_x, row2_y, "●", clrGray, 14); 
-   CreateLabel("Bias_Label", col1_x + 15, row2_y + 3, "NEUTRAL", clrGray, 7); 
+   // Row 2: M15 PA + M5 PA
+   CreateLabel("PA_T2", snap_col1_x, snap_row1_y + snap_row_h, "M15 PA:", clrGray, 8);
+   CreateLabel("PA_V2", snap_col1_x + 50, snap_row1_y + snap_row_h, "NONE", clrGray, 8, "Arial Bold");
+   CreateLabel("M5_PA_T", snap_col2_x, snap_row1_y + snap_row_h, "M5 PA:", clrGray, 8);
+   CreateLabel("M5_PA_V", snap_col2_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 8, "Arial Bold");
 
-   CreateLabel("TM_H4_Label", col1_x, row3_y, "H4:", clrGray, 8);
-   CreateLabel("TM_H4_Arrow", col1_x + 25, row3_y - 2, "→", clrGray, 10); 
+   // Row 3: RSI + Stoch
+   CreateLabel("RSI_T", snap_col1_x, snap_row1_y + snap_row_h * 2, "RSI:", clrGray, 8);
+   CreateLabel("RSI_V", snap_col1_x + 30, snap_row1_y + snap_row_h * 2, "--", clrGray, 8);
+   CreateLabel("Stoch_T", snap_col2_x, snap_row1_y + snap_row_h * 2, "Stoch:", clrGray, 8);
+   CreateLabel("Stoch_V", snap_col2_x + 35, snap_row1_y + snap_row_h * 2, "--", clrGray, 8);
 
-   CreateLabel("TM_H1_Label", col1_x, row4_y, "H1:", clrGray, 8);
-   CreateLabel("TM_H1_Arrow", col1_x + 25, row4_y - 2, "→", clrGray, 10);
+   // Row 4: Slope + EMA Distance
+   CreateLabel("Slope_T", snap_col1_x, snap_row1_y + snap_row_h * 3, "Slope:", clrGray, 8);
+   CreateLabel("Slope_V", snap_col1_x + 35, snap_row1_y + snap_row_h * 3, "FLAT", clrGray, 8);
+   CreateLabel("Dist_T", snap_col2_x, snap_row1_y + snap_row_h * 3, "EMA 20:", clrGray, 8);
+   CreateLabel("Dist_V", snap_col2_x + 45, snap_row1_y + snap_row_h * 3, "--", clrGray, 8);
 
-   CreateLabel("TM_M15_Label", col1_x, row5_y, "M15:", clrGray, 8);
-   CreateLabel("TM_M15_Arrow", col1_x + 25, row5_y - 2, "→", clrGray, 10);
-
-   CreateLabel("State_Label", col1_x, row6_y, "ACTION:", clrGray, 7);
-   CreateLabel("State_Value", col1_x + 35, row6_y, "WAIT", clrGray, 7); 
-
-   // --- COLUMN 2: MOMENTUM ---
-   CreateLabel("Mom_T", col2_x, row1_y, "MOMENTUM", C'100,200,255', 8, "Arial Bold");
-
-   // M15 PA (compact) - same font size as RSI/Stoch
-   CreateLabel("PA_T2", col2_x, row2_y, "M15:", clrGray, 8);
-   CreateLabel("PA_V2", col2_x + 30, row2_y, "NONE", clrGray, 8, "Arial Bold");
-
-   // M5 PA (compact) - on separate row to avoid overlap
-   CreateLabel("M5_PA_T", col2_x, row2_y + 16, "M5:", clrGray, 8);
-   CreateLabel("M5_PA_V", col2_x + 30, row2_y + 16, "--", clrGray, 8, "Arial Bold");
-
-   // Shift other rows down
-   CreateLabel("RSI_T", col2_x, row4_y, "RSI:", clrGray, 8);
-   CreateLabel("RSI_V", col2_x + 25, row4_y, "--", clrGray, 8);
-
-   CreateLabel("Stoch_T", col2_x, row5_y, "Stoch:", clrGray, 8);
-   CreateLabel("Stoch_V", col2_x + 30, row5_y, "--", clrGray, 8);
-
-   CreateLabel("Slope_T", col2_x, row6_y - 3, "Slope H1:", clrGray, 8);
-   CreateLabel("Slope_V", col2_x + 45, row6_y - 3, "FLAT", clrGray, 8);
-
-   // --- COLUMN 3: RISK ---
-   CreateLabel("Risk_T", col3_x, row1_y, "RISK", C'100,200,255', 8, "Arial Bold");
-   CreateLabel("ATR_T", col3_x, row2_y, "ATR M15:", clrGray, 8);
-   CreateLabel("ATR_V", col3_x + 45, row2_y, "-- pts", clrGray, 8);
-
-   CreateLabel("Dist_T", col3_x, row3_y, "EMA Dist:", clrGray, 8);
-   CreateLabel("Dist_V", col3_x + 45, row3_y, "--", clrGray, 8);
-
-   CreateLabel("Hybrid_T", col3_x, row4_y, "HYBRID:", clrGray, 8);
-   CreateLabel("Hybrid_V", col3_x + 40, row4_y, "OFF", clrGray, 7, "Arial Bold");
-
-   CreateLabel("Struct_T", col3_x, row5_y, "To Zone:", clrGray, 8);
-   CreateLabel("Struct_V", col3_x + 40, row5_y, "--", clrGray, 8);
-
-   CreateLabel("ADX_T2", col3_x, row6_y, "ADX:", clrGray, 8);
-   CreateLabel("ADX_V2", col3_x + 25, row6_y, "--", clrGray, 8);
+   // Row 5: ATR + To Zone
+   CreateLabel("ATR_T", snap_col1_x, snap_row1_y + snap_row_h * 4, "ATR M15:", clrGray, 8);
+   CreateLabel("ATR_V", snap_col1_x + 50, snap_row1_y + snap_row_h * 4, "-- pts", clrGray, 8);
+   CreateLabel("Struct_T", snap_col2_x, snap_row1_y + snap_row_h * 4, "To Zone:", clrGray, 8);
+   CreateLabel("Struct_V", snap_col2_x + 45, snap_row1_y + snap_row_h * 4, "--", clrGray, 8);
 
    // ============================================
-   // SPRINT 7: TRADE STRATEGY SECTION
+   // SECTION 2: TRADE STRATEGY (For Manual Traders)
    // ============================================
 
-   int strat_y_start = 250;  // Start below Market Intelligence
+   int strat_y_start = 180;  // Start below Market Snapshot (ends at 170)
    int strat_row_h = 18;     // Row height
 
+   CreateRect("StrategyBG", left_x, strat_y_start + 15, half_width, strat_row_h * 6 + 5, C'5,5,15', true, C'60,50,40');
    CreateLabel("Strategy_Header", left_x, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
 
    // Row 1: Market State
@@ -376,11 +348,12 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Strategy_Alt_Text", left_x + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
 
    // ============================================
-   // SPRINT 7: AUTO MODE STATUS SECTION
+   // SECTION 3: AUTO MODE STATUS (For Auto Traders)
    // ============================================
 
    int auto_y_start = strat_y_start + strat_row_h * 7 + 10;  // Start after Trade Strategy
 
+   CreateRect("AutoBG", left_x, auto_y_start + 15, half_width, 85, C'5,5,15', true, C'40,60,50');
    CreateLabel("Auto_Header", left_x, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
 
    // Sniper row
@@ -395,21 +368,22 @@ void CDashboardPanel::CreatePanel()
 
    // ============================================
 
-   // 3. Daily Zones Table (Panel A)
-   CreateLabel("LblZ", left_x + pad, 320, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
-   CreateRect("TableBG", left_x, 340, half_width, 140, C'5,5,15', true, C'45,45,60');
+   // SECTION 4: DAILY ZONES TABLE (Panel A) - Moved to bottom
+   int zones_y_start = auto_y_start + 90;  // After Auto Mode Status (~Y=410)
+   CreateLabel("LblZ", left_x + pad, zones_y_start, "DAILY ZONES (Smart Grid)", m_header_color, 10, "Arial Bold");
+   CreateRect("TableBG", left_x, zones_y_start + 20, half_width, 140, C'5,5,15', true, C'45,45,60');
 
-   CreateLabel("H_Z", left_x + 10, 350, "ZONE", clrGray, 8);
-   CreateLabel("H_P", left_x + 120, 350, "PRICE", clrGray, 8); // Shifted Right
-   CreateLabel("H_D", left_x + 220, 350, "DIST", clrGray, 8);  // Shifted Right
+   CreateLabel("H_Z", left_x + 10, zones_y_start + 30, "ZONE", clrGray, 8);
+   CreateLabel("H_P", left_x + 120, zones_y_start + 30, "PRICE", clrGray, 8);
+   CreateLabel("H_D", left_x + 220, zones_y_start + 30, "DIST", clrGray, 8);
 
    for(int i = 0; i < 6; i++)
    {
       string id = IntegerToString(i);
-      int ry = 365 + (i * 18);
+      int ry = zones_y_start + 45 + (i * 18);
       CreateLabel("L_N_" + id, left_x + 10, ry, "--", clrWhite, 9);
-      CreateLabel("L_P_" + id, left_x + 120, ry, "0.00", m_text_color, 9); // Shifted
-      CreateLabel("L_D_" + id, left_x + 220, ry, "0 pts", clrGray, 9);    // Shifted
+      CreateLabel("L_P_" + id, left_x + 120, ry, "0.00", m_text_color, 9);
+      CreateLabel("L_D_" + id, left_x + 220, ry, "0 pts", clrGray, 9);
    }
 
 
@@ -1804,67 +1778,24 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal, ENUM_SIGNAL_TYPE m5Signal)
 {
-   //===========================================================
-   // COLUMN 1: CONTEXT (Trend Matrix, Bias, Market State)
-   //===========================================================
+   // ==========================================================
+   // MARKET SNAPSHOT - Compact 2-Column Layout
+   // ==========================================================
 
-   // 1. Traffic Light Bias Indicator
+   // 1. Bias Indicator (Context)
    color biasColor = ctx.trendMatrix.displayColor;
    string biasText = ctx.trendMatrix.description;
-
-   // Update bias light (colored circle)
    SetColor("Bias_Light", biasColor);
    SetText("Bias_Label", biasText);
    SetColor("Bias_Label", biasColor);
 
-   // 2. Trend Matrix (H4/H1/M15 arrows)
-   string h4Arrow = (ctx.trendMatrix.h4 == TREND_UP) ? "↑" : ((ctx.trendMatrix.h4 == TREND_DOWN) ? "↓" : "→");
-   string h1Arrow = (ctx.trendMatrix.h1 == TREND_UP) ? "↑" : ((ctx.trendMatrix.h1 == TREND_DOWN) ? "↓" : "→");
-   string m15Arrow = (ctx.trendMatrix.m15 == TREND_UP) ? "↑" : ((ctx.trendMatrix.m15 == TREND_DOWN) ? "↓" : "→");
+   // 2. ADX Value
+   string adxText = (ctx.adxValue > 0) ? StringFormat("%.1f", ctx.adxValue) : "--";
+   SetText("ADX_V2", adxText);
 
-   color h4Color = (ctx.trendMatrix.h4 == TREND_UP) ? clrLime : ((ctx.trendMatrix.h4 == TREND_DOWN) ? clrRed : clrGray);
-   color h1Color = (ctx.trendMatrix.h1 == TREND_UP) ? clrLime : ((ctx.trendMatrix.h1 == TREND_DOWN) ? clrRed : clrGray);
-   color m15Color = (ctx.trendMatrix.m15 == TREND_UP) ? clrLime : ((ctx.trendMatrix.m15 == TREND_DOWN) ? clrRed : clrGray);
-
-   SetText("TM_H4_Arrow", h4Arrow);
-   SetColor("TM_H4_Arrow", h4Color);
-
-   SetText("TM_H1_Arrow", h1Arrow);
-   SetColor("TM_H1_Arrow", h1Color);
-
-   SetText("TM_M15_Arrow", m15Arrow);
-   SetColor("TM_M15_Arrow", m15Color);
-
-   // 3. Action Logic (Synthesis)
-   string actionText = "WAIT";
-   color actionColor = C'255,100,100'; // Redish
-
-   // Condition: Strong Trend Alignment (Score >= 2) AND Not Choppy (ADX > 20)
-   if (MathAbs(ctx.trendMatrix.score) >= 2 && ctx.adxValue > 20)
-   {
-      // Safety Check: Ensure Momentum supports the Trend (No Crash/Rocket against trend)
-      bool safe = true;
-      if (ctx.trendMatrix.h1 == TREND_UP && ctx.slopeH1 == SLOPE_CRASH) safe = false;
-      if (ctx.trendMatrix.h1 == TREND_DOWN && ctx.slopeH1 == SLOPE_UP) safe = false;
-      
-      if (safe)
-      {
-         actionText = "READY";
-         actionColor = clrLime;
-      }
-   }
-
-   SetText("State_Value", actionText);
-   SetColor("State_Value", actionColor);
-
-   //===========================================================
-   // COLUMN 2: MOMENTUM (PA Signal, RSI, Stoch, Slope)
-   //===========================================================
-
-   // 1. M15 PA Signal
+   // 3. M15 PA Signal
    string paText = "NONE";
    color paColor = clrGray;
-
    if(m15Signal == SIGNAL_PA_BUY)
    {
       paText = "BUY";
@@ -1875,14 +1806,12 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
       paText = "SELL";
       paColor = m_sell_color;
    }
-
    SetText("PA_V2", paText);
    SetColor("PA_V2", paColor);
 
-   // 1.5. M5 PA Signal (Hybrid Mode Entry Trigger)
+   // 4. M5 PA Signal
    string m5PaText = "--";
    color m5PaColor = clrGray;
-
    if(m5Signal == SIGNAL_PA_BUY)
    {
       m5PaText = "BUY";
@@ -1897,46 +1826,40 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
    {
       m5PaText = "NONE";
    }
-
    SetText("M5_PA_V", m5PaText);
    SetColor("M5_PA_V", m5PaColor);
 
-   // 2. RSI Value
+   // 5. RSI Value
    string rsiText = (rsi > 0) ? StringFormat("%.0f", rsi) : "--";
    color rsiColor = clrGray;
-
    if(rsi > 70)
-      rsiColor = clrRed;        // Overbought
+      rsiColor = clrRed;
    else if(rsi < 30)
-      rsiColor = clrLime;       // Oversold
+      rsiColor = clrLime;
    else if(rsi > 60)
-      rsiColor = m_sell_color;  // Bullish zone
+      rsiColor = m_sell_color;
    else if(rsi < 40)
-      rsiColor = m_buy_color;   // Bearish zone
-
+      rsiColor = m_buy_color;
    SetText("RSI_V", rsiText);
    SetColor("RSI_V", rsiColor);
 
-   // 3. Stochastic Value
+   // 6. Stochastic Value
    string stochText = (stoch > 0) ? StringFormat("%.0f", stoch) : "--";
    color stochColor = clrGray;
-
    if(stoch > 80)
-      stochColor = clrRed;      // Overbought
+      stochColor = clrRed;
    else if(stoch < 20)
-      stochColor = clrLime;     // Oversold
+      stochColor = clrLime;
    else if(stoch > 60)
-      stochColor = m_sell_color; // Bullish zone
+      stochColor = m_sell_color;
    else if(stoch < 40)
-      stochColor = m_buy_color;  // Bearish zone
-
+      stochColor = m_buy_color;
    SetText("Stoch_V", stochText);
    SetColor("Stoch_V", stochColor);
 
-   // 4. EMA Slope (H1)
+   // 7. EMA Slope
    string slopeText = "FLAT";
    color slopeColor = clrGray;
-
    switch(ctx.slopeH1)
    {
       case SLOPE_UP:
@@ -1956,104 +1879,27 @@ void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rs
          slopeColor = clrGray;
          break;
    }
-
    SetText("Slope_V", slopeText);
    SetColor("Slope_V", slopeColor);
 
-   // 5. Slope Warning (NO BUY if crash)
-   if(ctx.slopeH1 == SLOPE_CRASH)
-   {
-      SetText("Slope_Warn", "⚠ NO BUY");
-   }
-   else
-   {
-      SetText("Slope_Warn", " "); // Clear text (Space to avoid 'Label' artifact)
-   }
-
-   //===========================================================
-   // COLUMN 3: RISK (ATR, EMA Distance, Space to Run, Structure)
-   //===========================================================
-
-   // 1. ATR Value (M15)
-   string atrText = (ctx.atrM15 > 0) ? StringFormat("%.0f", ctx.atrM15) : "--";
-   SetText("ATR_V", atrText + " pts");
-
-   // 2. EMA Distance (Price vs H1 EMA 20)
+   // 8. EMA Distance
    string distText = (ctx.emaDistance != 0) ? StringFormat("%.0f", ctx.emaDistance) : "0";
    color distColor = clrGray;
-   
-   // High extension warning (> 200 pts)
-   if(ctx.emaDistance > 200) distColor = m_sell_color;      // Extended Up (Pullback likely)
-   else if(ctx.emaDistance < -200) distColor = m_buy_color; // Extended Down (Pullback likely)
-
+   if(ctx.emaDistance > 200) distColor = m_sell_color;
+   else if(ctx.emaDistance < -200) distColor = m_buy_color;
    SetText("Dist_V", distText + " pts");
    SetColor("Dist_V", distColor);
 
-   // 3. HYBRID Status (M15 Trend + M5 PA alignment check)
-   string hybridText = "OFF";
-   color hybridColor = clrGray;
+   // 9. ATR Value
+   string atrText = (ctx.atrM15 > 0) ? StringFormat("%.0f", ctx.atrM15) : "--";
+   SetText("ATR_V", atrText + " pts");
 
-   // Check if Hybrid mode conditions are met
-   bool trendAligned = (MathAbs(ctx.trendMatrix.score) >= 1); // At least 2/3 TFs aligned
-   bool m5TriggerReady = (m5Signal != SIGNAL_NONE);
-   bool biasValid = (ctx.trendMatrix.score != 0); // Not neutral
-
-   // Hybrid READY when: Trend aligned + M5 has signal + bias matches
-   if(trendAligned && m5TriggerReady && biasValid)
-   {
-      // Check if M5 signal direction matches the trend bias
-      bool buyMatch = (ctx.trendMatrix.score > 0 && m5Signal == SIGNAL_PA_BUY);
-      bool sellMatch = (ctx.trendMatrix.score < 0 && m5Signal == SIGNAL_PA_SELL);
-
-      if(buyMatch || sellMatch)
-      {
-         hybridText = "READY";
-         hybridColor = clrLime;
-      }
-      else
-      {
-         hybridText = "MISMATCH";
-         hybridColor = C'255,165,0'; // Orange
-      }
-   }
-   else if(trendAligned && !m5TriggerReady)
-   {
-      hybridText = "WAIT M5";
-      hybridColor = C'255,255,0'; // Yellow
-   }
-   else if(!trendAligned)
-   {
-      hybridText = "NO TREND";
-      hybridColor = clrRed;
-   }
-
-   SetText("Hybrid_V", hybridText);
-   SetColor("Hybrid_V", hybridColor);
-
-   // 4. Structure Distance (Distance to nearest zone)
-   string structText = (ctx.distanceToNearestZone > 0 && ctx.distanceToNearestZone < 1000000) ? 
+   // 10. To Zone (Structure Distance)
+   string structText = (ctx.distanceToNearestZone > 0 && ctx.distanceToNearestZone < 1000000) ?
                        StringFormat("%.0f", ctx.distanceToNearestZone) : "--";
    color structColor = ctx.nearStructuralLevel ? clrLime : clrGray;
    SetText("Struct_V", structText + " pts");
    SetColor("Struct_V", structColor);
-
-   // 5. ADX Value
-   string adxText = (ctx.adxValue > 0) ? StringFormat("%.1f", ctx.adxValue) : "--";
-   SetText("ADX_V2", adxText);
-
-   // ==========================================================
-   // VISUAL SAFETY ALERT (Panel Flash)
-   // ==========================================================
-   color mainBorder = C'45,45,60'; // Default Neutral Border
-
-   // Flash RED if Market is in CRASH mode or Extreme Upward Momentum (Dangerous)
-   if (ctx.slopeH1 == SLOPE_CRASH || ctx.slopeH1 == SLOPE_UP)
-   {
-      mainBorder = clrRed;
-   }
-   
-   // Apply to Main Background
-   ObjectSetInteger(m_chart_id, m_prefix+"MainBG", OBJPROP_BORDER_COLOR, mainBorder);
 }
 
 //+------------------------------------------------------------------+
