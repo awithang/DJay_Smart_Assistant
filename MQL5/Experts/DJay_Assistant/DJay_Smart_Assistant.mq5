@@ -711,6 +711,18 @@ void OnTimer()
    // Update Trade Strategy UI
    dashboardPanel.UpdateTradeStrategy(tradeRec);
 
+   // SPRINT 7: Update Auto Mode Status (filter states)
+   SniperFilterStates sniperStates;
+   HybridFilterStates hybridStates;
+   signalEngine.GetSniperFilterStates(sniperStates);
+   signalEngine.GetHybridFilterStates(hybridStates);
+
+   // Get mode enablement from inputs (or you can pass them as parameters)
+   bool sniperEnabled = Input_Enable_Sniper_Mode;
+   bool hybridEnabled = Input_Enable_Hybrid_Mode;
+
+   dashboardPanel.UpdateAutoModeStatus(sniperEnabled, hybridEnabled, sniperStates, hybridStates);
+
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
    double recPrice, recSL, recTP;

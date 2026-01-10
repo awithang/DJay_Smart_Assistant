@@ -298,3 +298,47 @@ struct TradeRecommendation
 };
 
 //+------------------------------------------------------------------+
+//| Sniper Filter States - Track individual filter pass/fail         |
+//+------------------------------------------------------------------+
+struct SniperFilterStates
+{
+    bool PA;      // Price Action pattern detected
+    bool LOC;     // Pullback/Location filter (at value)
+    bool VOL;     // Volume filter (candle body size)
+    bool ZONE;    // Structure filter (touched zone)
+
+    // Constructor
+    void SniperFilterStates()
+    {
+        PA = false;
+        LOC = false;
+        VOL = false;
+        ZONE = false;
+    }
+};
+
+//+------------------------------------------------------------------+
+//| Hybrid Filter States - Track individual filter pass/fail         |
+//+------------------------------------------------------------------+
+struct HybridFilterStates
+{
+    bool Trend;       // Trend alignment (score >= 1)
+    int TrendScore;   // Actual trend score (-3 to +3)
+    bool ADX;         // Market not choppy (ADX > 20)
+    bool ATR;         // Valid ATR > 0
+    bool M5;          // M5 PA signal present
+    bool M5Match;     // M5 direction matches trend bias
+
+    // Constructor
+    void HybridFilterStates()
+    {
+        Trend = false;
+        TrendScore = 0;
+        ADX = false;
+        ATR = false;
+        M5 = false;
+        M5Match = false;
+    }
+};
+
+//+------------------------------------------------------------------+

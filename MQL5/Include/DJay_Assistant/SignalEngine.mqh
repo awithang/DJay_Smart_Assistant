@@ -172,6 +172,10 @@ public:
     string FormatPrice(double price);
     string GetZoneText(ENUM_ZONE_STATUS zone);
 
+    //--- Filter States for AUTO MODE STATUS (Sprint 7)
+    void GetSniperFilterStates(SniperFilterStates &states);
+    void GetHybridFilterStates(HybridFilterStates &states);
+
     //--- Sniper Update: Sprint 2 - Sniper Filter Functions
     ENUM_SIGNAL_TYPE GetSniperSignal(bool debug_mode = false,  // M15-based filtered signals
                                      double atr_multiplier = 1.0,      // Volume filter multiplier
@@ -1789,6 +1793,88 @@ string CSignalEngine::GetZoneText(ENUM_ZONE_STATUS zone)
       case ZONE_STATUS_IN_SELL2: return "SELL2";
       default: return "MIDDLE";
    }
+}
+
+//+====================================================================+
+//| FILTER STATES FOR AUTO MODE STATUS DISPLAY                          |
+//+====================================================================+
+
+//+------------------------------------------------------------------+
+//| Get Sniper Filter States                                           |
+//| Check and return the current state of each Sniper filter            |
+//+------------------------------------------------------------------+
+void CSignalEngine::GetSniperFilterStates(SniperFilterStates &states)
+{
+   MarketContext ctx = GetMarketContext();
+
+   // FILTER 1: PA Check
+   bool isHammer = IsHammer(1, PERIOD_M15);
+   bool isShootingStar = IsShootingStar(1, PERIOD_M15);
+   bool isEngulfing = IsEngulfing(1, PERIOD_M15);
+   states.PA = (isHammer || isShootingStar || isEngulfing);
+
+   // FILTER 2: Pullback/Location Check
+   double atrM15 = ctx.atrM15;
+   double ema20 = GetEMAValue(PERIOD_M15, 20, 0);
+   double currentPrice = m_current_price;
+   double emaDistance = (currentPrice - ema20) / _Point;
+
+   // Use same adaptive logic as GetSniperSignal
+   double adx = GetADXValue(PERIOD_H1);
+   double baseMultiplier = 0.5;
+   double adaptiveMultiplier = baseMultiplier;
+
+   if(adx < 20) adaptiveMultiplier = baseMultiplier * 0.6;
+   else if(adx >= 20 && adx < 25) adaptiveMultiplier = baseMultiplier;
+   else if(adx >= 25 && adx < 30) adaptiveMultiplier = baseMultiplier * 2.0;
+   else adaptiveMultiplier = baseMultiplier * 3.0;
+
+   // For buy: price should be at or below EMA (allow tolerance)
+   // For sell: price should be at or above EMA (allow tolerance)
+   bool buyOK = (emaDistance <= atrM15 * adaptiveMultiplier);
+   bool sellOK = (emaDistance >= -atrM15 * adaptiveMultiplier);
+   states.LOC = (buyOK || sellOK);
+
+   // FILTER 3: Volume Check (candle body >= ATR)
+   double openM15 = iOpen(_Symbol, PERIOD_M15, 1);
+   double closeM15 = iClose(_Symbol, PERIOD_M15, 1);
+   double bodySize = MathAbs(closeM15 - openM15) / _Point;
+   states.VOL = (bodySize >= atrM15);
+
+   // FILTER 4: Zone Check (price touched/wicked a zone)
+   ENUM_ZONE_STATUS zone = GetCurrentZoneStatus();
+   states.ZONE = (zone != ZONE_STATUS_NONE);
+}
+
+//+------------------------------------------------------------------+
+//| Get Hybrid Filter States                                           |
+//| Check and return the current state of each Hybrid filter            |
+//+------------------------------------------------------------------+
+void CSignalEngine::GetHybridFilterStates(HybridFilterStates &states)
+{
+   MarketContext ctx = GetMarketContext();
+
+   // FILTER 1: Trend Alignment
+   states.TrendScore = ctx.trendMatrix.score;
+   states.Trend = (MathAbs(ctx.trendMatrix.score) >= 1);
+
+   // FILTER 2: Market State (not choppy)
+   states.ADX = (ctx.adxValue >= 20);
+
+   // FILTER 3: Volatility Check
+   states.ATR = (ctx.atrM15 > 50);
+
+   // FILTER 4: M5 PA Signal
+   ENUM_SIGNAL_TYPE m5Signal = GetActiveSignalTF(PERIOD_M5);
+   states.M5 = (m5Signal == SIGNAL_PA_BUY || m5Signal == SIGNAL_PA_SELL);
+
+   // FILTER 5: M5 direction matches trend bias
+   if(m5Signal == SIGNAL_PA_BUY && ctx.trendMatrix.score > 0)
+      states.M5Match = true;
+   else if(m5Signal == SIGNAL_PA_SELL && ctx.trendMatrix.score < 0)
+      states.M5Match = true;
+   else
+      states.M5Match = false;
 }
 
 //+====================================================================+

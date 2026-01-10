@@ -102,6 +102,11 @@ public:
    void UpdateTradeStrategy(TradeRecommendation &rec);
    string GetRecommendationIcon(string code);
 
+   //--- Sprint 7: Auto Mode Status Update
+   void UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnabled,
+                               SniperFilterStates &sniperStates,
+                               HybridFilterStates &hybridStates);
+
    //--- Ghost Button Logic (v5.0)
    void UpdateExecutionButtons(MarketContext &ctx);
 
@@ -369,6 +374,24 @@ void CDashboardPanel::CreatePanel()
    // Row 6: Alternatives
    CreateLabel("Strategy_Alt_Label", left_x + 5, strat_y_start + strat_row_h * 6, "", clrGray, 8);
    CreateLabel("Strategy_Alt_Text", left_x + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+
+   // ============================================
+   // SPRINT 7: AUTO MODE STATUS SECTION
+   // ============================================
+
+   int auto_y_start = strat_y_start + strat_row_h * 7 + 10;  // Start after Trade Strategy
+
+   CreateLabel("Auto_Header", left_x, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
+
+   // Sniper row
+   CreateLabel("Auto_Sniper_Label", left_x + 5, auto_y_start + 18, "SNIPER:", clrGray, 8);
+   CreateLabel("Auto_Sniper_Status", left_x + 55, auto_y_start + 18, "⚪ OFF", clrGray, 8, "Arial Bold");
+   CreateLabel("Auto_Sniper_Filters", left_x + 5, auto_y_start + 36, "PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
+
+   // Hybrid row
+   CreateLabel("Auto_Hybrid_Label", left_x + 5, auto_y_start + 54, "HYBRID:", clrGray, 8);
+   CreateLabel("Auto_Hybrid_Status", left_x + 55, auto_y_start + 54, "⚪ OFF", clrGray, 8, "Arial Bold");
+   CreateLabel("Auto_Hybrid_Filters", left_x + 5, auto_y_start + 72, "Trend:[ ]  ADX:[ ]  M5:[ ]", clrGray, 7);
 
    // ============================================
 
@@ -2098,6 +2121,38 @@ string CDashboardPanel::GetRecommendationIcon(string code)
    if(code == "STAY_OUT" || code == "CHOPPY" || code == "NO_TREND") return "🔴";
    if(code == "WAIT") return "⏳";
    return "⏳";  // Default
+}
+
+//+------------------------------------------------------------------+
+//| Update Auto Mode Status                                            |
+//| Display filter states for Sniper and Hybrid auto modes            |
+//+------------------------------------------------------------------+
+void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnabled,
+                                           SniperFilterStates &sniperStates,
+                                           HybridFilterStates &hybridStates)
+{
+   // Sniper Status
+   string sniperStatus = sniperEnabled ? "🟢 ON" : "⚪ OFF";
+   string sniperFilters = StringFormat("PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
+                                       sniperStates.PA ? '✓' : '❌',
+                                       sniperStates.LOC ? '✓' : '❌',
+                                       sniperStates.VOL ? '✓' : '❌',
+                                       sniperStates.ZONE ? '✓' : '❌');
+
+   SetText("Auto_Sniper_Status", sniperStatus);
+   SetText("Auto_Sniper_Filters", sniperFilters);
+
+   // Hybrid Status
+   string hybridStatus = hybridEnabled ? "🟢 ON" : "⚪ OFF";
+   string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? '✓' : '⚠') : '⏳';
+   string hybridFilters = StringFormat("Trend:[%c score=%+d] ADX:[%c] M5:[%c]",
+                                       hybridStates.Trend ? '✓' : '❌',
+                                       hybridStates.TrendScore,
+                                       hybridStates.ADX ? '✓' : '❌',
+                                       hybridM5Icon);
+
+   SetText("Auto_Hybrid_Status", hybridStatus);
+   SetText("Auto_Hybrid_Filters", hybridFilters);
 }
 
 //+------------------------------------------------------------------+
