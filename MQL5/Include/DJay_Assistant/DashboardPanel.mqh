@@ -392,15 +392,14 @@ void CDashboardPanel::CreatePanel()
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
    int bottom_y_start = auto_y_start + strat_row_h * 5 + 15;  // After Auto Mode Status
+   int row_h = 20;
+   int gap = 10;
 
    // ============================================
    // LEFT PANEL: Settings, Smart Filters, Auto Strategy
    // ============================================
    int left_y = bottom_y_start;
-
-
-
-            // ============================================
+   int left_x_pos = bottom_left_x;
 
 
 
