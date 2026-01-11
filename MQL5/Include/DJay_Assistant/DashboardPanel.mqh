@@ -308,29 +308,29 @@ void CDashboardPanel::CreatePanel()
    int snap_row1_y = snap_y_start + 5;
    int snap_row_h = 14;
 
-   // Row 1: Context | ADX | RSI | Stoch | ATR
-   CreateLabel("Ctx_Label", snap_col1_x, snap_row1_y, "Context:", clrGray, 8);
+   // Row 1: Context | ADX | RSI | Stoch | ATR (Increased font size to 9 for readability)
+   CreateLabel("Ctx_Label", snap_col1_x, snap_row1_y, "Context:", clrGray, 9);
    CreateLabel("Bias_Light", snap_col1_x + 50, snap_row1_y, "●", clrGray, 10);
-   CreateLabel("ADX_Label2", snap_col2_x, snap_row1_y, "ADX:", clrGray, 8);
-   CreateLabel("ADX_V2", snap_col2_x + 30, snap_row1_y, "--", clrGray, 8);
-   CreateLabel("RSI_T", snap_col3_x, snap_row1_y, "RSI:", clrGray, 8);
-   CreateLabel("RSI_V", snap_col3_x + 30, snap_row1_y, "--", clrGray, 8);
-   CreateLabel("Stoch_T", snap_col4_x, snap_row1_y, "Stoch:", clrGray, 8);
-   CreateLabel("Stoch_V", snap_col4_x + 35, snap_row1_y, "--", clrGray, 8);
-   CreateLabel("ATR_T", snap_col5_x, snap_row1_y, "ATR:", clrGray, 8);
-   CreateLabel("ATR_V", snap_col5_x + 30, snap_row1_y, "--", clrGray, 8);
+   CreateLabel("ADX_Label2", snap_col2_x, snap_row1_y, "ADX:", clrGray, 9);
+   CreateLabel("ADX_V2", snap_col2_x + 30, snap_row1_y, "--", clrGray, 9);
+   CreateLabel("RSI_T", snap_col3_x, snap_row1_y, "RSI:", clrGray, 9);
+   CreateLabel("RSI_V", snap_col3_x + 30, snap_row1_y, "--", clrGray, 9);
+   CreateLabel("Stoch_T", snap_col4_x, snap_row1_y, "Stoch:", clrGray, 9);
+   CreateLabel("Stoch_V", snap_col4_x + 35, snap_row1_y, "--", clrGray, 9);
+   CreateLabel("ATR_T", snap_col5_x, snap_row1_y, "ATR:", clrGray, 9);
+   CreateLabel("ATR_V", snap_col5_x + 30, snap_row1_y, "--", clrGray, 9);
 
-   // Row 2: M15 PA | M5 PA | EMA 20 | Slope | To Zone
-   CreateLabel("PA_T2", snap_col1_x, snap_row1_y + snap_row_h, "M15 PA:", clrGray, 8);
-   CreateLabel("PA_V2", snap_col1_x + 50, snap_row1_y + snap_row_h, "NONE", clrGray, 8, "Arial Bold");
-   CreateLabel("M5_PA_T", snap_col2_x, snap_row1_y + snap_row_h, "M5 PA:", clrGray, 8);
-   CreateLabel("M5_PA_V", snap_col2_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 8, "Arial Bold");
-   CreateLabel("Dist_T", snap_col3_x, snap_row1_y + snap_row_h, "EMA 20:", clrGray, 8);
-   CreateLabel("Dist_V", snap_col3_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 8);
-   CreateLabel("Slope_T", snap_col4_x, snap_row1_y + snap_row_h, "Slope:", clrGray, 8);
-   CreateLabel("Slope_V", snap_col4_x + 35, snap_row1_y + snap_row_h, "FLAT", clrGray, 8);
-   CreateLabel("Struct_T", snap_col5_x, snap_row1_y + snap_row_h, "To Zone:", clrGray, 8);
-   CreateLabel("Struct_V", snap_col5_x + 50, snap_row1_y + snap_row_h, "--", clrGray, 8);
+   // Row 2: M15 PA | M5 PA | EMA 20 | Slope | To Zone (Increased font size to 9 for readability)
+   CreateLabel("PA_T2", snap_col1_x, snap_row1_y + snap_row_h, "M15 PA:", clrGray, 9);
+   CreateLabel("PA_V2", snap_col1_x + 50, snap_row1_y + snap_row_h, "NONE", clrGray, 9, "Arial Bold");
+   CreateLabel("M5_PA_T", snap_col2_x, snap_row1_y + snap_row_h, "M5 PA:", clrGray, 9);
+   CreateLabel("M5_PA_V", snap_col2_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 9, "Arial Bold");
+   CreateLabel("Dist_T", snap_col3_x, snap_row1_y + snap_row_h, "EMA 20:", clrGray, 9);
+   CreateLabel("Dist_V", snap_col3_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 9);
+   CreateLabel("Slope_T", snap_col4_x, snap_row1_y + snap_row_h, "Slope:", clrGray, 9);
+   CreateLabel("Slope_V", snap_col4_x + 35, snap_row1_y + snap_row_h, "FLAT", clrGray, 9);
+   CreateLabel("Struct_T", snap_col5_x, snap_row1_y + snap_row_h, "To Zone:", clrGray, 9);
+   CreateLabel("Struct_V", snap_col5_x + 50, snap_row1_y + snap_row_h, "--", clrGray, 9);
 
    // ============================================
    // SUBSECTION 2: TRADE STRATEGY (For Manual Traders)
@@ -339,26 +339,26 @@ void CDashboardPanel::CreatePanel()
    int strat_y_start = snap_y_start + snap_row_h * 2 + 12;  // After Market Snapshot (2 rows now)
    int strat_row_h = 18;     // Row height
 
-   CreateLabel("Strategy_Header", left_x + pad, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
+   CreateLabel("Strategy_Header", left_x + pad, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 10, "Arial Bold");
 
-   // Row 1: Market State
-   CreateLabel("Strategy_State_Label", left_x + pad + 5, strat_y_start + strat_row_h, "State:", clrGray, 8);
-   CreateLabel("Strategy_State", left_x + pad + 45, strat_y_start + strat_row_h, "--", clrGray, 8);
+   // Row 1: Market State (Increased to 9)
+   CreateLabel("Strategy_State_Label", left_x + pad + 5, strat_y_start + strat_row_h, "State:", clrGray, 9);
+   CreateLabel("Strategy_State", left_x + pad + 45, strat_y_start + strat_row_h, "--", clrGray, 9);
 
-   // Row 2: Recommendation
-   CreateLabel("Strategy_Rec_Label", left_x + pad + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 8);
-   CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 10);
-   CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 8, "Arial Bold");
+   // Row 2: Recommendation (Increased to 9/11 for icon)
+   CreateLabel("Strategy_Rec_Label", left_x + pad + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 9);
+   CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 11);
+   CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 9, "Arial Bold");
 
-   // Row 3: Reasoning
-   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 7);
+   // Row 3: Reasoning (Increased to 8)
+   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 8);
 
-   // Row 4: Entry + Targets combined (single row)
-   CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 8);
+   // Row 4: Entry + Targets combined (Increased to 9)
+   CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 9);
 
-   // Row 5: Alternatives
-   CreateLabel("Strategy_Alt_Label", left_x + pad + 5, strat_y_start + strat_row_h * 5, "", clrGray, 8);
-   CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 5, "", clrGray, 8);
+   // Row 5: Alternatives (Increased to 9)
+   CreateLabel("Strategy_Alt_Label", left_x + pad + 5, strat_y_start + strat_row_h * 5, "", clrGray, 9);
+   CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 5, "", clrGray, 9);
 
    // ============================================
    // SUBSECTION 3: AUTO MODE STATUS (For Auto Traders)
@@ -366,18 +366,16 @@ void CDashboardPanel::CreatePanel()
 
    int auto_y_start = strat_y_start + strat_row_h * 6 + 10;  // After Trade Strategy (6 rows now)
 
-   CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
+   CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Sniper row (status + filters combined)
-   CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: ⚪ OFF  PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
-
-   // Hybrid row (status + filters combined)
-   CreateLabel("Auto_Hybrid_Row", left_x + pad + 5, auto_y_start + strat_row_h * 2, "HYBRID: ⚪ OFF  Trend:[ ] ADX:[ ] M5:[ ]", clrGray, 7);
+   // Combined Sniper + Hybrid row (On/Off status removed - visible in Auto Strategy section)
+   // Format: SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]  |  HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]
+   CreateLabel("Auto_Status_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]  |  HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 8);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
-   int bottom_y_start = auto_y_start + strat_row_h * 3 + 12;  // After Auto Mode Status (3 rows total)
+   int bottom_y_start = auto_y_start + strat_row_h * 2 + 12;  // After Auto Mode Status (2 rows now: header + combined row)
    int row_h = 20;
    int gap = 10;
 
@@ -1423,26 +1421,25 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
-   // Sniper row - status + filters combined
-   string sniperStatus = sniperEnabled ? "🟢 ON" : "⚪ OFF";
+   // Sniper filters (no On/Off status - visible in Auto Strategy section)
    string sniperFilters = StringFormat("PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
                                        sniperStates.PA ? '✓' : '❌',
                                        sniperStates.LOC ? '✓' : '❌',
                                        sniperStates.VOL ? '✓' : '❌',
                                        sniperStates.ZONE ? '✓' : '❌');
-   string sniperRow = "SNIPER: " + sniperStatus + "  " + sniperFilters;
-   SetText("Auto_Sniper_Row", sniperRow);
 
-   // Hybrid row - status + filters combined
-   string hybridStatus = hybridEnabled ? "🟢 ON" : "⚪ OFF";
+   // Hybrid filters (no On/Off status - visible in Auto Strategy section)
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
-   string hybridFilters = StringFormat("Trend:[%c score=%+d] ADX:[%c] M5:[%c]",
+   string hybridFilters = StringFormat("Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
                                        hybridStates.Trend ? '✓' : '❌',
                                        hybridStates.TrendScore,
                                        hybridStates.ADX ? '✓' : '❌',
+                                       hybridStates.ATR ? '✓' : '❌',
                                        hybridM5Icon);
-   string hybridRow = "HYBRID: " + hybridStatus + "  " + hybridFilters;
-   SetText("Auto_Hybrid_Row", hybridRow);
+
+   // Combined row: SNIPER filters | HYBRID filters
+   string combinedRow = "SNIPER: " + sniperFilters + "  |  HYBRID: " + hybridFilters;
+   SetText("Auto_Status_Row", combinedRow);
 }
 
 //+------------------------------------------------------------------+
