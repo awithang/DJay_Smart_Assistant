@@ -294,23 +294,23 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
    // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
    // Starts at mi_y_start + 18 = 76
-   // Ends below Auto Mode Status detail row: auto_y_start + strat_row_h + text_height = 244 + 18 + 12 = 274
-   // Height = 274 - 76 = 198
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 198, C'5,5,15', true, C'45,45,60');
+   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 2 + 12 - 10 = 244 + 36 + 12 - 10 = 282
+   // Height = 282 - 76 = 206 (includes bottom padding)
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 206, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
    // ============================================
    int snap_y_start = mi_y_start + 28;
 
-   // 5-column layout using full width (full_width - 10 for padding)
+   // 5-column layout using full width with proper padding (pad = 10)
    // Each column gets ~58px of space to prevent text overlap
-   int col_w = (full_width - 10) / 5;
-   int snap_col1_x = left_x + 5;                     // Column 1: 5px start
-   int snap_col2_x = left_x + 5 + col_w;             // Column 2
-   int snap_col3_x = left_x + 5 + col_w * 2;         // Column 3
-   int snap_col4_x = left_x + 5 + col_w * 3;         // Column 4
-   int snap_col5_x = left_x + 5 + col_w * 4;         // Column 5
+   int col_w = (full_width - pad * 2) / 5;
+   int snap_col1_x = left_x + pad;                     // Column 1: matches other sections
+   int snap_col2_x = left_x + pad + col_w;             // Column 2
+   int snap_col3_x = left_x + pad + col_w * 2;         // Column 3
+   int snap_col4_x = left_x + pad + col_w * 3;         // Column 4
+   int snap_col5_x = left_x + pad + col_w * 4;         // Column 5
    int snap_row1_y = snap_y_start + 5;
    int snap_row_h = 14;
 
@@ -374,9 +374,12 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Combined Sniper + Hybrid row (On/Off status removed - visible in Auto Strategy section)
+   // Combined Sniper + Hybrid row using full width (like Market Snapshot)
    // Format: SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]  |  HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]
-   CreateLabel("Auto_Status_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]  |  HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 8);
+   // Split into 2 labels for better full-width utilization
+   CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 9);
+   // Hybrid row positioned to use remaining width (starts where column 3 would start)
+   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 2, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
@@ -1430,24 +1433,22 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            HybridFilterStates &hybridStates)
 {
    // Sniper filters (no On/Off status - visible in Auto Strategy section)
-   string sniperFilters = StringFormat("PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
-                                       sniperStates.PA ? '✓' : '❌',
-                                       sniperStates.LOC ? '✓' : '❌',
-                                       sniperStates.VOL ? '✓' : '❌',
-                                       sniperStates.ZONE ? '✓' : '❌');
+   string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
+                                    sniperStates.PA ? '✓' : '❌',
+                                    sniperStates.LOC ? '✓' : '❌',
+                                    sniperStates.VOL ? '✓' : '❌',
+                                    sniperStates.ZONE ? '✓' : '❌');
+   SetText("Auto_Sniper_Row", sniperText);
 
    // Hybrid filters (no On/Off status - visible in Auto Strategy section)
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
-   string hybridFilters = StringFormat("Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
-                                       hybridStates.Trend ? '✓' : '❌',
-                                       hybridStates.TrendScore,
-                                       hybridStates.ADX ? '✓' : '❌',
-                                       hybridStates.ATR ? '✓' : '❌',
-                                       hybridM5Icon);
-
-   // Combined row: SNIPER filters | HYBRID filters
-   string combinedRow = "SNIPER: " + sniperFilters + "  |  HYBRID: " + hybridFilters;
-   SetText("Auto_Status_Row", combinedRow);
+   string hybridText = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
+                                    hybridStates.Trend ? '✓' : '❌',
+                                    hybridStates.TrendScore,
+                                    hybridStates.ADX ? '✓' : '❌',
+                                    hybridStates.ATR ? '✓' : '❌',
+                                    hybridM5Icon);
+   SetText("Auto_Hybrid_Row", hybridText);
 }
 
 //+------------------------------------------------------------------+
