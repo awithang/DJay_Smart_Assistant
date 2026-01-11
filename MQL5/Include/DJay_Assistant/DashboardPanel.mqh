@@ -293,20 +293,24 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
    // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
-   // Starts at mi_y_start + 18 = 76, ends at auto_y_start + strat_row_h = 262, height = 262 - 76 = 186
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 186, C'5,5,15', true, C'45,45,60');
+   // Starts at mi_y_start + 18 = 76
+   // Ends below Auto Mode Status detail row: auto_y_start + strat_row_h + text_height = 244 + 18 + 12 = 274
+   // Height = 274 - 76 = 198
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 198, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
    // ============================================
    int snap_y_start = mi_y_start + 28;
 
-   // 5-column layout to maximize horizontal space usage
-   int snap_col1_x = left_x + 5;       // Column 1
-   int snap_col2_x = left_x + 65;      // Column 2
-   int snap_col3_x = left_x + 125;     // Column 3
-   int snap_col4_x = left_x + 185;     // Column 4
-   int snap_col5_x = left_x + 245;     // Column 5
+   // 5-column layout using full width (full_width - 10 for padding)
+   // Each column gets ~58px of space to prevent text overlap
+   int col_w = (full_width - 10) / 5;
+   int snap_col1_x = left_x + 5;                     // Column 1: 5px start
+   int snap_col2_x = left_x + 5 + col_w;             // Column 2
+   int snap_col3_x = left_x + 5 + col_w * 2;         // Column 3
+   int snap_col4_x = left_x + 5 + col_w * 3;         // Column 4
+   int snap_col5_x = left_x + 5 + col_w * 4;         // Column 5
    int snap_row1_y = snap_y_start + 5;
    int snap_row_h = 14;
 
