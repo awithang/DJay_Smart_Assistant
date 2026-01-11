@@ -347,9 +347,11 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Strategy_Header", left_x + pad, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 10, "Arial Bold");
 
-   // Row 1: Market State (Increased to 9)
+   // Row 1: Market State - split into 2 labels to prevent text cutoff
    CreateLabel("Strategy_State_Label", left_x + pad + 5, strat_y_start + strat_row_h, "State:", clrGray, 9);
-   CreateLabel("Strategy_State", left_x + pad + 45, strat_y_start + strat_row_h, "--", clrGray, 9);
+   // Split long state text into 2 parts: Part 1 (Trend info) starts after label, Part 2 (ADX/Zone/RSI) starts at column 3
+   CreateLabel("Strategy_State_1", left_x + pad + 45, strat_y_start + strat_row_h, "--", clrGray, 9);
+   CreateLabel("Strategy_State_2", left_x + pad + col_w * 2 + 5, strat_y_start + strat_row_h, "--", clrGray, 9);
 
    // Row 2: Recommendation (Increased to 9/11 for icon)
    CreateLabel("Strategy_Rec_Label", left_x + pad + 5, strat_y_start + strat_row_h * 2, "Rec:", clrGray, 9);
@@ -1385,8 +1387,25 @@ void CDashboardPanel::UpdateTradeStrategy(TradeRecommendation &rec)
    // Note: UI elements for Trade Strategy section will be created in CreatePanel()
    // This function updates the existing elements with new data
 
-   // Update market state
-   SetText("Strategy_State", rec.marketStateText);
+   // Update market state - split into 2 labels to prevent text cutoff
+   // Find the "  ADX:" separator and split there
+   string fullState = rec.marketStateText;
+   string state1, state2;
+
+   int adxPos = StringFind(fullState, "  ADX:");
+   if(adxPos > 0)
+   {
+      state1 = StringSubstr(fullState, 0, adxPos);  // "Trend: UPTREND +3 (↑↑↑)"
+      state2 = StringSubstr(fullState, adxPos + 2); // "ADX: 25.5  Zone: Middle  RSI: 60 (Neutral)"
+   }
+   else
+   {
+      state1 = fullState;
+      state2 = "";
+   }
+
+   SetText("Strategy_State_1", state1);
+   SetText("Strategy_State_2", state2);
 
    // Update recommendation code with icon
    SetText("Strategy_Rec_Code", GetRecommendationIcon(rec.recommendationCode));
