@@ -423,7 +423,7 @@ void CDashboardPanel::CreatePanel()
    CreateEdit("EditTrailStep", plX + 115, left_y, 30, 20, IntegerToString(m_initial_pl_step));
 
    left_y += 40;
-   // Removed gap after SETTINGS to save space
+   left_y += gap;  // 10px gap - same as between Market Intelligence and bottom panels
 
    // ============================================
    // LEFT PANEL SECTION 2: SMART FILTERS
@@ -445,7 +445,7 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnFilterAggr", left_x_pos + 10, left_y, 15, 15, "", clrGray, clrWhite, 8);
    CreateLabel("L_F_Aggr", left_x_pos + 30, left_y, "Aggressive (Ignore All)", C'255,100,100', 8);
 
-   left_y += 20;  // Reduced gap from 35 to 20 for more compact layout
+   left_y += gap;  // 10px gap - same as other sections
 
    // ============================================
    // LEFT PANEL SECTION 3: AUTO STRATEGY
@@ -472,12 +472,11 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStratHybrid", left_x_pos + 120, left_y, 15, 15, "", clrGray);
    CreateLabel("L_Hybrid", left_x_pos + 140, left_y, "HYBRID", clrCyan, 9, "Arial Bold");
 
-   left_y += 15;  // Reduced gap from 35 to 15 for more compact layout
+   left_y += gap;  // 10px gap - same as other sections
 
    // ============================================
    // LEFT PANEL SECTION 4: AUTO MODE STATUS (For Auto Traders)
    // ============================================
-   // Minimal gap - place close after Auto Strategy to save vertical space
    CreateLabel("LblAutoStatus", left_x_pos + pad, left_y, "AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
    left_y += row_h;
 
@@ -514,7 +513,7 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Auto_Hybrid_ATR", hyb_x + 135, hyb_row_y, "ATR:[ ]", clrGray, 8);
    CreateLabel("Auto_Hybrid_M5", hyb_x + 178, hyb_row_y, "M5:[ ]", clrGray, 8);
 
-   left_y += autoStatus_h;  // Removed gap after AUTO MODE STATUS
+   left_y += autoStatus_h + gap;  // Add 10px gap after AUTO MODE STATUS
 
    // ============================================
    // RIGHT PANEL: Manual Trade + Daily Zones
