@@ -508,14 +508,14 @@ void OnTimer()
    dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
 
    // PERFORMANCE OPTIMIZATION: Throttle Heavy Logic
-   // Run heavy analysis only every 5 seconds to balance update frequency with UI responsiveness
-   // Test: Reducing from 10 to 5 seconds - monitor button response
+   // Run heavy analysis only every 10 seconds to give more time for button clicks
+   // This reduces blocking frequency and improves UI responsiveness
    static int heavy_tick = 0;
    heavy_tick++;
-   if(heavy_tick % 5 != 0) return;
+   if(heavy_tick % 10 != 0) return;
 
    // NOTE: RefreshData() is already called in OnTick every 1 second - no need to duplicate here
-   // Data is always fresh when heavy logic runs (every 5 seconds)
+   // Data is always fresh when heavy logic runs (every 10 seconds)
 
    if(!signalEngine.IsDataReady())
    {
