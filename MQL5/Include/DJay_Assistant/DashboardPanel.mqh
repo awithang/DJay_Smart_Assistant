@@ -503,24 +503,11 @@ void CDashboardPanel::CreatePanel()
 
    // Label "SNIPER:" (gray)
    CreateLabel("Auto_Sniper_Label", snip_x, snip_row_y, "SNIPER:", clrGray, 8);
-   // Individual filter labels - split into 3 parts: text (gray), symbol (colored), bracket (gray)
-   // Increased spacing to prevent overlap - evenly distributed across available width
-   // PA Filter
-   CreateLabel("Auto_Sniper_PA_Label", snip_x + 40, snip_row_y, "PA:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_PA_Sym", snip_x + 52, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_PA_Bracket", snip_x + 58, snip_row_y, "]", clrGray, 8);
-   // LOC Filter
-   CreateLabel("Auto_Sniper_LOC_Label", snip_x + 95, snip_row_y, "LOC:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC_Sym", snip_x + 107, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC_Bracket", snip_x + 113, snip_row_y, "]", clrGray, 8);
-   // VOL Filter
-   CreateLabel("Auto_Sniper_VOL_Label", snip_x + 150, snip_row_y, "VOL:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL_Sym", snip_x + 162, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL_Bracket", snip_x + 168, snip_row_y, "]", clrGray, 8);
-   // ZONE Filter
-   CreateLabel("Auto_Sniper_ZONE_Label", snip_x + 205, snip_row_y, "ZONE:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE_Sym", snip_x + 217, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE_Bracket", snip_x + 223, snip_row_y, "]", clrGray, 8);
+   // Single label per filter - all gray, no color change
+   CreateLabel("Auto_Sniper_PA", snip_x + 40, snip_row_y, "PA:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC", snip_x + 85, snip_row_y, "LOC:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL", snip_x + 130, snip_row_y, "VOL:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE", snip_x + 175, snip_row_y, "ZONE:[✓]", clrGray, 8);
 
    // ============================================
    // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
@@ -530,24 +517,11 @@ void CDashboardPanel::CreatePanel()
 
    // Label "HYBRID:" (gray)
    CreateLabel("Auto_Hybrid_Label", hyb_x, hyb_row_y, "HYBRID:", clrGray, 8);
-   // Individual filter labels - split into 3 parts: text (gray), symbol (colored), score+bracket (gray)
-   // Increased spacing - Trend needs more room for score, others evenly distributed
-   // Trend Filter (more space for score)
-   CreateLabel("Auto_Hybrid_Trend_Label", hyb_x + 40, hyb_row_y, "Trd:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Trend_Sym", hyb_x + 52, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Trend_Score", hyb_x + 58, hyb_row_y, " +2]", clrGray, 7);
-   // ADX Filter
-   CreateLabel("Auto_Hybrid_ADX_Label", hyb_x + 105, hyb_row_y, "ADX:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX_Sym", hyb_x + 117, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX_Bracket", hyb_x + 123, hyb_row_y, "]", clrGray, 8);
-   // ATR Filter
-   CreateLabel("Auto_Hybrid_ATR_Label", hyb_x + 160, hyb_row_y, "ATR:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR_Sym", hyb_x + 172, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR_Bracket", hyb_x + 178, hyb_row_y, "]", clrGray, 8);
-   // M5 Filter
-   CreateLabel("Auto_Hybrid_M5_Label", hyb_x + 215, hyb_row_y, "M5:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5_Sym", hyb_x + 227, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5_Bracket", hyb_x + 233, hyb_row_y, "]", clrGray, 8);
+   // Single label per filter - all gray, no color change
+   CreateLabel("Auto_Hybrid_Trend", hyb_x + 40, hyb_row_y, "Trd:[✓ +2]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX", hyb_x + 105, hyb_row_y, "ADX:[✓]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR", hyb_x + 155, hyb_row_y, "ATR:[✓]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5", hyb_x + 200, hyb_row_y, "M5:[✓]", clrGray, 8);
 
    left_y += autoStatus_h + gap;  // Add 10px gap after AUTO MODE STATUS
 
@@ -1530,69 +1504,55 @@ string CDashboardPanel::GetRecommendationIcon(string code)
 //+------------------------------------------------------------------+
 //| Update Auto Mode Status                                            |
 //| Display filter states for Sniper and Hybrid auto modes            |
-//| Only the symbol (✓/✗) is colored, brackets and text remain gray   |
+//| Single label per filter, all gray - no color changes              |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnabled,
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
    // ============================================
-   // SNIPER Filters (4 filters) - Update only symbol labels with color
-   // Brackets remain gray
+   // SNIPER Filters (4 filters) - Single label, all gray
    // ============================================
 
-   // PA Filter - Update symbol only
-   SetText("Auto_Sniper_PA_Sym", sniperStates.PA ? "✓" : "✗");
-   SetColor("Auto_Sniper_PA_Sym", sniperStates.PA ? m_buy_color : m_sell_color);
+   // PA Filter
+   SetText("Auto_Sniper_PA", sniperStates.PA ? "PA:[✓]" : "PA:[✗]");
 
-   // LOC Filter - Update symbol only
-   SetText("Auto_Sniper_LOC_Sym", sniperStates.LOC ? "✓" : "✗");
-   SetColor("Auto_Sniper_LOC_Sym", sniperStates.LOC ? m_buy_color : m_sell_color);
+   // LOC Filter
+   SetText("Auto_Sniper_LOC", sniperStates.LOC ? "LOC:[✓]" : "LOC:[✗]");
 
-   // VOL Filter - Update symbol only
-   SetText("Auto_Sniper_VOL_Sym", sniperStates.VOL ? "✓" : "✗");
-   SetColor("Auto_Sniper_VOL_Sym", sniperStates.VOL ? m_buy_color : m_sell_color);
+   // VOL Filter
+   SetText("Auto_Sniper_VOL", sniperStates.VOL ? "VOL:[✓]" : "VOL:[✗]");
 
-   // ZONE Filter - Update symbol only
-   SetText("Auto_Sniper_ZONE_Sym", sniperStates.ZONE ? "✓" : "✗");
-   SetColor("Auto_Sniper_ZONE_Sym", sniperStates.ZONE ? m_buy_color : m_sell_color);
+   // ZONE Filter
+   SetText("Auto_Sniper_ZONE", sniperStates.ZONE ? "ZONE:[✓]" : "ZONE:[✗]");
 
    // ============================================
-   // HYBRID Filters (4 filters) - Update only symbol labels with color
-   // Score and brackets remain gray
+   // HYBRID Filters (4 filters) - Single label, all gray
    // ============================================
 
-   // Trend Filter - Update symbol and score separately
-   SetText("Auto_Hybrid_Trend_Sym", hybridStates.Trend ? "✓" : "✗");
-   SetColor("Auto_Hybrid_Trend_Sym", hybridStates.Trend ? m_buy_color : m_sell_color);
-   // Score text (gray)
+   // Trend Filter (includes score)
    string trendSign = hybridStates.TrendScore >= 0 ? "+" : "";
-   SetText("Auto_Hybrid_Trend_Score", " " + trendSign + IntegerToString(hybridStates.TrendScore) + "]");
-   SetColor("Auto_Hybrid_Trend_Score", clrGray);
+   SetText("Auto_Hybrid_Trend", StringFormat("Trd:[%c %s%d]",
+            hybridStates.Trend ? '✓' : '✗',
+            trendSign,
+            hybridStates.TrendScore));
 
-   // ADX Filter - Update symbol only
-   SetText("Auto_Hybrid_ADX_Sym", hybridStates.ADX ? "✓" : "✗");
-   SetColor("Auto_Hybrid_ADX_Sym", hybridStates.ADX ? m_buy_color : m_sell_color);
+   // ADX Filter
+   SetText("Auto_Hybrid_ADX", hybridStates.ADX ? "ADX:[✓]" : "ADX:[✗]");
 
-   // ATR Filter - Update symbol only
-   SetText("Auto_Hybrid_ATR_Sym", hybridStates.ATR ? "✓" : "✗");
-   SetColor("Auto_Hybrid_ATR_Sym", hybridStates.ATR ? m_buy_color : m_sell_color);
+   // ATR Filter
+   SetText("Auto_Hybrid_ATR", hybridStates.ATR ? "ATR:[✓]" : "ATR:[✗]");
 
    // M5 Filter (has 3 states: ✓ pass, ⚠ warning, ⏳ not ready)
-   string m5SymText;
-   color m5Color;
+   string m5Text;
    if(!hybridStates.M5) {
-      m5SymText = "⏳";
-      m5Color = clrGray;
+      m5Text = "M5:[⏳]";
    } else if(hybridStates.M5Match) {
-      m5SymText = "✓";
-      m5Color = m_buy_color;
+      m5Text = "M5:[✓]";
    } else {
-      m5SymText = "⚠";
-      m5Color = C'200,150,50';  // Orange for warning
+      m5Text = "M5:[⚠]";
    }
-   SetText("Auto_Hybrid_M5_Sym", m5SymText);
-   SetColor("Auto_Hybrid_M5_Sym", m5Color);
+   SetText("Auto_Hybrid_M5", m5Text);
 }
 
 //+------------------------------------------------------------------+
