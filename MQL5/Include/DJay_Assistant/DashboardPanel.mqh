@@ -358,10 +358,10 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 11);
    CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 9, "Arial Bold");
 
-   // Row 3: Reasoning - split into 2 labels for long text
+   // Row 3: Reasoning - split into 2 labels for long text (more spacing to prevent overlap)
    CreateLabel("Strategy_Reasoning_Label", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Reasoning:", clrGray, 9);
    CreateLabel("Strategy_Reasoning_1", left_x + pad + 70, strat_y_start + strat_row_h * 3, "--", clrGray, 9);
-   CreateLabel("Strategy_Reasoning_2", left_x + pad + col_w * 2 + 5, strat_y_start + strat_row_h * 3, "", clrGray, 9);
+   CreateLabel("Strategy_Reasoning_2", left_x + pad + col_w * 3 + 5, strat_y_start + strat_row_h * 3, "", clrGray, 9);
 
    // Row 4: Entry + Targets combined (Increased to 9)
    CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 9);
@@ -378,10 +378,10 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Combined Sniper + Hybrid on SAME row (split into 2 labels for width)
-   // Format: SNIPER: PA:[x] LOC:[x] VOL:[x] ZONE:[x] | HYBRID: Trend:[x] ADX:[x] ATR:[x] M5:[x]
+   // Combined Sniper + Hybrid on SAME row (more spacing between them)
+   // Format: SNIPER: PA:[x] LOC:[x] VOL:[x] ZONE:[x] |    HYBRID: Trend:[x] ADX:[x] ATR:[x] M5:[x]
    CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ] |", clrGray, 9);
-   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 2 + 5, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
+   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 3 + 5, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
@@ -1469,20 +1469,21 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            HybridFilterStates &hybridStates)
 {
    // Row 1: Sniper filters (ends with | separator for Hybrid label)
+   // Using clearer symbols: ✓ (pass) / ✗ (fail) for better distinction
    string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c] |",
-                                    sniperStates.PA ? '✓' : '❌',
-                                    sniperStates.LOC ? '✓' : '❌',
-                                    sniperStates.VOL ? '✓' : '❌',
-                                    sniperStates.ZONE ? '✓' : '❌');
+                                    sniperStates.PA ? '✓' : '✗',
+                                    sniperStates.LOC ? '✓' : '✗',
+                                    sniperStates.VOL ? '✓' : '✗',
+                                    sniperStates.ZONE ? '✓' : '✗');
    SetText("Auto_Sniper_Row", sniperText);
 
-   // Row 1 (continued): Hybrid filters (on same row, starts at col_w * 2)
+   // Row 1 (continued): Hybrid filters (on same row, starts at col_w * 3)
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
    string hybridText = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
-                                    hybridStates.Trend ? '✓' : '❌',
+                                    hybridStates.Trend ? '✓' : '✗',
                                     hybridStates.TrendScore,
-                                    hybridStates.ADX ? '✓' : '❌',
-                                    hybridStates.ATR ? '✓' : '❌',
+                                    hybridStates.ADX ? '✓' : '✗',
+                                    hybridStates.ATR ? '✓' : '✗',
                                     hybridM5Icon);
    SetText("Auto_Hybrid_Row", hybridText);
 }
