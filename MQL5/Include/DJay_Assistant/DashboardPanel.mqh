@@ -799,15 +799,16 @@ void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h,
    ObjectSetInteger(m_chart_id, n, OBJPROP_YSIZE, h);
    ObjectSetInteger(m_chart_id, n, OBJPROP_BGCOLOR, bg);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
-   
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ZORDER, 0); // Background rectangles at bottom
+
    if(border)
    {
       ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_COLOR, border_color);
-      
+
       // Make the Main Panel border thicker
       if(StringFind(name, "MainBG") >= 0)
-         ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 2); 
+         ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 2);
       else
          ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 1);
    }
@@ -816,7 +817,7 @@ void CDashboardPanel::CreateRect(const string name, int x, int ry, int w, int h,
       ObjectSetInteger(m_chart_id, n, OBJPROP_BORDER_TYPE, BORDER_SUNKEN);
       ObjectSetInteger(m_chart_id, n, OBJPROP_WIDTH, 0);
    }
-   
+
    ObjectSetInteger(m_chart_id, n, OBJPROP_SELECTABLE, false);
 }
 
@@ -832,6 +833,7 @@ void CDashboardPanel::CreateLabel(const string name, int x, int ry, const string
    ObjectSetInteger(m_chart_id, n, OBJPROP_FONTSIZE, font_size);
    ObjectSetString(m_chart_id, n, OBJPROP_FONT, font);
    ObjectSetInteger(m_chart_id, n, OBJPROP_ANCHOR, (align=="right" ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER));
+   ObjectSetInteger(m_chart_id, n, OBJPROP_ZORDER, 5); // Ensure labels are above background rectangles
 }
 
 void CDashboardPanel::CreateButton(const string name, int x, int ry, int width, int height, const string text, color clr, color txt_clr, int font_size)
