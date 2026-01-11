@@ -1755,18 +1755,19 @@ TradeRecommendation CSignalEngine::GetTradeRecommendation()
 //+------------------------------------------------------------------+
 string CSignalEngine::FormatMarketState(MarketContext &ctx, ENUM_ZONE_STATUS zone, double rsi, double stoch)
 {
-   string trendText = (ctx.trendMatrix.score > 0) ? "UPTREND" :
-                      (ctx.trendMatrix.score < 0) ? "DOWNTREND" : "NEUTRAL";
+   string trendText = (ctx.trendMatrix.score > 0) ? "UP" :
+                      (ctx.trendMatrix.score < 0) ? "DN" : "NT";
    string score = StringFormat("%+d", ctx.trendMatrix.score);
-   string arrows = StringFormat("(%s%s%s)",
+   string arrows = StringFormat("%s%s%s",
                                 (ctx.trendMatrix.h4 == TREND_UP) ? "↑" : (ctx.trendMatrix.h4 == TREND_DOWN) ? "↓" : "→",
                                 (ctx.trendMatrix.h1 == TREND_UP) ? "↑" : (ctx.trendMatrix.h1 == TREND_DOWN) ? "↓" : "→",
                                 (ctx.trendMatrix.m15 == TREND_UP) ? "↑" : (ctx.trendMatrix.m15 == TREND_DOWN) ? "↓" : "→");
 
    string zoneText = GetZoneText(zone);
-   string obOsText = (rsi > 70) ? "OB" : (rsi < 30) ? "OS" : "Neutral";
+   string obOsText = (rsi > 70) ? "OB" : (rsi < 30) ? "OS" : "Neut";
 
-   return StringFormat("Trend: %s %s %s  ADX: %.1f  Zone: %s  RSI: %.0f (%s)",
+   // Compact format: UP+3(↑↑↑) ADX:25.5 Zone:BUY1 RSI:60(Neut)
+   return StringFormat("%s%s%s ADX:%.1f Zone:%s RSI:%.0f(%s)",
                       trendText, score, arrows, ctx.adxValue, zoneText, rsi, obOsText);
 }
 

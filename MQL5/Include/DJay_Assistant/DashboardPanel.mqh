@@ -292,8 +292,9 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblPrice", left_x + full_width - 100, mi_y_start, "0.00000", C'255,223,0', 12, "Arial Bold", "right");
    CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
-   // InfoBG: Fix height parameter (was mi_y_start + 175, should be just 175)
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 157, C'5,5,15', true, C'45,45,60');
+   // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
+   // Starts at mi_y_start + 18 = 76, ends at auto_y_start + strat_row_h = 262, height = 262 - 76 = 186
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 186, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
