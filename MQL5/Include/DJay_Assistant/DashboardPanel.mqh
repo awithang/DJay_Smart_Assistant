@@ -477,14 +477,14 @@ void CDashboardPanel::CreatePanel()
    // ============================================
    // LEFT PANEL SECTION 4: AUTO MODE STATUS (For Auto Traders)
    // ============================================
-   left_y += gap;
+   // No extra gap - place immediately after Auto Strategy to save vertical space
    CreateLabel("LblAutoStatus", left_x_pos + pad, left_y, "AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
    left_y += row_h;
 
-   // Background for Auto Mode Status
-   int autoStatus_h = 55;  // Height for 2 rows of filter status
+   // Background for Auto Mode Status - compact height
+   int autoStatus_h = 50;  // Reduced from 55 to 50 for more compact display
    CreateRect("AutoStatusBG", left_x_pos, left_y, bottom_half_width, autoStatus_h, C'5,5,15', true, C'45,45,60');
-   left_y += 8;  // Top padding
+   left_y += 6;  // Reduced top padding from 8 to 6
 
    // ============================================
    // Row 1: SNIPER Filters (PA, LOC, VOL, ZONE)
@@ -503,7 +503,7 @@ void CDashboardPanel::CreatePanel()
    // ============================================
    // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
    // ============================================
-   int hyb_row_y = left_y + 18;  // Row 2 below Row 1
+   int hyb_row_y = left_y + 16;  // Row 2 below Row 1 - reduced from 18 to 16 for compact display
    int hyb_x = left_x_pos + 8;
 
    // Label "HYBRID:" (gray)
