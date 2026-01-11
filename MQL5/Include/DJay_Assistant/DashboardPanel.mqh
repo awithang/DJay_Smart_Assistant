@@ -294,9 +294,9 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
    // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
    // Starts at mi_y_start + 18 = 76
-   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 3 + 12 - 10 = 244 + 54 + 12 - 10 = 300
-   // Height = 300 - 76 = 224 (includes bottom padding)
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 224, C'5,5,15', true, C'45,45,60');
+   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 2 + 12 - 10 = 244 + 36 + 12 - 10 = 282
+   // Height = 282 - 76 = 206 (includes bottom padding)
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 206, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
@@ -358,8 +358,10 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 11);
    CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 9, "Arial Bold");
 
-   // Row 3: Reasoning (Increased to 9 to match other rows)
-   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 9);
+   // Row 3: Reasoning - split into 2 labels for long text
+   CreateLabel("Strategy_Reasoning_Label", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Reasoning:", clrGray, 9);
+   CreateLabel("Strategy_Reasoning_1", left_x + pad + 70, strat_y_start + strat_row_h * 3, "--", clrGray, 9);
+   CreateLabel("Strategy_Reasoning_2", left_x + pad + col_w * 2 + 5, strat_y_start + strat_row_h * 3, "", clrGray, 9);
 
    // Row 4: Entry + Targets combined (Increased to 9)
    CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 9);
@@ -376,32 +378,15 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Combined into 2 rows, each using FULL available width
-   // Use custom creation to set explicit width for long text
-   string n1 = m_prefix + "Auto_Sniper_Row";
-   ObjectCreate(m_chart_id, n1, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_CORNER, m_corner);
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_XDISTANCE, left_x + pad + 5);
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_YDISTANCE, Y(auto_y_start + strat_row_h));
-   ObjectSetString(m_chart_id, n1, OBJPROP_TEXT, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]");
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_COLOR, clrGray);
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_FONTSIZE, 9);
-   ObjectSetInteger(m_chart_id, n1, OBJPROP_ZORDER, 5);
-
-   string n2 = m_prefix + "Auto_Hybrid_Row";
-   ObjectCreate(m_chart_id, n2, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_CORNER, m_corner);
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_XDISTANCE, left_x + pad + 5);
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_YDISTANCE, Y(auto_y_start + strat_row_h * 2));
-   ObjectSetString(m_chart_id, n2, OBJPROP_TEXT, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]");
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_COLOR, clrGray);
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_FONTSIZE, 9);
-   ObjectSetInteger(m_chart_id, n2, OBJPROP_ZORDER, 5);
+   // Combined Sniper + Hybrid on SAME row (split into 2 labels for width)
+   // Format: SNIPER: PA:[x] LOC:[x] VOL:[x] ZONE:[x] | HYBRID: Trend:[x] ADX:[x] ATR:[x] M5:[x]
+   CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ] |", clrGray, 9);
+   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 2 + 5, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
-   int bottom_y_start = auto_y_start + strat_row_h * 3 + 12;  // After Auto Mode Status (3 rows now: header + sniper + hybrid)
+   int bottom_y_start = auto_y_start + strat_row_h * 2 + 12;  // After Auto Mode Status (2 rows: header + combined)
    int row_h = 20;
    int gap = 10;
 
@@ -1415,8 +1400,25 @@ void CDashboardPanel::UpdateTradeStrategy(TradeRecommendation &rec)
    SetText("Strategy_Rec_Text", rec.recommendationText);
    SetColor("Strategy_Rec_Text", rec.recommendationColor);
 
-   // Update reasoning
-   SetText("Strategy_Reasoning", rec.reasoning);
+   // Update reasoning - split into 2 labels for long text
+   string reasoning = rec.reasoning;
+   string reason1, reason2;
+
+   // Split at period ". " separator
+   int periodPos = StringFind(reasoning, ". ");
+   if(periodPos > 0 && periodPos < 60)  // Only split if period is within first 60 chars
+   {
+      reason1 = StringSubstr(reasoning, 0, periodPos + 1);  // Include the period
+      reason2 = StringSubstr(reasoning, periodPos + 2);     // Skip ". "
+   }
+   else
+   {
+      reason1 = reasoning;
+      reason2 = "";
+   }
+
+   SetText("Strategy_Reasoning_1", reason1);
+   SetText("Strategy_Reasoning_2", reason2);
 
    // Update entry details - format as "ENTRY: MARKET @ 1.0850 | TP: 1.0900 | SL: 1.0800"
    if(rec.entryType != "")
@@ -1466,15 +1468,15 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
-   // Row 1: Sniper filters (full width)
-   string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
+   // Row 1: Sniper filters (ends with | separator for Hybrid label)
+   string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c] |",
                                     sniperStates.PA ? '✓' : '❌',
                                     sniperStates.LOC ? '✓' : '❌',
                                     sniperStates.VOL ? '✓' : '❌',
                                     sniperStates.ZONE ? '✓' : '❌');
    SetText("Auto_Sniper_Row", sniperText);
 
-   // Row 2: Hybrid filters (full width)
+   // Row 1 (continued): Hybrid filters (on same row, starts at col_w * 2)
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
    string hybridText = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
                                     hybridStates.Trend ? '✓' : '❌',
