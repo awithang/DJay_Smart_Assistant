@@ -284,6 +284,7 @@ void CDashboardPanel::CreatePanel()
 
    // ============================================
    // MARKET INTELLIGENCE (Full Width - Panel A + B merged)
+   // For Manual Traders: Market context and trade recommendations
    // ============================================
    int mi_y_start = 58;  // Start below header (35 + 18 + 5 gap)
 
@@ -292,11 +293,12 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblPrice", left_x + full_width - 100, mi_y_start, "0.00000", C'255,223,0', 12, "Arial Bold", "right");
    CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
-   // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
+   // InfoBG: Calculate height to cover Market Snapshot + Trade Strategy only
    // Starts at mi_y_start + 18 = 76
-   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 2 + 12 - 10 = 244 + 36 + 12 - 10 = 282
-   // Height = 282 - 76 = 206 (includes bottom padding)
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 206, C'5,5,15', true, C'45,45,60');
+   // Ends at strat_y_start + strat_row_h * 6 + 10 = snap_y_start + snap_row_h * 2 + 12 + strat_row_h * 6 + 10
+   // = 91 + 28 + 12 + 108 + 10 = 249, with 10px gap = 239
+   // Height = 239 - 76 = 163
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 163, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
@@ -371,43 +373,11 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 5, "", clrGray, 9);
 
    // ============================================
-   // SUBSECTION 3: AUTO MODE STATUS (For Auto Traders)
-   // ============================================
-
-   int auto_y_start = strat_y_start + strat_row_h * 6 + 10;  // After Trade Strategy (6 rows now)
-
-   CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
-
-   // ============================================
-   // AUTO MODE STATUS - Separate colored labels for each filter
-   // ============================================
-
-   // --- SNIPER Section (4 filters: PA, LOC, VOL, ZONE) ---
-   int snip_x = left_x + pad + 5;
-   int snip_y = auto_y_start + strat_row_h;
-
-   CreateLabel("Auto_Sniper_Label", snip_x, snip_y, "SNIPER:", clrGray, 9);
-   // Individual filter labels (for colored status)
-   CreateLabel("Auto_Sniper_PA", snip_x + 52, snip_y, "PA:[ ]", clrGray, 9);
-   CreateLabel("Auto_Sniper_LOC", snip_x + 95, snip_y, "LOC:[ ]", clrGray, 9);
-   CreateLabel("Auto_Sniper_VOL", snip_x + 142, snip_y, "VOL:[ ]", clrGray, 9);
-   CreateLabel("Auto_Sniper_ZONE", snip_x + 190, snip_y, "ZONE:[ ]", clrGray, 9);
-   CreateLabel("Auto_Sniper_Sep", snip_x + 238, snip_y, "|", clrGray, 9);
-
-   // --- HYBRID Section (4 filters: Trend, ADX, ATR, M5) ---
-   int hyb_x = left_x + pad + col_w * 3 + 5;  // More spacing after Sniper
-
-   CreateLabel("Auto_Hybrid_Label", hyb_x, snip_y, "HYBRID:", clrGray, 9);
-   // Individual filter labels (for colored status)
-   CreateLabel("Auto_Hybrid_Trend", hyb_x + 52, snip_y, "Trend:[ ]", clrGray, 9);
-   CreateLabel("Auto_Hybrid_ADX", hyb_x + 115, snip_y, "ADX:[ ]", clrGray, 9);
-   CreateLabel("Auto_Hybrid_ATR", hyb_x + 165, snip_y, "ATR:[ ]", clrGray, 9);
-   CreateLabel("Auto_Hybrid_M5", hyb_x + 210, snip_y, "M5:[ ]", clrGray, 9);
-
-   // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
-   int bottom_y_start = auto_y_start + strat_row_h * 2 + 12;  // After Auto Mode Status (2 rows: header + combined)
+   // Market Intelligence now ends at strat_y_start + strat_row_h * 6 + 10
+   // bottom_y_start is right after with small gap
+   int bottom_y_start = strat_y_start + strat_row_h * 6 + 10;  // After Trade Strategy (6 rows: header + 5 data)
    int row_h = 20;
    int gap = 10;
 
@@ -506,6 +476,48 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblLastAuto", left_x_pos + 10, left_y + 20, "Last: ---", C'80,80,80', 7);
 
    left_y += 35;
+
+   // ============================================
+   // LEFT PANEL SECTION 4: AUTO MODE STATUS (For Auto Traders)
+   // ============================================
+   left_y += gap;
+   CreateLabel("LblAutoStatus", left_x_pos + pad, left_y, "AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
+   left_y += row_h;
+
+   // Background for Auto Mode Status
+   int autoStatus_h = 55;  // Height for 2 rows of filter status
+   CreateRect("AutoStatusBG", left_x_pos, left_y, bottom_half_width, autoStatus_h, C'5,5,15', true, C'45,45,60');
+   left_y += 8;  // Top padding
+
+   // ============================================
+   // Row 1: SNIPER Filters (PA, LOC, VOL, ZONE)
+   // ============================================
+   int snip_row_y = left_y;
+   int snip_x = left_x_pos + 8;
+
+   // Label "SNIPER:" (gray)
+   CreateLabel("Auto_Sniper_Label", snip_x, snip_row_y, "SNIPER:", clrGray, 8);
+   // Individual filter labels (for colored status) - smaller font for compact display
+   CreateLabel("Auto_Sniper_PA", snip_x + 42, snip_row_y, "PA:[ ]", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC", snip_x + 80, snip_row_y, "LOC:[ ]", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL", snip_x + 122, snip_row_y, "VOL:[ ]", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE", snip_x + 163, snip_row_y, "ZONE:[ ]", clrGray, 8);
+
+   // ============================================
+   // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
+   // ============================================
+   int hyb_row_y = left_y + 18;  // Row 2 below Row 1
+   int hyb_x = left_x_pos + 8;
+
+   // Label "HYBRID:" (gray)
+   CreateLabel("Auto_Hybrid_Label", hyb_x, hyb_row_y, "HYBRID:", clrGray, 8);
+   // Individual filter labels (for colored status)
+   CreateLabel("Auto_Hybrid_Trend", hyb_x + 42, hyb_row_y, "Trd:[ ]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX", hyb_x + 90, hyb_row_y, "ADX:[ ]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR", hyb_x + 135, hyb_row_y, "ATR:[ ]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5", hyb_x + 178, hyb_row_y, "M5:[ ]", clrGray, 8);
+
+   left_y += autoStatus_h + gap;
 
    // ============================================
    // RIGHT PANEL: Manual Trade + Daily Zones
