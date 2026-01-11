@@ -378,10 +378,31 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Combined Sniper + Hybrid on SAME row (more spacing between them)
-   // Format: SNIPER: PA:[x] LOC:[x] VOL:[x] ZONE:[x] |    HYBRID: Trend:[x] ADX:[x] ATR:[x] M5:[x]
-   CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ] |", clrGray, 9);
-   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 3 + 5, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
+   // ============================================
+   // AUTO MODE STATUS - Separate colored labels for each filter
+   // ============================================
+
+   // --- SNIPER Section (4 filters: PA, LOC, VOL, ZONE) ---
+   int snip_x = left_x + pad + 5;
+   int snip_y = auto_y_start + strat_row_h;
+
+   CreateLabel("Auto_Sniper_Label", snip_x, snip_y, "SNIPER:", clrGray, 9);
+   // Individual filter labels (for colored status)
+   CreateLabel("Auto_Sniper_PA", snip_x + 52, snip_y, "PA:[ ]", clrGray, 9);
+   CreateLabel("Auto_Sniper_LOC", snip_x + 95, snip_y, "LOC:[ ]", clrGray, 9);
+   CreateLabel("Auto_Sniper_VOL", snip_x + 142, snip_y, "VOL:[ ]", clrGray, 9);
+   CreateLabel("Auto_Sniper_ZONE", snip_x + 190, snip_y, "ZONE:[ ]", clrGray, 9);
+   CreateLabel("Auto_Sniper_Sep", snip_x + 238, snip_y, "|", clrGray, 9);
+
+   // --- HYBRID Section (4 filters: Trend, ADX, ATR, M5) ---
+   int hyb_x = left_x + pad + col_w * 3 + 5;  // More spacing after Sniper
+
+   CreateLabel("Auto_Hybrid_Label", hyb_x, snip_y, "HYBRID:", clrGray, 9);
+   // Individual filter labels (for colored status)
+   CreateLabel("Auto_Hybrid_Trend", hyb_x + 52, snip_y, "Trend:[ ]", clrGray, 9);
+   CreateLabel("Auto_Hybrid_ADX", hyb_x + 115, snip_y, "ADX:[ ]", clrGray, 9);
+   CreateLabel("Auto_Hybrid_ATR", hyb_x + 165, snip_y, "ATR:[ ]", clrGray, 9);
+   CreateLabel("Auto_Hybrid_M5", hyb_x + 210, snip_y, "M5:[ ]", clrGray, 9);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
@@ -1463,29 +1484,70 @@ string CDashboardPanel::GetRecommendationIcon(string code)
 //+------------------------------------------------------------------+
 //| Update Auto Mode Status                                            |
 //| Display filter states for Sniper and Hybrid auto modes            |
+//| Each filter has its own label for individual color control        |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnabled,
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
-   // Row 1: Sniper filters (ends with | separator for Hybrid label)
-   // Using clearer symbols: ✓ (pass) / ✗ (fail) for better distinction
-   string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c] |",
-                                    sniperStates.PA ? '✓' : '✗',
-                                    sniperStates.LOC ? '✓' : '✗',
-                                    sniperStates.VOL ? '✓' : '✗',
-                                    sniperStates.ZONE ? '✓' : '✗');
-   SetText("Auto_Sniper_Row", sniperText);
+   // ============================================
+   // SNIPER Filters (4 filters)
+   // ============================================
 
-   // Row 1 (continued): Hybrid filters (on same row, starts at col_w * 3)
-   string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
-   string hybridText = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
-                                    hybridStates.Trend ? '✓' : '✗',
-                                    hybridStates.TrendScore,
-                                    hybridStates.ADX ? '✓' : '✗',
-                                    hybridStates.ATR ? '✓' : '✗',
-                                    hybridM5Icon);
-   SetText("Auto_Hybrid_Row", hybridText);
+   // PA Filter
+   string paText = StringFormat("PA:[%c]", sniperStates.PA ? '✓' : '✗');
+   SetText("Auto_Sniper_PA", paText);
+   SetColor("Auto_Sniper_PA", sniperStates.PA ? m_buy_color : m_sell_color);
+
+   // LOC Filter
+   string locText = StringFormat("LOC:[%c]", sniperStates.LOC ? '✓' : '✗');
+   SetText("Auto_Sniper_LOC", locText);
+   SetColor("Auto_Sniper_LOC", sniperStates.LOC ? m_buy_color : m_sell_color);
+
+   // VOL Filter
+   string volText = StringFormat("VOL:[%c]", sniperStates.VOL ? '✓' : '✗');
+   SetText("Auto_Sniper_VOL", volText);
+   SetColor("Auto_Sniper_VOL", sniperStates.VOL ? m_buy_color : m_sell_color);
+
+   // ZONE Filter
+   string zoneText = StringFormat("ZONE:[%c]", sniperStates.ZONE ? '✓' : '✗');
+   SetText("Auto_Sniper_ZONE", zoneText);
+   SetColor("Auto_Sniper_ZONE", sniperStates.ZONE ? m_buy_color : m_sell_color);
+
+   // ============================================
+   // HYBRID Filters (4 filters)
+   // ============================================
+
+   // Trend Filter (includes score)
+   string trendText = StringFormat("Trend:[%c %+d]", hybridStates.Trend ? '✓' : '✗', hybridStates.TrendScore);
+   SetText("Auto_Hybrid_Trend", trendText);
+   SetColor("Auto_Hybrid_Trend", hybridStates.Trend ? m_buy_color : m_sell_color);
+
+   // ADX Filter
+   string adxText = StringFormat("ADX:[%c]", hybridStates.ADX ? '✓' : '✗');
+   SetText("Auto_Hybrid_ADX", adxText);
+   SetColor("Auto_Hybrid_ADX", hybridStates.ADX ? m_buy_color : m_sell_color);
+
+   // ATR Filter
+   string atrText = StringFormat("ATR:[%c]", hybridStates.ATR ? '✓' : '✗');
+   SetText("Auto_Hybrid_ATR", atrText);
+   SetColor("Auto_Hybrid_ATR", hybridStates.ATR ? m_buy_color : m_sell_color);
+
+   // M5 Filter (has 3 states: ✓ pass, ⚠ warning, ⏳ not ready)
+   string m5Text;
+   color m5Color;
+   if(!hybridStates.M5) {
+      m5Text = StringFormat("M5:[⏳]");
+      m5Color = clrGray;
+   } else if(hybridStates.M5Match) {
+      m5Text = StringFormat("M5:[✓]");
+      m5Color = m_buy_color;
+   } else {
+      m5Text = StringFormat("M5:[⚠]");
+      m5Color = C'200,150,50';  // Orange for warning
+   }
+   SetText("Auto_Hybrid_M5", m5Text);
+   SetColor("Auto_Hybrid_M5", m5Color);
 }
 
 //+------------------------------------------------------------------+
