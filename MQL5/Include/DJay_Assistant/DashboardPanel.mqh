@@ -374,13 +374,27 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Split into 2 separate rows, each split into 2 labels to prevent cutoff
-   // Row 1: Sniper filters (split into 2 labels for better distribution)
-   CreateLabel("Auto_Sniper_1", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ]", clrGray, 9);
-   CreateLabel("Auto_Sniper_2", left_x + pad + col_w * 2 + 5, auto_y_start + strat_row_h, "VOL:[ ] ZONE:[ ]", clrGray, 9);
-   // Row 2: Hybrid filters (split into 2 labels for better distribution)
-   CreateLabel("Auto_Hybrid_1", left_x + pad + 5, auto_y_start + strat_row_h * 2, "HYBRID: Trend:[ ] ADX:[ ]", clrGray, 9);
-   CreateLabel("Auto_Hybrid_2", left_x + pad + col_w * 2 + 5, auto_y_start + strat_row_h * 2, "ATR:[ ] M5:[ ]", clrGray, 9);
+   // Combined into 2 rows, each using FULL available width
+   // Use custom creation to set explicit width for long text
+   string n1 = m_prefix + "Auto_Sniper_Row";
+   ObjectCreate(m_chart_id, n1, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_XDISTANCE, left_x + pad + 5);
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_YDISTANCE, Y(auto_y_start + strat_row_h));
+   ObjectSetString(m_chart_id, n1, OBJPROP_TEXT, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]");
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_COLOR, clrGray);
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(m_chart_id, n1, OBJPROP_ZORDER, 5);
+
+   string n2 = m_prefix + "Auto_Hybrid_Row";
+   ObjectCreate(m_chart_id, n2, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_CORNER, m_corner);
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_XDISTANCE, left_x + pad + 5);
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_YDISTANCE, Y(auto_y_start + strat_row_h * 2));
+   ObjectSetString(m_chart_id, n2, OBJPROP_TEXT, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]");
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_COLOR, clrGray);
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(m_chart_id, n2, OBJPROP_ZORDER, 5);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
@@ -1433,27 +1447,23 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
-   // Sniper filters split into 2 labels for better width distribution
-   string sniper1 = StringFormat("SNIPER: PA:[%c] LOC:[%c]",
-                                  sniperStates.PA ? '✓' : '❌',
-                                  sniperStates.LOC ? '✓' : '❌');
-   string sniper2 = StringFormat("VOL:[%c] ZONE:[%c]",
-                                  sniperStates.VOL ? '✓' : '❌',
-                                  sniperStates.ZONE ? '✓' : '❌');
-   SetText("Auto_Sniper_1", sniper1);
-   SetText("Auto_Sniper_2", sniper2);
+   // Row 1: Sniper filters (full width)
+   string sniperText = StringFormat("SNIPER: PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
+                                    sniperStates.PA ? '✓' : '❌',
+                                    sniperStates.LOC ? '✓' : '❌',
+                                    sniperStates.VOL ? '✓' : '❌',
+                                    sniperStates.ZONE ? '✓' : '❌');
+   SetText("Auto_Sniper_Row", sniperText);
 
-   // Hybrid filters split into 2 labels for better width distribution
+   // Row 2: Hybrid filters (full width)
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
-   string hybrid1 = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c]",
-                                  hybridStates.Trend ? '✓' : '❌',
-                                  hybridStates.TrendScore,
-                                  hybridStates.ADX ? '✓' : '❌');
-   string hybrid2 = StringFormat("ATR:[%c] M5:[%c]",
-                                  hybridStates.ATR ? '✓' : '❌',
-                                  hybridM5Icon);
-   SetText("Auto_Hybrid_1", hybrid1);
-   SetText("Auto_Hybrid_2", hybrid2);
+   string hybridText = StringFormat("HYBRID: Trend:[%c %+d] ADX:[%c] ATR:[%c] M5:[%c]",
+                                    hybridStates.Trend ? '✓' : '❌',
+                                    hybridStates.TrendScore,
+                                    hybridStates.ADX ? '✓' : '❌',
+                                    hybridStates.ATR ? '✓' : '❌',
+                                    hybridM5Icon);
+   SetText("Auto_Hybrid_Row", hybridText);
 }
 
 //+------------------------------------------------------------------+
