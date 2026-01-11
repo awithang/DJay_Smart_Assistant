@@ -1,0 +1,33 @@
++ button response time when make/close order
+
++ arrow symbol for hybrid use same as old QS arrow
+
++ change quick scalp label to Hybrid Mode and move ball in front of label and check color status. 
+
+- Add options Lot, tp, sl, profit lock for manual trade. Combine current setting, smart filter, auto strategy into 1 section call "Auto Trade". Profit Lock should be Global setting, use for both manual and  Auto trade.
+
+- Modify hybrid can activate if Sniper order close but graph still trending move.
+
+- Sniper and Hybrid should be set default to True.
+
+- Display M5 condition details on cockpit.
+
+- change pending to auto pending ? pending at recommend price, no =/- extra point.
+
+- How arrow signal on graph work and their logic? Is it accurate?
+
+- เพิ่มคำอธิบาย การวิเคราะห์ราคาตลาดปัจุบัน แนวโน้ม แนะนำจุดเข้า เพิ่มปุ่ม buy/sell, limit/stop, เช่น ตอนนี้เป็น strong uptrend แต่ rsi is over bought และอยู่ใน sell zone ไม่ควร buy จุดที่่น่าเข้า order คือ รอให้กราฟ .......
+
+- When change TF, Settings on dashboard are refresh to default.
+
+- Update input, then value on dashboard back to default value.
+
+- To Zone in cockpit shold be show buy/sell zone+distance 
+
+- Scroll problem, when we have more than 5 orders and scroll to bottom order, when all orders finished by not manual scroll up to to orders before all orders finished. No order display when new order created.
+
++ Conditions Strong uptrend, M15 PA buy, but zone is Sell zone 2. Smart filter: both trend and zone both active, hybrid mode on and sniper mode off. why buy signal arrow appear and order made when new M15 bar appear?
+
+- Report panel.
+
+

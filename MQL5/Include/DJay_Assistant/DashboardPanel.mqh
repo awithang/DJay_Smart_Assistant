@@ -504,10 +504,11 @@ void CDashboardPanel::CreatePanel()
    // Label "SNIPER:" (gray)
    CreateLabel("Auto_Sniper_Label", snip_x, snip_row_y, "SNIPER:", clrGray, 8);
    // Single label per filter - all gray, no color change
-   CreateLabel("Auto_Sniper_PA", snip_x + 40, snip_row_y, "PA:[✓]", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC", snip_x + 85, snip_row_y, "LOC:[✓]", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL", snip_x + 130, snip_row_y, "VOL:[✓]", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE", snip_x + 175, snip_row_y, "ZONE:[✓]", clrGray, 8);
+   // Increased spacing to prevent overlap
+   CreateLabel("Auto_Sniper_PA", snip_x + 45, snip_row_y, "PA:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC", snip_x + 95, snip_row_y, "LOC:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL", snip_x + 150, snip_row_y, "VOL:[✓]", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE", snip_x + 205, snip_row_y, "ZONE:[✓]", clrGray, 8);
 
    // ============================================
    // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
@@ -518,10 +519,11 @@ void CDashboardPanel::CreatePanel()
    // Label "HYBRID:" (gray)
    CreateLabel("Auto_Hybrid_Label", hyb_x, hyb_row_y, "HYBRID:", clrGray, 8);
    // Single label per filter - all gray, no color change
-   CreateLabel("Auto_Hybrid_Trend", hyb_x + 40, hyb_row_y, "Trd:[✓ +2]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX", hyb_x + 105, hyb_row_y, "ADX:[✓]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR", hyb_x + 155, hyb_row_y, "ATR:[✓]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5", hyb_x + 200, hyb_row_y, "M5:[✓]", clrGray, 8);
+   // Increased spacing to prevent overlap
+   CreateLabel("Auto_Hybrid_Trend", hyb_x + 48, hyb_row_y, "Trd:[✓ +2]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX", hyb_x + 120, hyb_row_y, "ADX:[✓]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR", hyb_x + 175, hyb_row_y, "ATR:[✓]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5", hyb_x + 230, hyb_row_y, "M5:[✓]", clrGray, 8);
 
    left_y += autoStatus_h + gap;  // Add 10px gap after AUTO MODE STATUS
 
@@ -1532,10 +1534,8 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
 
    // Trend Filter (includes score)
    string trendSign = hybridStates.TrendScore >= 0 ? "+" : "";
-   SetText("Auto_Hybrid_Trend", StringFormat("Trd:[%c %s%d]",
-            hybridStates.Trend ? '✓' : '✗',
-            trendSign,
-            hybridStates.TrendScore));
+   string trendText = "Trd:[" + (hybridStates.Trend ? "✓" : "✗") + " " + trendSign + IntegerToString(hybridStates.TrendScore) + "]";
+   SetText("Auto_Hybrid_Trend", trendText);
 
    // ADX Filter
    SetText("Auto_Hybrid_ADX", hybridStates.ADX ? "ADX:[✓]" : "ADX:[✗]");

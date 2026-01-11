@@ -1,16 +1,15 @@
-EK	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK START ==========
-EI	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] Clicked object: DJ_BtnMode
-HL	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 1. OnEvent took: 0.019 ms
-GN	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	Trading Mode: AUTO ON (Manual + Auto trading)
-CJ	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 2. Button handlers took: 0.004 ms
-CH	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 3. ChartRedraw took: 0.003 ms
-RL	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] TOTAL OnChartEvent took: 0.045 ms
-RN	0	23:18:35.710	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK END ==========
-RJ	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK START ==========
-QD	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] Clicked object: DJ_BtnStratQS
-NL	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 1. OnEvent took: 0.001 ms
-NS	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	Hybrid Mode: ENABLED
-NG	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 2. Button handlers took: 0.006 ms
-OM	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] 3. ChartRedraw took: 0.006 ms
-EP	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] TOTAL OnChartEvent took: 0.036 ms
-IJ	0	23:18:37.908	DJay_Smart_Assistant (XAUUSD,M15)	[TIMING] ========== BUTTON CLICK END ==========
+QL	0	11:13:09.186	DJay_Smart_Assistant (XAUUSD,M15)	HYBRID MODE: ENABLED - M15 Context + M5 Entry
+MM	0	11:13:09.186	DJay_Smart_Assistant (XAUUSD,M15)	SNIPER MODE: ENABLED - Using M15 3-filter signals
+OD	0	11:13:09.324	DJay_Smart_Assistant (XAUUSD,M15)	DJAY Smart Assistant initialized successfully.
+OG	0	11:13:19.786	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 435 ms
+JQ	0	11:13:30.604	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 1253 ms
+CH	0	11:13:40.123	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 771 ms
+MF	0	11:13:49.805	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 452 ms
+CO	0	11:14:00.573	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 1219 ms
+CF	0	11:14:11.354	DJay_Smart_Assistant (XAUUSD,M15)	INFO: Filter states refreshed (every 60 seconds)
+HG	0	11:14:11.355	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 2000 ms
+PQ	0	11:14:21.924	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 1552 ms
+IH	0	11:14:30.825	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 453 ms
+JG	0	11:14:40.591	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 219 ms
+JN	0	11:14:51.611	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 1253 ms
+FK	0	11:15:01.143	DJay_Smart_Assistant (XAUUSD,M15)	WARNING: OnTimer took 784 ms

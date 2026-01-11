@@ -1,3 +1,0 @@
-wrong parameters count	DJay_Smart_Assistant.mq5	443	25
-   built-in: string StringFormat(const string,...)	DJay_Smart_Assistant.mq5	443	25
-1 errors, 0 warnings		1	0

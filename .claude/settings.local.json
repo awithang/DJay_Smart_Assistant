@@ -43,7 +43,14 @@
       "Bash(\"C:\\\\Program Files\\\\MetaTrader 5\\\\MetaEditor.exe\" /compile \"DJay_Smart_Assistant.mq5\" /close)",
       "Bash(\"/mnt/c/Program Files/MetaTrader 5/MetaEditor.exe\":*)",
       "Bash(cmd.exe:*)",
-      "Bash(metaeditorcompile:*)"
+      "Bash(metaeditorcompile:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(git -C \"C:\\\\Users\\\\YocH-Dell\\\\Desktop\\\\EA_helper\" diff --stat MQL5/Include/DJay_Assistant/DashboardPanel.mqh)",
+      "Bash(\"C:/Program Files/MetaTrader 5/metaeditor64.exe\" /compile \"C:/Users/YocH-Dell/Desktop/EA_helper/MQL5/Experts/DJay_Assistant/DJay_Smart_Assistant.mq5\" /close)",
+      "Bash(git -C:*)",
+      "Bash(\" \\(gray separator\\)\n\nHYBRID Section \\(4 separate labels\\):\n- Auto_Hybrid_Label: \"HYBRID:\" \\(gray\\)\n- Auto_Hybrid_Trend: \"Trend:[✓ +2]\" \\(green/red with score\\)\n- Auto_Hybrid_ADX: \"ADX:[✗]\" \\(red/green\\)\n- Auto_Hybrid_ATR: \"ATR:[✓]\" \\(green/red\\)\n- Auto_Hybrid_M5: \"M5:[⚠]\" \\(orange warning, green pass, gray pending\\)\n\nColor Scheme:\n- ✓ \\(Pass\\) = ForestGreen \\(C''34,139,34''\\)\n- ✗ \\(Fail\\) = DarkRed \\(C''139,0,0''\\)\n- ⚠ \\(Warning\\) = Orange \\(C''200,150,50''\\)\n- ⏳ \\(Pending\\) = Gray\n\nBenefits:\n- Instant visual feedback on filter status\n- Clear distinction between pass/fail states\n- At-a-glance mode health assessment\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(metaeditor64.exe /compile:\"MQL5\\\\Experts\\\\DJay_Assistant\\\\DJay_Smart_Assistant.mq5\" /close:*)"
     ]
   }
 }
