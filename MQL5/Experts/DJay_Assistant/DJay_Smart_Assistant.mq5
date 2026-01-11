@@ -158,7 +158,7 @@ int OnInit()
    dashboardPanel.Init(0, Input_RiskPercent, Input_ProfitLock_Trigger_Pts, Input_ProfitLock_Amount_Pts, Input_ProfitLock_Step_Pts);
    dashboardPanel.InitSettings(Input_Default_RR, Input_Use_TradeManagement);  // Initialize Settings with Profit Lock state
    dashboardPanel.UpdateTradingMode((int)g_tradingMode);
-   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
+   dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_sniper_mode_enabled, g_hybrid_mode_enabled);
 
    // Initialize Chart Zones
    double d1Open = signalEngine.GetD1Open();
@@ -197,15 +197,20 @@ void OnTick()
    // This prevents blocking the UI thread with heavy calculations on every tick
    static ulong last_calc_time = 0;
    ulong now = GetMicrosecondCount();
-   
+
    if (now - last_calc_time > 1000000) // 1 second throttle
    {
        signalEngine.RefreshData();
-       
-       // SNIPER UPDATE: Risk Management & Ghost Buttons
-       g_marketContext = signalEngine.GetMarketContext();
+
+       // SNIPER UPDATE: Risk Management & Ghost Buttons - CACHE expensive GetMarketContext
+       static ulong last_context_cache = 0;
+       if(now - last_context_cache > 10000000) // 10 seconds (was every 1 sec, too slow!)
+       {
+           g_marketContext = signalEngine.GetMarketContext();
+           last_context_cache = now;
+       }
        dashboardPanel.UpdateExecutionButtons(g_marketContext);
-       
+
        last_calc_time = now;
    }
 
@@ -505,13 +510,14 @@ void OnTimer()
    dashboardPanel.UpdateSessionInfo(sessionName, timeStr, isRunTime);
 
    // PERFORMANCE OPTIMIZATION: Throttle Heavy Logic
-   // Run heavy analysis only every 3 seconds to keep UI responsive
+   // Run heavy analysis only every 10 seconds to give more time for button clicks
+   // This reduces blocking frequency and improves UI responsiveness
    static int heavy_tick = 0;
    heavy_tick++;
-   if(heavy_tick % 3 != 0) return;
+   if(heavy_tick % 10 != 0) return;
 
-   // 3. Update Strategy Signals using SignalEngine methods
-   signalEngine.RefreshData();
+   // NOTE: RefreshData() is already called in OnTick every 1 second - no need to duplicate here
+   // Data is always fresh when heavy logic runs (every 10 seconds)
 
    if(!signalEngine.IsDataReady())
    {
@@ -521,38 +527,55 @@ void OnTimer()
       return;
    }
 
-   // 3a. Trend Alignment (D1/H4/H1)
-   TrendAlignment trend = signalEngine.GetTrendAlignment();
-   dashboardPanel.UpdateTrendStrength(trend.strengthText, trend.strengthColor);
+   // 3a. Trend Alignment (D1/H4/H1) - CACHED (expensive - creates temp indicator handles)
+   static TrendAlignment cached_trend;
+   static ulong last_trend_cache = 0;
+   if(GetMicrosecondCount() - last_trend_cache > 30000000) // 30 seconds
+   {
+      cached_trend = signalEngine.GetTrendAlignment();
+      last_trend_cache = GetMicrosecondCount();
+   }
+   dashboardPanel.UpdateTrendStrength(cached_trend.strengthText, cached_trend.strengthColor);
 
-   // 3b. Combined PA Signal (H1 primary, M5 entry)
-   CombinedSignal paSignal = signalEngine.GetCombinedPASignal();
-   string paText = paSignal.description;
+   // 3b. Combined PA Signal (H1 primary, M5 entry) - CACHED
+   static CombinedSignal cached_pa_signal;
+   static ulong last_pa_cache = 0;
+   if(GetMicrosecondCount() - last_pa_cache > 30000000) // 30 seconds
+   {
+      cached_pa_signal = signalEngine.GetCombinedPASignal();
+      last_pa_cache = GetMicrosecondCount();
+   }
+   string paText = cached_pa_signal.description;
 
-   // Update strategy panel (new signature: reversal_alert, rev_valid, breakout_alert, brk_valid, pa_signal)
-   g_last_rev_entry = signalEngine.GetReversalEntryPoint();
-   g_last_brk_entry = signalEngine.GetBreakoutEntryPoint();
+   // Update strategy panel - CACHED entry points (was called every 3-5 seconds, now cached for 5 sec)
+   static EntryPoint cached_rev_entry;
+   static EntryPoint cached_brk_entry;
+   static ulong last_entry_cache = 0;
+   if(GetMicrosecondCount() - last_entry_cache > 5000000) // 5 seconds
+   {
+      cached_rev_entry = signalEngine.GetReversalEntryPoint();
+      cached_brk_entry = signalEngine.GetBreakoutEntryPoint();
+      last_entry_cache = GetMicrosecondCount();
+   }
+   g_last_rev_entry = cached_rev_entry;
+   g_last_brk_entry = cached_brk_entry;
 
    // Capture valid entry points for button execution (preserve until signal invalid)
    if(g_last_rev_entry.isValid && !g_has_captured_rev) {
       g_captured_rev_entry = g_last_rev_entry;
       g_has_captured_rev = true;
-      // Print("DEBUG: Captured Reversal entry - ", g_captured_rev_entry.direction, " @ ", g_captured_rev_entry.price, " (", g_captured_rev_entry.zone, ")");
    }
    // Reset capture when signal becomes invalid (using isValid flag, not description string)
    if(!g_last_rev_entry.isValid && g_has_captured_rev) {
-      // Print("DEBUG: Resetting captured Reversal entry - signal invalid");
       g_has_captured_rev = false;
    }
 
    if(g_last_brk_entry.isValid && !g_has_captured_brk) {
       g_captured_brk_entry = g_last_brk_entry;
       g_has_captured_brk = true;
-      // Print("DEBUG: Captured Breakout entry - ", g_captured_brk_entry.direction, " @ ", g_captured_brk_entry.price, " (", g_captured_brk_entry.zone, ")");
    }
    // Reset capture when signal becomes invalid (using isValid flag, not description string)
    if(!g_last_brk_entry.isValid && g_has_captured_brk) {
-      // Print("DEBUG: Resetting captured Breakout entry - signal invalid");
       g_has_captured_brk = false;
    }
 
@@ -647,9 +670,23 @@ void OnTimer()
    // Hybrid Mode status
    qsText = g_hybrid_mode_enabled ? "HYBRID: Active" : "HYBRID: Inactive";
 
-   // RSI and Stochastic values (combined on same row)
-   double rsiVal = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
-   double stochVal = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
+   // RSI and Stochastic values - CACHED to avoid expensive indicator reads
+   static double cached_rsi = 0;
+   static double cached_stoch = 0;
+   static double cached_adx = 0;
+   static ulong last_indicator_cache = 0;
+
+   // Only update indicator cache every 30 seconds (expensive operations!)
+   if(GetMicrosecondCount() - last_indicator_cache > 30000000)
+   {
+      cached_rsi = signalEngine.GetRSIValue(PERIOD_M5, 14, 0);
+      cached_stoch = signalEngine.GetStochKValue(PERIOD_M5, 14, 3, 0);
+      cached_adx = signalEngine.GetADXValue(PERIOD_M5);
+      last_indicator_cache = GetMicrosecondCount();
+   }
+
+   double rsiVal = cached_rsi;
+   double stochVal = cached_stoch;
 
    if(rsiVal > 0 && stochVal > 0)
       rsiText = StringFormat("RSI: %.0f | Stoch: %.1f", rsiVal, stochVal);
@@ -661,11 +698,15 @@ void OnTimer()
       rsiText = "RSI: -- | Stoch: --";
 
    // ADX value
-   double adxVal = signalEngine.GetADXValue(PERIOD_M5);
+   double adxVal = cached_adx;
    string adxText = (adxVal > 0) ? StringFormat("ADX(M5): %.1f", adxVal) : "ADX(M5): --";
 
    // Current TF PA Signal (for Quick Scalp reference)
-   ENUM_SIGNAL_TYPE currentTFSignal = signalEngine.GetActiveSignal();
+   static ENUM_SIGNAL_TYPE cached_current_signal = SIGNAL_NONE;
+   if(GetMicrosecondCount() - last_indicator_cache > 30000000)
+         cached_current_signal = signalEngine.GetActiveSignal();
+
+   ENUM_SIGNAL_TYPE currentTFSignal = cached_current_signal;
    string currentTFPAText = "";
    if(currentTFSignal == SIGNAL_PA_BUY)
       currentTFPAText = "PA: BUY";
@@ -679,49 +720,61 @@ void OnTimer()
    //============================================================
    // SNIPER UPDATE: Sprint 3 - Dashboard 3-Column Grid Update
    //============================================================
-   // Get RSI and Stochastic for the grid
-   double rsiForGrid = signalEngine.GetRSIValue(PERIOD_M15, 14, 0);
-   double stochForGrid = signalEngine.GetStochKValue(PERIOD_M15, 14, 3, 0);
-   ENUM_SIGNAL_TYPE m15Signal = signalEngine.GetActiveSignal();
-   ENUM_SIGNAL_TYPE m5Signal = signalEngine.GetActiveSignalTF(PERIOD_M5);  // Hybrid Mode M5 trigger
+   // Get RSI and Stochastic for the grid - CACHED
+   static double cached_rsi_m15 = 0;
+   static double cached_stoch_m15 = 0;
+   static ENUM_SIGNAL_TYPE cached_m15_signal = SIGNAL_NONE;
+   static ENUM_SIGNAL_TYPE cached_m5_signal = SIGNAL_NONE;
+
+   if(GetMicrosecondCount() - last_indicator_cache > 30000000)
+   {
+      cached_rsi_m15 = signalEngine.GetRSIValue(PERIOD_M15, 14, 0);
+      cached_stoch_m15 = signalEngine.GetStochKValue(PERIOD_M15, 14, 3, 0);
+      cached_m15_signal = signalEngine.GetActiveSignal();
+      cached_m5_signal = signalEngine.GetActiveSignalTF(PERIOD_M5);
+   }
+
+   double rsiForGrid = cached_rsi_m15;
+   double stochForGrid = cached_stoch_m15;
+   ENUM_SIGNAL_TYPE m15Signal = cached_m15_signal;
+   ENUM_SIGNAL_TYPE m5Signal = cached_m5_signal;
 
    // Update the Market Intelligence Grid with all context data (including M5 PA for Hybrid)
    dashboardPanel.UpdateMarketIntelligenceGrid(g_marketContext, rsiForGrid, stochForGrid, m15Signal, m5Signal);
 
-   // SPRINT 7: Get Trade Recommendation for Manual Traders
-   TradeRecommendation tradeRec = signalEngine.GetTradeRecommendation();
-
-   // DEBUG: Print recommendation to Experts log (remove after testing)
-   static datetime lastPrintTime = 0;
-   if(TimeCurrent() - lastPrintTime > 60)  // Print every 60 seconds
+   // SPRINT 7: Get Trade Recommendation for Manual Traders - CACHED (750ms operation!)
+   static TradeRecommendation cached_trade_rec;
+   static ulong last_trade_rec_cache = 0;
+   if(GetMicrosecondCount() - last_trade_rec_cache > 20000000) // 20 seconds
    {
-      lastPrintTime = TimeCurrent();
-      Print("=== TRADE RECOMMENDATION ===");
-      Print("Code: ", tradeRec.recommendationCode);
-      Print("Text: ", tradeRec.recommendationText);
-      Print("Market State: ", tradeRec.marketStateText);
-      Print("Entry: ", tradeRec.entryType, " @ ", tradeRec.entryPriceText);
-      Print("Targets: ", tradeRec.targetsText);
-      Print("Reason: ", tradeRec.reasoning);
-      if(tradeRec.alternatives != "")
-         Print("Alternatives: ", tradeRec.alternatives);
-      Print("============================");
+      cached_trade_rec = signalEngine.GetTradeRecommendation();
+      last_trade_rec_cache = GetMicrosecondCount();
    }
+   TradeRecommendation tradeRec = cached_trade_rec;
 
    // Update Trade Strategy UI
    dashboardPanel.UpdateTradeStrategy(tradeRec);
 
-   // SPRINT 7: Update Auto Mode Status (filter states)
-   SniperFilterStates sniperStates;
-   HybridFilterStates hybridStates;
-   signalEngine.GetSniperFilterStates(sniperStates);
-   signalEngine.GetHybridFilterStates(hybridStates);
+   // SPRINT 7: Update Auto Mode Status (filter states) - CACHED to 60 seconds (major reduction)
+   // GetSniperFilterStates/GetHybridFilterStates call GetMarketContext() internally (expensive - 1.5 sec!)
+   // Increased to 60 seconds to reduce button blocking from every 20 sec to every 60 sec
+   // Filter states are only for display - don't need real-time updates
+   static ulong last_filter_update = 0;
+   static SniperFilterStates cachedSniperStates;
+   static HybridFilterStates cachedHybridStates;
+   if(GetMicrosecondCount() - last_filter_update > 60000000) // 60 seconds (reduced blocking frequency by 3x)
+   {
+      signalEngine.GetSniperFilterStates(cachedSniperStates);
+      signalEngine.GetHybridFilterStates(cachedHybridStates);
+      last_filter_update = GetMicrosecondCount();
+      Print("INFO: Filter states refreshed (every 60 seconds)");
+   }
 
-   // Get mode enablement from inputs (or you can pass them as parameters)
-   bool sniperEnabled = Input_Enable_Sniper_Mode;
-   bool hybridEnabled = Input_Enable_Hybrid_Mode;
+   // Get mode enablement from runtime state (updated by checkbox toggles)
+   bool sniperEnabled = g_sniper_mode_enabled;
+   bool hybridEnabled = g_hybrid_mode_enabled;
 
-   dashboardPanel.UpdateAutoModeStatus(sniperEnabled, hybridEnabled, sniperStates, hybridStates);
+   dashboardPanel.UpdateAutoModeStatus(sniperEnabled, hybridEnabled, cachedSniperStates, cachedHybridStates);
 
    // 3g. Check for Pending Order Recommendation
    ENUM_ORDER_TYPE recType;
@@ -747,20 +800,33 @@ void OnTimer()
    // 4. Panel Updates
    // Price and Orders are now updated in OnTick for real-time responsiveness
 
-   // OPTIMIZATION: Moved heavy zone updates here from OnTick
+   // OPTIMIZATION: Only update zones when D1 Open changes (once per day)
+   // Previously called every 3 seconds - unnecessary since zones only change on new day
+   static double cached_d1Open = 0;
    double d1Open = signalEngine.GetD1Open();
-   dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
+   if(d1Open != cached_d1Open)
+   {
+      dashboardPanel.UpdateDJayZones(d1Open, Input_Max_Zones_Show * 2);
+      cached_d1Open = d1Open;
+   }
    currentPrice = signalEngine.GetCurrentPrice();
 
-   // 5. Update Chart Zones
-   chartZones.Update(d1Open, currentPrice);
+   // 5. Update Chart Zones - Only when price moves significantly (>50 points)
+   // Previously called every 5 seconds - unnecessary if price hasn't moved much
+   static double cached_price = 0;
+   double priceDelta = MathAbs(currentPrice - cached_price);
+   if(priceDelta > 50 * _Point) // Only update if price moved > 50 points (5 pips)
+   {
+      chartZones.Update(d1Open, currentPrice);
+      cached_price = currentPrice;
+   }
 
-   // Final Redraw to update all changes
-   dashboardPanel.Redraw();
-   
-   // ulong duration = GetMicrosecondCount() - start;
-   // if(duration > 10000) // Print if > 10ms
-   //    Print("WARNING: OnTimer took ", duration, " us");
+   // REMOVED: dashboardPanel.Redraw() - ChartRedraw every 1 second was blocking button clicks
+   // Individual ObjectSetInteger calls update immediately without full redraw
+
+   ulong duration = GetMicrosecondCount() - start;
+   if(duration > 10000) // Print if > 10ms
+      Print("WARNING: OnTimer took ", duration/1000, " ms");
 }
 
 //+------------------------------------------------------------------+
@@ -783,13 +849,16 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // Trading blocked by risk management - show alert to user
             Alert("Manual BUY Blocked: Risk Management limit reached. Check Experts log for details.");
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+            ChartRedraw(0);  // Force immediate visual update
+            return;  // Early return
          }
          else
          {
             ExecuteBuyTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+            ChartRedraw(0);  // Force immediate visual update
+            return;  // Early return
          }
-         handled = true;
       }
       else if(dashboardPanel.IsSellButtonClicked(sparam))
       {
@@ -799,21 +868,25 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // Trading blocked by risk management - show alert to user
             Alert("Manual SELL Blocked: Risk Management limit reached. Check Experts log for details.");
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+            ChartRedraw(0);  // Force immediate visual update
+            return;  // Early return
          }
          else
          {
             ExecuteSellTrade();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+            ChartRedraw(0);  // Force immediate visual update
+            return;  // Early return
          }
-         handled = true;
       }
       else if(dashboardPanel.IsModeButtonClicked(sparam))
       {
          // Toggle AUTO mode (ON/OFF) - Manual always available
-         // Print("DEBUG: Auto button clicked! Before toggle: g_tradingMode=", (int)g_tradingMode, " (0=OFF, 1=ON)");
          g_tradingMode = (g_tradingMode == MODE_MANUAL) ? MODE_AUTO : MODE_MANUAL;
          dashboardPanel.UpdateTradingMode((int)g_tradingMode);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         ChartRedraw(0);  // Force immediate visual update
+         return;  // Early return - matches Settings button behavior for instant response
       }
       else if(dashboardPanel.IsOpenSettingsClicked(sparam))
       {
@@ -822,12 +895,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PostMessageW(handle, WM_KEYDOWN, VK_F7, 0);
          PostMessageW(handle, WM_KEYUP, VK_F7, 0);
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         return;  // Early return for instant response
       }
       else if(dashboardPanel.IsStatsButtonClicked(sparam))
       {
          // TODO: Open Trade Statistics panel (not implemented yet)
          Print("Statistics button clicked - Feature coming soon!");
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false); // Reset button state
+         return;  // Early return for instant response
       }
       else if(dashboardPanel.IsConfirmButtonClicked(sparam))
       {
@@ -992,33 +1067,38 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          }
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
       }
-      // Strategy Toggles
-      else if(dashboardPanel.IsStratArrowClicked(sparam))
+      // Strategy Toggles (Auto Strategy buttons) - Early return for fast response like Settings buttons
+      else if(dashboardPanel.IsStratArrowClicked(sparam) ||
+              dashboardPanel.IsStratRevClicked(sparam) ||
+              dashboardPanel.IsStratBreakClicked(sparam) ||
+              dashboardPanel.IsStratSniperClicked(sparam) ||
+              dashboardPanel.IsStratHybridClicked(sparam))
       {
-         g_strat_arrow = !g_strat_arrow;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         handled = true;
-      }
-      else if(dashboardPanel.IsStratRevClicked(sparam))
-      {
-         g_strat_rev = !g_strat_rev;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         handled = true;
-      }
-      else if(dashboardPanel.IsStratBreakClicked(sparam))
-      {
-         g_strat_break = !g_strat_break;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         handled = true;
-      }
-      else if(dashboardPanel.IsStratQSClicked(sparam))
-      {
-         g_hybrid_mode_enabled = !g_hybrid_mode_enabled;
-         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_hybrid_mode_enabled);
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         // Determine which button was clicked ONCE (avoid duplicate checks)
+         bool isArrow = dashboardPanel.IsStratArrowClicked(sparam);
+         bool isRev = dashboardPanel.IsStratRevClicked(sparam);
+         bool isBreak = dashboardPanel.IsStratBreakClicked(sparam);
+         bool isSniper = dashboardPanel.IsStratSniperClicked(sparam);
+         bool isHybrid = dashboardPanel.IsStratHybridClicked(sparam);
+
+         // Toggle the appropriate strategy (use stored bool values, not re-check)
+         if(isArrow)
+            g_strat_arrow = !g_strat_arrow;
+         else if(isRev)
+            g_strat_rev = !g_strat_rev;
+         else if(isBreak)
+            g_strat_break = !g_strat_break;
+         else if(isSniper)
+            g_sniper_mode_enabled = !g_sniper_mode_enabled;
+         else if(isHybrid)
+            g_hybrid_mode_enabled = !g_hybrid_mode_enabled;
+
+         // Update all strategy button visuals
+         dashboardPanel.UpdateStrategyButtons(g_strat_arrow, g_strat_rev, g_strat_break, g_sniper_mode_enabled, g_hybrid_mode_enabled);
+
+         // Force chart redraw immediately for instant visual feedback
+         ChartRedraw(0);
+         return;  // Early return
       }
       // Settings Buttons (handled in DashboardPanel - RR, Trailing, and Profit Lock)
       else if(dashboardPanel.IsRR1Clicked(sparam) ||
@@ -1034,18 +1114,24 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       {
          tradeManager.CloseAllSymbolPositions();
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ChartRedraw(0);  // Force immediate visual update
+         return;  // Early return
       }
       else if(dashboardPanel.IsScrollUpClicked(sparam))
       {
          // Scroll up - decrease scroll offset
          dashboardPanel.ScrollUp();
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ChartRedraw(0);  // Force immediate visual update
+         return;  // Early return
       }
       else if(dashboardPanel.IsScrollDownClicked(sparam))
       {
          // Scroll down - increase scroll offset
          dashboardPanel.ScrollDown();
          ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         ChartRedraw(0);  // Force immediate visual update
+         return;  // Early return
       }
       // Individual order close buttons
       else
@@ -1066,10 +1152,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                }
             }
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+            ChartRedraw(0);  // Force immediate visual update
+            return;  // Early return
          }
       }
 
-      ChartRedraw(0);
+      // ChartRedraw(0);  // REMOVED: Not needed - ObjectSetInteger changes are visible immediately
    }
 }
 

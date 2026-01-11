@@ -112,10 +112,8 @@ public:
 
    // New Methods
    void UpdateTradingMode(int mode);
-   void UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool qs);
-   void UpdateQuickScalpButton(bool isActive);
-   void UpdateQuickScalpSmartState(bool isEnabled, ENUM_ZONE_STATUS zone, double adx, double adxThreshold);
-   void UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias);  // Sprint 6 - Hybrid Mode
+   void UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool sniper, bool hybrid);
+   void UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias);
    void UpdateConfirmButton(string text, bool enable);
 
    //--- Settings Methods (NEW)
@@ -160,7 +158,8 @@ public:
    bool IsStratArrowClicked(string sparam) { return (sparam == m_prefix+"BtnStratArrow"); }
    bool IsStratRevClicked(string sparam) { return (sparam == m_prefix+"BtnStratRev"); }
    bool IsStratBreakClicked(string sparam) { return (sparam == m_prefix+"BtnStratBreak"); }
-   bool IsStratQSClicked(string sparam) { return (sparam == m_prefix+"BtnStratQS"); }
+   bool IsStratSniperClicked(string sparam) { return (sparam == m_prefix+"BtnStratSniper"); }
+   bool IsStratHybridClicked(string sparam) { return (sparam == m_prefix+"BtnStratHybrid"); }
 
    bool IsRevActionClicked(string sparam) { return (sparam == m_prefix+"BtnRev"); }
    bool IsBrkActionClicked(string sparam) { return (sparam == m_prefix+"BtnBrk"); }
@@ -293,55 +292,51 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblPrice", left_x + full_width - 100, mi_y_start, "0.00000", C'255,223,0', 12, "Arial Bold", "right");
    CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, mi_y_start + 200, C'5,5,15', true, C'45,45,60');
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, mi_y_start + 175, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
    // ============================================
    int snap_y_start = mi_y_start + 28;
 
-   // Compact 2-column layout (full width)
-   int snap_col1_x = left_x + 10;   // Left column labels
-   int snap_col2_x = left_x + 180;  // Right column labels (more space for full width)
+   // 5-column layout to maximize horizontal space usage
+   int snap_col1_x = left_x + 5;       // Column 1
+   int snap_col2_x = left_x + 65;      // Column 2
+   int snap_col3_x = left_x + 125;     // Column 3
+   int snap_col4_x = left_x + 185;     // Column 4
+   int snap_col5_x = left_x + 245;     // Column 5
    int snap_row1_y = snap_y_start + 5;
    int snap_row_h = 14;
 
-   // Row 1: Context + ADX
+   // Row 1: Context | ADX | RSI | Stoch | ATR
    CreateLabel("Ctx_Label", snap_col1_x, snap_row1_y, "Context:", clrGray, 8);
    CreateLabel("Bias_Light", snap_col1_x + 50, snap_row1_y, "●", clrGray, 10);
-   CreateLabel("Bias_Label", snap_col1_x + 62, snap_row1_y, "NEUTRAL", clrGray, 8);
    CreateLabel("ADX_Label2", snap_col2_x, snap_row1_y, "ADX:", clrGray, 8);
    CreateLabel("ADX_V2", snap_col2_x + 30, snap_row1_y, "--", clrGray, 8);
+   CreateLabel("RSI_T", snap_col3_x, snap_row1_y, "RSI:", clrGray, 8);
+   CreateLabel("RSI_V", snap_col3_x + 30, snap_row1_y, "--", clrGray, 8);
+   CreateLabel("Stoch_T", snap_col4_x, snap_row1_y, "Stoch:", clrGray, 8);
+   CreateLabel("Stoch_V", snap_col4_x + 35, snap_row1_y, "--", clrGray, 8);
+   CreateLabel("ATR_T", snap_col5_x, snap_row1_y, "ATR:", clrGray, 8);
+   CreateLabel("ATR_V", snap_col5_x + 30, snap_row1_y, "--", clrGray, 8);
 
-   // Row 2: M15 PA + M5 PA
+   // Row 2: M15 PA | M5 PA | EMA 20 | Slope | To Zone
    CreateLabel("PA_T2", snap_col1_x, snap_row1_y + snap_row_h, "M15 PA:", clrGray, 8);
    CreateLabel("PA_V2", snap_col1_x + 50, snap_row1_y + snap_row_h, "NONE", clrGray, 8, "Arial Bold");
    CreateLabel("M5_PA_T", snap_col2_x, snap_row1_y + snap_row_h, "M5 PA:", clrGray, 8);
    CreateLabel("M5_PA_V", snap_col2_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 8, "Arial Bold");
-
-   // Row 3: RSI + Stoch
-   CreateLabel("RSI_T", snap_col1_x, snap_row1_y + snap_row_h * 2, "RSI:", clrGray, 8);
-   CreateLabel("RSI_V", snap_col1_x + 30, snap_row1_y + snap_row_h * 2, "--", clrGray, 8);
-   CreateLabel("Stoch_T", snap_col2_x, snap_row1_y + snap_row_h * 2, "Stoch:", clrGray, 8);
-   CreateLabel("Stoch_V", snap_col2_x + 35, snap_row1_y + snap_row_h * 2, "--", clrGray, 8);
-
-   // Row 4: Slope + EMA Distance
-   CreateLabel("Slope_T", snap_col1_x, snap_row1_y + snap_row_h * 3, "Slope:", clrGray, 8);
-   CreateLabel("Slope_V", snap_col1_x + 35, snap_row1_y + snap_row_h * 3, "FLAT", clrGray, 8);
-   CreateLabel("Dist_T", snap_col2_x, snap_row1_y + snap_row_h * 3, "EMA 20:", clrGray, 8);
-   CreateLabel("Dist_V", snap_col2_x + 45, snap_row1_y + snap_row_h * 3, "--", clrGray, 8);
-
-   // Row 5: ATR + To Zone
-   CreateLabel("ATR_T", snap_col1_x, snap_row1_y + snap_row_h * 4, "ATR M15:", clrGray, 8);
-   CreateLabel("ATR_V", snap_col1_x + 50, snap_row1_y + snap_row_h * 4, "-- pts", clrGray, 8);
-   CreateLabel("Struct_T", snap_col2_x, snap_row1_y + snap_row_h * 4, "To Zone:", clrGray, 8);
-   CreateLabel("Struct_V", snap_col2_x + 45, snap_row1_y + snap_row_h * 4, "--", clrGray, 8);
+   CreateLabel("Dist_T", snap_col3_x, snap_row1_y + snap_row_h, "EMA 20:", clrGray, 8);
+   CreateLabel("Dist_V", snap_col3_x + 45, snap_row1_y + snap_row_h, "--", clrGray, 8);
+   CreateLabel("Slope_T", snap_col4_x, snap_row1_y + snap_row_h, "Slope:", clrGray, 8);
+   CreateLabel("Slope_V", snap_col4_x + 35, snap_row1_y + snap_row_h, "FLAT", clrGray, 8);
+   CreateLabel("Struct_T", snap_col5_x, snap_row1_y + snap_row_h, "To Zone:", clrGray, 8);
+   CreateLabel("Struct_V", snap_col5_x + 50, snap_row1_y + snap_row_h, "--", clrGray, 8);
 
    // ============================================
    // SUBSECTION 2: TRADE STRATEGY (For Manual Traders)
    // ============================================
 
-   int strat_y_start = snap_y_start + snap_row_h * 5 + 15;  // After Market Snapshot
+   int strat_y_start = snap_y_start + snap_row_h * 2 + 12;  // After Market Snapshot (2 rows now)
    int strat_row_h = 18;     // Row height
 
    CreateLabel("Strategy_Header", left_x + pad, strat_y_start, "📊 TRADE STRATEGY", C'255,200,50', 9, "Arial Bold");
@@ -358,40 +353,31 @@ void CDashboardPanel::CreatePanel()
    // Row 3: Reasoning
    CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 7);
 
-   // Row 4: Entry
-   CreateLabel("Strategy_Entry_Label", left_x + pad + 5, strat_y_start + strat_row_h * 4, "📌 ENTRY:", clrGray, 8);
-   CreateLabel("Strategy_Entry_Type", left_x + pad + 65, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
-   CreateLabel("Strategy_Entry_Price", left_x + pad + 120, strat_y_start + strat_row_h * 4, "--", clrGray, 8);
+   // Row 4: Entry + Targets combined (single row)
+   CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 8);
 
-   // Row 5: Targets
-   CreateLabel("Strategy_Targets", left_x + pad + 5, strat_y_start + strat_row_h * 5, "TP: -- | SL: --", clrGray, 8);
-
-   // Row 6: Alternatives
-   CreateLabel("Strategy_Alt_Label", left_x + pad + 5, strat_y_start + strat_row_h * 6, "", clrGray, 8);
-   CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 6, "", clrGray, 8);
+   // Row 5: Alternatives
+   CreateLabel("Strategy_Alt_Label", left_x + pad + 5, strat_y_start + strat_row_h * 5, "", clrGray, 8);
+   CreateLabel("Strategy_Alt_Text", left_x + pad + 25, strat_y_start + strat_row_h * 5, "", clrGray, 8);
 
    // ============================================
    // SUBSECTION 3: AUTO MODE STATUS (For Auto Traders)
    // ============================================
 
-   int auto_y_start = strat_y_start + strat_row_h * 7 + 10;  // After Trade Strategy
+   int auto_y_start = strat_y_start + strat_row_h * 6 + 10;  // After Trade Strategy (6 rows now)
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 9, "Arial Bold");
 
-   // Sniper row
-   CreateLabel("Auto_Sniper_Label", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER:", clrGray, 8);
-   CreateLabel("Auto_Sniper_Status", left_x + pad + 60, auto_y_start + strat_row_h, "⚪ OFF", clrGray, 8, "Arial Bold");
-   CreateLabel("Auto_Sniper_Filters", left_x + pad + 5, auto_y_start + strat_row_h * 2, "PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
+   // Sniper row (status + filters combined)
+   CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: ⚪ OFF  PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 7);
 
-   // Hybrid row
-   CreateLabel("Auto_Hybrid_Label", left_x + pad + 5, auto_y_start + strat_row_h * 3, "HYBRID:", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Status", left_x + pad + 60, auto_y_start + strat_row_h * 3, "⚪ OFF", clrGray, 8, "Arial Bold");
-   CreateLabel("Auto_Hybrid_Filters", left_x + pad + 5, auto_y_start + strat_row_h * 4, "Trend:[ ]  ADX:[ ]  M5:[ ]", clrGray, 7);
+   // Hybrid row (status + filters combined)
+   CreateLabel("Auto_Hybrid_Row", left_x + pad + 5, auto_y_start + strat_row_h * 2, "HYBRID: ⚪ OFF  Trend:[ ] ADX:[ ] M5:[ ]", clrGray, 7);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
-   int bottom_y_start = auto_y_start + strat_row_h * 5 + 15;  // After Auto Mode Status
+   int bottom_y_start = auto_y_start + strat_row_h * 3 + 12;  // After Auto Mode Status (3 rows total)
    int row_h = 20;
    int gap = 10;
 
@@ -430,11 +416,11 @@ void CDashboardPanel::CreatePanel()
    // PL Inputs (horizontal layout)
    int plX = left_x_pos + 80;
    CreateLabel("L_TP_Trail", plX, left_y + 3, "T:", clrGray, 8);
-   CreateEdit("EditTrailTP", plX + 15, left_y, 30, 20, IntegerToString(m_trailing_tp));
+   CreateEdit("EditTrailTP", plX + 15, left_y, 30, 20, IntegerToString(m_initial_pl_trigger));
    CreateLabel("L_SL_Trail", plX + 50, left_y + 3, "L:", clrGray, 8);
-   CreateEdit("EditTrailSL", plX + 65, left_y, 30, 20, IntegerToString(m_trailing_sl));
+   CreateEdit("EditTrailSL", plX + 65, left_y, 30, 20, IntegerToString(m_initial_pl_lock));
    CreateLabel("L_Step_Trail", plX + 100, left_y + 3, "S:", clrGray, 8);
-   CreateEdit("EditTrailStep", plX + 115, left_y, 30, 20, IntegerToString(m_trailing_step));
+   CreateEdit("EditTrailStep", plX + 115, left_y, 30, 20, IntegerToString(m_initial_pl_step));
 
    left_y += 40;
    left_y += gap;
@@ -459,8 +445,7 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnFilterAggr", left_x_pos + 10, left_y, 15, 15, "", clrGray, clrWhite, 8);
    CreateLabel("L_F_Aggr", left_x_pos + 30, left_y, "Aggressive (Ignore All)", C'255,100,100', 8);
 
-   left_y += 40;
-   left_y += gap;
+   left_y += 35;  // Reduced gap from 50 to 35
 
    // ============================================
    // LEFT PANEL SECTION 3: AUTO STRATEGY
@@ -469,7 +454,7 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnMode", left_x_pos + bottom_half_width - 65, left_y + 3, 60, row_h, "OFF", clrGray, clrWhite, 9);
    left_y += row_h;
 
-   CreateRect("StratBG", left_x_pos, left_y, bottom_half_width, 65, C'5,5,15', true, C'45,45,60');
+   CreateRect("StratBG", left_x_pos, left_y, bottom_half_width, 50, C'5,5,15', true, C'45,45,60');
    left_y += 10;
 
    // Row 1: Arrow, Rev, Break
@@ -480,14 +465,17 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStratBreak", left_x_pos + 155, left_y, 15, 15, "", clrGray);
    CreateLabel("L_Break", left_x_pos + 175, left_y, "Break", clrCyan, 9, "Arial Bold");
 
-   // Row 2: Quick Scalp
-   left_y += 25;
-   CreateLabel("L_QS_Label", left_x_pos + 10, left_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
-   CreateLabel("QS_Status_Dot", left_x_pos + 85, left_y, "●", clrGray, 10);
-   CreateButton("BtnStratQS", left_x_pos + 100, left_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
-   CreateLabel("LblLastAuto", left_x_pos + 10, left_y + 32, "Last: ---", C'80,80,80', 8);
+   // Row 2: Sniper, Hybrid (replaces Quick Scalp)
+   left_y += 22;
+   CreateButton("BtnStratSniper", left_x_pos + 10, left_y, 15, 15, "", clrGray);
+   CreateLabel("L_Sniper", left_x_pos + 30, left_y, "SNIPER", clrCyan, 9, "Arial Bold");
+   CreateButton("BtnStratHybrid", left_x_pos + 120, left_y, 15, 15, "", clrGray);
+   CreateLabel("L_Hybrid", left_x_pos + 140, left_y, "HYBRID", clrCyan, 9, "Arial Bold");
 
-   left_y += 55;
+   // Last auto trade info
+   CreateLabel("LblLastAuto", left_x_pos + 10, left_y + 20, "Last: ---", C'80,80,80', 7);
+
+   left_y += 35;
 
    // ============================================
    // RIGHT PANEL: Manual Trade + Daily Zones
@@ -580,732 +568,33 @@ void CDashboardPanel::UpdateTradingMode(int mode)
    ObjectSetString(m_chart_id, m_prefix+"LblMode", OBJPROP_TEXT, text);
    ObjectSetInteger(m_chart_id, m_prefix+"LblMode", OBJPROP_COLOR, bg);
 }
-
-
-
-
-         
-
-
-
-                        CreateLabel("LblCtrl", right_x + pad, right_y, "EXECUTION", m_header_color, 10, "Arial Bold");
-
-
-
-         
-
-
-
-                        CreateLabel("LblPrice", right_x + half_width - pad, right_y, "0.00000", C'255,223,0', 10, "Arial Bold", "right");
-
-
-
-         
-
-
-
-                        
-
-
-
-         
-
-
-
-                        right_y += 20;
-
-
-
-         
-
-
-
-                        int btnW = (half_width - 30) / 2;
-
-
-
-         
-
-
-
-                        CreateButton("BtnBuy", right_x + 10, right_y, btnW, 30, "BUY", m_buy_color, clrWhite, 9);
-
-
-
-         
-
-
-
-                        CreateButton("BtnSell", right_x + half_width - 10 - btnW, right_y, btnW, 30, "SELL", m_sell_color, clrWhite, 9);
-
-
-
-         
-
-
-
-                     
-
-
-
-         
-
-
-
-                        // GAP REDUCTION: Reduced from 50 to 40 to tighten top section
-
-
-
-         
-
-
-
-                        right_y += 40;
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        // 5. COMPACT SETTINGS Section (Redesigned)
-                        CreateLabel("LblSettings", right_x + pad, right_y, "SETTINGS", m_header_color, 10, "Arial Bold");
-
-                        // Icons (Gear + Stats)
-                        CreateButton("BtnOpenSettings", right_x + half_width - 50, right_y, 20, 20, "⚙", clrGray, clrWhite, 12);
-                        CreateButton("BtnStats", right_x + half_width - 25, right_y, 20, 20, "📋", clrGray, clrWhite, 12);
-
-                        right_y += 20; 
-                        
-                        // Compact Background (Reduced height from 150 -> 75)
-                        CreateRect("SettingsBG", right_x, right_y, half_width, 75, C'5,5,15', true, C'45,45,60');
-
-                        // Row 1: RR Ratio + Risk %
-                        right_y += 10;
-                        int rrBtnW = 40;
-                        int rrGap = 2;
-                        
-                        CreateLabel("L_RR_Title", right_x + 10, right_y + 3, "RR:", clrGray, 8);
-                        CreateButton("BtnRR1", right_x + 35, right_y, rrBtnW, 20, "1:1", clrGray, clrWhite, 8);
-                        CreateButton("BtnRR15", right_x + 35 + rrBtnW + rrGap, right_y, rrBtnW, 20, "1:1.5", clrGray, clrWhite, 8);
-                        CreateButton("BtnRR2", right_x + 35 + (rrBtnW + rrGap)*2, right_y, rrBtnW, 20, "1:2", m_buy_color, clrWhite, 8); 
-
-                        // Risk Input (Small)
-                        CreateLabel("L_Risk", right_x + half_width - 70, right_y + 3, "Risk:", clrGray, 8);
-                        CreateEdit("EditRisk", right_x + half_width - 40, right_y, 30, 20, DoubleToString(m_initial_risk, 1));
-
-                        // Row 2: Profit Lock (Compact Row)
-                        right_y += 28;
-                        CreateLabel("L_Trail", right_x + 10, right_y + 3, "PL:", clrGray, 8);
-                        CreateButton("BtnTrailToggle", right_x + 35, right_y, 35, 20, "ON", m_buy_color, clrWhite, 8);
-                        
-                        // Inputs: Trig | Lock | Step
-                        int plInputW = 35;
-                        int plX = right_x + 80;
-                        
-                        CreateLabel("L_T", plX, right_y + 3, "T", clrGray, 8);
-                        CreateEdit("EditPL_Trigger", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_trigger));
-                        
-                        plX += 10 + plInputW + 5;
-                        CreateLabel("L_L", plX, right_y + 3, "L", clrGray, 8);
-                        CreateEdit("EditPL_Amount", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_lock));
-                        
-                        plX += 10 + plInputW + 5;
-                        CreateLabel("L_S", plX, right_y + 3, "S", clrGray, 8);
-                        CreateEdit("EditPL_Step", plX + 10, right_y, plInputW, 20, IntegerToString(m_initial_pl_step));
-
-                        // ----------------------------------------------------
-                        // 6. SMART FILTERS (NEW SECTION)
-                        // ----------------------------------------------------
-                        right_y += 45; // Gap
-                        CreateLabel("LblFilters", right_x + pad, right_y, "SMART FILTERS", m_header_color, 10, "Arial Bold");
-                        
-                        right_y += 20;
-                        CreateRect("FilterBG", right_x, right_y, half_width, 60, C'5,5,15', true, C'45,45,60');
-                        
-                        // Row 1: Trend + Zone Filters
-                        right_y += 10;
-                        CreateButton("BtnFilterTrend", right_x + 10, right_y, 15, 15, "X", m_buy_color, clrWhite, 8);
-                        CreateLabel("L_F_Trend", right_x + 30, right_y, "Trend Filter", clrWhite, 8);
-                        
-                        CreateButton("BtnFilterZone", right_x + 150, right_y, 15, 15, "X", m_buy_color, clrWhite, 8);
-                        CreateLabel("L_F_Zone", right_x + 170, right_y, "Zone Filter", clrWhite, 8);
-                        
-                        // Row 2: Aggressive Mode
-                        right_y += 25;
-                        CreateButton("BtnFilterAggr", right_x + 10, right_y, 15, 15, "", clrGray, clrWhite, 8);
-                        CreateLabel("L_F_Aggr", right_x + 30, right_y, "Aggressive (Ignore All)", C'255,100,100', 8);
-
-                        // ----------------------------------------------------
-                        // 7. AUTO STRATEGY (Adjusted Position)
-                        // ----------------------------------------------------
-                        right_y += 40; 
-                        CreateLabel("LblStratTitle", right_x + pad, right_y + 3, "AUTO STRATEGY", m_header_color, 10, "Arial Bold");
-
-
-
-         
-
-
-
-                        CreateButton("BtnMode", right_x + half_width - 65, right_y, 60, row_h, "OFF", clrGray, clrWhite, 9);
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        right_y += 25;
-
-
-
-         
-
-
-
-                        CreateRect("StratBG", right_x, right_y, half_width, 65, C'5,5,15', true, C'45,45,60');
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        right_y += 13;
-
-                        // Auto Strategy checkboxes (single row)
-                        CreateButton("BtnStratArrow", right_x + 10, right_y, 15, 15, "", clrGray);
-                        CreateLabel("L_Arrow", right_x + 30, right_y, "Arrow", clrCyan, 9, "Arial Bold");
-
-                        CreateButton("BtnStratRev", right_x + 85, right_y, 15, 15, "", clrGray);
-                        CreateLabel("L_Rev", right_x + 105, right_y, "Rev", clrCyan, 9, "Arial Bold");
-
-                        CreateButton("BtnStratBreak", right_x + 155, right_y, 15, 15, "", clrGray);
-                        CreateLabel("L_Break", right_x + 175, right_y, "Break", clrCyan, 9, "Arial Bold");
-
-                        // Quick Scalp section (separate)
-                        right_y += 25;
-                        CreateLabel("L_QS_Label", right_x + 10, right_y, "QUICK SCALP:", m_header_color, 9, "Arial Bold");
-                        CreateLabel("QS_Status_Dot", right_x + 85, right_y, "●", clrGray, 10);
-                        CreateButton("BtnStratQS", right_x + 100, right_y, 60, 20, "OFF", C'50,50,60', C'100,100,100', 8);
-
-                        right_y += 30;
-
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-                        CreateLabel("LblLastAuto", right_x + 10, right_y + 32, "Last: ---", C'80,80,80', 8);
-
-
-
-         
-
-
-
-            
-
-
-
-         
-
-
-
-            // ============================================
-            // Strategy Signal section moved to Panel A
-            // ============================================
-
-
-
-         
-
-
-
-                        // right_y += 60; // REMOVED: Strategy Signal moved to Panel A
-
-
-
-         
-
-
-
-                        // CreateLabel LblSig REMOVED - now in Panel A
-
-
-
-         
-
-
-
-                        // CreateRect InfoBG REMOVED
-
-
-
-            
-
-
-
-            // int sig_y REMOVED 
-
-
-
-            // CreateLabel Trend_T REMOVED
-
-
-
-            // CreateLabel Trend_V REMOVED
-
-
-
-         
-
-
-
-            // sig_y increment REMOVED
-
-
-
-            // CreateLabel PA_T REMOVED
-
-
-
-            // CreateLabel PA_V REMOVED
-
-
-
-         
-
-
-
-            // sig_y increment REMOVED
-
-
-
-            // CreateRect Sep1 REMOVED
-
-
-
-         
-
-
-
-            // sig_y increment REMOVED
-
-
-
-            // CreateLabel Adv_T REMOVED
-
-
-
-            // CreateLabel Adv_V REMOVED
-
-
-
-            // CreateLabel Adv_V2 REMOVED
-
-
-
-         
-
-
-
-            // CreateLabel Ver REMOVED
-
-
-
-         
-
-
-
-            // ============================================
-
-
-
-            // LOWER SECTIONS (Fixed Footer - Unchanged)
-
-
-
-            // ============================================
-
-
-
-            
-
-
-
-            // Ensure Footer starts strictly below the content we just drew
-
-
-
-            // Current right_y ends around 15+45+50+75+65+150+45+100 ~ 545px.
-
-
-
-            // Footer starts at m_panel_height - 220 = 445.
-
-
-
-            // Wait, 545 > 445. Overlap Risk! 
-
-
-
-            // If panel H is 665, Footer starts at 445 (Pending) and 535 (Orders).
-
-
-
-            // Strategy Signal ends at 545. 
-
-
-
-            // We need to move Pending Alerts DOWN or shrink spacing.
-
-
-
-            
-
-
-
-            // Let's PUSH the Footer down (anchored to bottom).
-
-
-
-            // The strategy signal ends around 550px.
-
-
-
-            // We have 665px total. 
-
-
-
-            // Footer needs ~200px. 550+200 = 750px.
-
-
-
-            // WE NEED TO INCREASE PANEL HEIGHT.
-
-
-
-            
-
-
-
-            // NOTE: The user requested "plenty of space". 
-
-
-
-            // I will set Panel Height to 780 in Constructor to accommodate this new vertical stack.
-
-
-
-            
-
-
-
-            // 7. ACTIVE ORDERS Section (Bottom Anchor)
-
-
-
-            int orderY = m_panel_height - 130; 
-
-
-
-      
-
-
-
-         CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", m_header_color, 10, "Arial Bold");
-
-
-
-         CreateLabel("LblBalance", x + 150, orderY, "Balance: $--", clrWhite, 9, "Arial Bold");
-
-
-
-         CreateLabel("LblTotalProfit", x + 280, orderY, "Profit: $0.00", clrGray, 9, "Arial Bold");
-
-
-
-         CreateButton("BtnCloseAll", x + m_panel_width - 75, orderY - 2, 65, 18, "CLOSE ALL", m_sell_color, clrWhite, 8);
-
-
-
-      
-
-
-
-         CreateRect("OrderListBG", x + 5, orderY + 20, m_panel_width - 20, 105, C'5,5,15', true, C'45,45,60');
-
-         // Scroll buttons for Active Orders (hidden when <= 4 orders)
-         // Created AFTER OrderListBG to appear on top (z-index)
-         // Positioned inside OrderListBG area (right side, within the dark background)
-         CreateButton("BtnScrollUp", x + m_panel_width - 30, orderY + 25, 15, 15, "▲", clrGray, clrWhite, 10);
-         CreateButton("BtnScrollDown", x + m_panel_width - 30, orderY + 45, 15, 15, "▼", clrGray, clrWhite, 10);
-
-
-
-      
-
-
-
-         for(int i=0; i<4; i++)
-
-
-
-         {
-
-
-
-            string sid = IntegerToString(i);
-
-
-
-            int rowY = (orderY + 38) + (i * 24); // Tighter list rows
-
-
-
-      
-
-
-
-            CreateLabel("ActOrder_L_"+sid, -200, rowY, "", clrCyan, 9);
-
-
-
-            CreateLabel("ActOrder_M_"+sid, -200, rowY, "", clrWhite, 9);
-
-
-
-            CreateLabel("ActOrder_R_"+sid, -200, rowY, "", clrWhite, 9);
-
-
-
-            CreateButton("BtnCloseOrder_"+sid, -100, rowY - 3, 35, 18, "X", C'80,80,80', clrWhite, 9);
-
-
-
-         }
-
-
-
-      
-
-
-
-         // 6. PENDING ALERTS Section (Anchored above Active Orders)
-
-
-
-         // Active Orders Top is 'orderY'. We want Pending Alerts above it.
-
-
-
-         // Pending Section Height ~ 80px (Header + Rect).
-
-
-
-         // Gap = 20px.
-
-
-
-         // pendingY = orderY - 80 - 20 = orderY - 100.
-
-
-
-         int pendingY = orderY - 90;
-
-
-
-      
-
-
-
-         CreateLabel("LblPending", x + pad, pendingY, "PENDING ALERTS", m_header_color, 10, "Arial Bold");
-
-
-
-         CreateButton("BtnConfirm", x + m_panel_width - 130, pendingY - 2, 120, 20, "NO SIGNAL", C'50,50,60', C'100,100,100', 8);
-
-
-
-         
-
-
-
-         CreateRect("PendingBG", x + 5, pendingY + 20, m_panel_width - 20, 60, C'5,5,15', true, C'45,45,60');
-
-
-
-         
-
-
-
-   CreateButton("BtnRev", x + 15, pendingY + 30, m_panel_width - 40, 20, "NO REVERSAL SETUP", clrGray, clrWhite, 8);
-   CreateButton("BtnBrk", x + 15, pendingY + 55, m_panel_width - 40, 20, "NO BREAKOUT SETUP", clrGray, clrWhite, 8);
-
-   ChartRedraw(m_chart_id);
-}
-
 //+------------------------------------------------------------------+
-//| Update Trading Mode                                              |
+//| Update Strategy Selection Buttons (all 5)                         |
 //+------------------------------------------------------------------+
-void CDashboardPanel::UpdateTradingMode(int mode)
-{
-   // mode 0 = AUTO OFF (manual only), mode 1 = AUTO ON (manual + auto)
-   string text = (mode == 0) ? "OFF" : "ON";
-   color bg = (mode == 0) ? clrGray : m_buy_color;   // Gray when OFF, Green when ON
-   color txt = clrWhite; // Always White for better contrast
-
-   ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
-
-   // Update mode label
-   ObjectSetString(m_chart_id, m_prefix+"LblMode", OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chart_id, m_prefix+"LblMode", OBJPROP_COLOR, bg);
-}
-
-   
-   ObjectSetString(m_chart_id, m_prefix+"BtnMode", OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnMode", OBJPROP_COLOR, txt);
-   // Print("DEBUG: UpdateTradingMode called with mode=", mode, " -> ", text); // Silenced for performance
-}
-
-//+------------------------------------------------------------------+
-//| Update Strategy Selection Buttons                                |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool qs)
+void CDashboardPanel::UpdateStrategyButtons(bool arrow, bool rev, bool brk, bool sniper, bool hybrid)
 {
    color bgArrow = arrow ? m_buy_color : clrGray;
    color bgRev   = rev ? m_buy_color : clrGray;
    color bgBrk   = brk ? m_buy_color : clrGray;
+   color bgSniper = sniper ? m_buy_color : clrGray;
+   color bgHybrid = hybrid ? m_buy_color : clrGray;
 
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratArrow", OBJPROP_BGCOLOR, bgArrow);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratRev", OBJPROP_BGCOLOR, bgRev);
    ObjectSetInteger(m_chart_id, m_prefix+"BtnStratBreak", OBJPROP_BGCOLOR, bgBrk);
-
-   // Update Quick Scalp button separately
-   UpdateQuickScalpButton(qs);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratSniper", OBJPROP_BGCOLOR, bgSniper);
+   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratHybrid", OBJPROP_BGCOLOR, bgHybrid);
 }
 
 //+------------------------------------------------------------------+
-//| Update Quick Scalp Button                                         |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateQuickScalpButton(bool isActive)
-{
-   string text = isActive ? "ON" : "OFF";
-   color bg = isActive ? m_buy_color : C'50,50,60';
-   color txt = isActive ? clrWhite : C'100,100,100';
-
-   ObjectSetString(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(m_chart_id, m_prefix+"BtnStratQS", OBJPROP_COLOR, txt);
-}
-
-//+------------------------------------------------------------------+
-//| Update Quick Scalp Smart State (Auto-Switch Visual Feedback)      |
-//+------------------------------------------------------------------+
-void CDashboardPanel::UpdateQuickScalpSmartState(bool isEnabled, ENUM_ZONE_STATUS zone, double adx, double adxThreshold)
-{
-   string btnText;
-   color btnColor;
-   color bgColor;
-
-   if(!isEnabled)
-   {
-      // State 1: DISABLED (Gray)
-      btnText = "OFF";
-      btnColor = clrGray;
-      bgColor = C'50,50,60';
-   }
-   else if(zone == ZONE_STATUS_NONE)
-   {
-      // Middle zone - check ADX for trading quality
-      if(adx >= adxThreshold)
-      {
-         // State 2: READY (Green) - Middle zone + ADX OK
-         btnText = "READY";
-         btnColor = clrLime;
-         bgColor = C'40,80,40';
-      }
-      else
-      {
-         // State 3: LOW ADX (Orange) - Middle zone but choppy
-         btnText = "LOW ADX";
-         btnColor = clrOrange;
-         bgColor = C'80,60,20';
-      }
-   }
-   else
-   {
-      // State 4: IN ZONE (Yellow) - Not in middle zone
-      btnText = "WAIT";
-      btnColor = clrYellow;
-      bgColor = C'80,80,40';
-   }
-
-   // Update button
-   SetText("BtnStratQS", btnText);
-   SetBgColor("BtnStratQS", bgColor);
-   SetColor("BtnStratQS", btnColor);
-
-   // Update Status Dot (Phase 4.1 Restoration)
-   color dotColor = clrGray;
-   if(isEnabled)
-   {
-      if(btnText == "READY") dotColor = clrLime;
-      else dotColor = clrRed;
-   }
-   SetColor("QS_Status_Dot", dotColor);
-}
-
-//+------------------------------------------------------------------+
-//| Update Hybrid Mode Status (Sprint 6 - Phase 4)                    |
+//| Update Hybrid Mode Status (context only, not checkbox)           |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateHybridStatus(bool contextReady, ENUM_TREND_BIAS bias)
 {
    // Store Hybrid Mode context state for dashboard tracking
    m_hybrid_context_ready = contextReady;
    m_hybrid_bias = bias;
-
-   // DEBUG: Print state changes for verification
-   // Print("HYBRID Status Update: Ready=", contextReady ? "YES" : "NO", " Bias=", EnumToString(bias)); // Silenced for performance
+   // Note: Status dot removed - context shown in Auto Mode Status section instead
 }
 
 //+------------------------------------------------------------------+
@@ -1936,21 +1225,18 @@ void CDashboardPanel::UpdateActiveOrders(int count, long &tickets[], double &pri
 //+====================================================================+
 
 //+------------------------------------------------------------------+
-//| Update Market Intelligence Grid (3-Column Layout)                   |
+//| Update Market Intelligence Grid (5-Column Layout)                  |
 //| Populates the new dashboard grid with market context data           |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateMarketIntelligenceGrid(MarketContext &ctx, double rsi, double stoch, ENUM_SIGNAL_TYPE m15Signal, ENUM_SIGNAL_TYPE m5Signal)
 {
    // ==========================================================
-   // MARKET SNAPSHOT - Compact 2-Column Layout
+   // MARKET SNAPSHOT - 5-Column Layout
    // ==========================================================
 
    // 1. Bias Indicator (Context)
    color biasColor = ctx.trendMatrix.displayColor;
-   string biasText = ctx.trendMatrix.description;
    SetColor("Bias_Light", biasColor);
-   SetText("Bias_Label", biasText);
-   SetColor("Bias_Label", biasColor);
 
    // 2. ADX Value
    string adxText = (ctx.adxValue > 0) ? StringFormat("%.1f", ctx.adxValue) : "--";
@@ -2089,22 +1375,19 @@ void CDashboardPanel::UpdateTradeStrategy(TradeRecommendation &rec)
    // Update reasoning
    SetText("Strategy_Reasoning", rec.reasoning);
 
-   // Update entry details - format as "BUY LIMIT @ 1.0850" or "--" if no entry
+   // Update entry details - format as "ENTRY: MARKET @ 1.0850 | TP: 1.0900 | SL: 1.0800"
    if(rec.entryType != "")
    {
-      SetText("Strategy_Entry_Type", rec.entryType + " @");
-      SetText("Strategy_Entry_Price", rec.entryPriceText);
-      SetText("Strategy_Targets", rec.targetsText);
+      string entryText = StringFormat("ENTRY: %s @ %s | %s",
+                                       rec.entryType,
+                                       rec.entryPriceText,
+                                       rec.targetsText);
+      SetText("Strategy_Entry_Row", entryText);
    }
    else
    {
-      SetText("Strategy_Entry_Type", "");
-      SetText("Strategy_Entry_Price", "--");
-      SetText("Strategy_Targets", "");
+      SetText("Strategy_Entry_Row", "ENTRY: -- | TP: -- | SL: --");
    }
-
-   // Update targets (already set above, but kept for clarity)
-   // SetText("Strategy_Targets", rec.targetsText);
 
    // Update alternatives if present
    if(rec.alternatives != "")
@@ -2140,18 +1423,17 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
-   // Sniper Status
+   // Sniper row - status + filters combined
    string sniperStatus = sniperEnabled ? "🟢 ON" : "⚪ OFF";
    string sniperFilters = StringFormat("PA:[%c] LOC:[%c] VOL:[%c] ZONE:[%c]",
                                        sniperStates.PA ? '✓' : '❌',
                                        sniperStates.LOC ? '✓' : '❌',
                                        sniperStates.VOL ? '✓' : '❌',
                                        sniperStates.ZONE ? '✓' : '❌');
+   string sniperRow = "SNIPER: " + sniperStatus + "  " + sniperFilters;
+   SetText("Auto_Sniper_Row", sniperRow);
 
-   SetText("Auto_Sniper_Status", sniperStatus);
-   SetText("Auto_Sniper_Filters", sniperFilters);
-
-   // Hybrid Status
+   // Hybrid row - status + filters combined
    string hybridStatus = hybridEnabled ? "🟢 ON" : "⚪ OFF";
    string hybridM5Icon = hybridStates.M5 ? (hybridStates.M5Match ? "✓" : "⚠") : "⏳";
    string hybridFilters = StringFormat("Trend:[%c score=%+d] ADX:[%c] M5:[%c]",
@@ -2159,9 +1441,8 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
                                        hybridStates.TrendScore,
                                        hybridStates.ADX ? '✓' : '❌',
                                        hybridM5Icon);
-
-   SetText("Auto_Hybrid_Status", hybridStatus);
-   SetText("Auto_Hybrid_Filters", hybridFilters);
+   string hybridRow = "HYBRID: " + hybridStatus + "  " + hybridFilters;
+   SetText("Auto_Hybrid_Row", hybridRow);
 }
 
 //+------------------------------------------------------------------+
@@ -2278,6 +1559,21 @@ void CDashboardPanel::OnEvent(const int id, const long &lparam, const double &dp
          UpdateFilterVisuals();
          ChartRedraw(m_chart_id);
          return;
+      }
+
+      //--- AUTO STRATEGY Toggle Clicks (moved here for instant response like Settings buttons)
+      // NOTE: We can't toggle state here because the global variables are in the main file
+      // So we just reset the button state instantly here and return early
+      // The actual state toggle happens in main handler (which is fast because it just updates bools)
+      if(sparam == m_prefix + "BtnStratArrow" ||
+         sparam == m_prefix + "BtnStratRev" ||
+         sparam == m_prefix + "BtnStratBreak" ||
+         sparam == m_prefix + "BtnStratSniper" ||
+         sparam == m_prefix + "BtnStratHybrid")
+      {
+         // IMMEDIATE button state reset for instant visual feedback
+         ObjectSetInteger(m_chart_id, sparam, OBJPROP_STATE, false);
+         return;  // Return immediately - main handler will toggle state and redraw
       }
 
       // Note: Profit Lock inputs (Trigger/Lock/Step Edits) are handled natively by MT5

@@ -2,6 +2,7 @@
 //|                                                   SignalEngine.mqh |
 //|                                    Copyright 2025, EA Helper Project |
 //|                                             https://ea-helper.com    |
+//|                       FORCE RELOAD - Updated 2025-01-11 01:50        |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, EA Helper Project"
 #property link      "https://ea-helper.com"
@@ -1801,7 +1802,6 @@ string CSignalEngine::GetZoneText(ENUM_ZONE_STATUS zone)
 
 //+------------------------------------------------------------------+
 //| Get Sniper Filter States                                           |
-//| Check and return the current state of each Sniper filter            |
 //+------------------------------------------------------------------+
 void CSignalEngine::GetSniperFilterStates(SniperFilterStates &states)
 {
@@ -1848,7 +1848,6 @@ void CSignalEngine::GetSniperFilterStates(SniperFilterStates &states)
 
 //+------------------------------------------------------------------+
 //| Get Hybrid Filter States                                           |
-//| Check and return the current state of each Hybrid filter            |
 //+------------------------------------------------------------------+
 void CSignalEngine::GetHybridFilterStates(HybridFilterStates &states)
 {
