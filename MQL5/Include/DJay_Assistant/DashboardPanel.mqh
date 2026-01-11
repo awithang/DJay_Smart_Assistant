@@ -503,11 +503,19 @@ void CDashboardPanel::CreatePanel()
 
    // Label "SNIPER:" (gray)
    CreateLabel("Auto_Sniper_Label", snip_x, snip_row_y, "SNIPER:", clrGray, 8);
-   // Individual filter labels (for colored status) - smaller font for compact display
-   CreateLabel("Auto_Sniper_PA", snip_x + 42, snip_row_y, "PA:[ ]", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC", snip_x + 80, snip_row_y, "LOC:[ ]", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL", snip_x + 122, snip_row_y, "VOL:[ ]", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE", snip_x + 163, snip_row_y, "ZONE:[ ]", clrGray, 8);
+   // Individual filter labels - split into text (gray) and symbol (colored)
+   // PA Filter
+   CreateLabel("Auto_Sniper_PA_Label", snip_x + 42, snip_row_y, "PA:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_PA_Sym", snip_x + 62, snip_row_y, "]", clrGray, 8);
+   // LOC Filter
+   CreateLabel("Auto_Sniper_LOC_Label", snip_x + 80, snip_row_y, "LOC:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC_Sym", snip_x + 100, snip_row_y, "]", clrGray, 8);
+   // VOL Filter
+   CreateLabel("Auto_Sniper_VOL_Label", snip_x + 122, snip_row_y, "VOL:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL_Sym", snip_x + 142, snip_row_y, "]", clrGray, 8);
+   // ZONE Filter
+   CreateLabel("Auto_Sniper_ZONE_Label", snip_x + 163, snip_row_y, "ZONE:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE_Sym", snip_x + 183, snip_row_y, "]", clrGray, 8);
 
    // ============================================
    // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
@@ -517,11 +525,19 @@ void CDashboardPanel::CreatePanel()
 
    // Label "HYBRID:" (gray)
    CreateLabel("Auto_Hybrid_Label", hyb_x, hyb_row_y, "HYBRID:", clrGray, 8);
-   // Individual filter labels (for colored status)
-   CreateLabel("Auto_Hybrid_Trend", hyb_x + 42, hyb_row_y, "Trd:[ ]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX", hyb_x + 90, hyb_row_y, "ADX:[ ]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR", hyb_x + 135, hyb_row_y, "ATR:[ ]", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5", hyb_x + 178, hyb_row_y, "M5:[ ]", clrGray, 8);
+   // Individual filter labels - split into text (gray) and symbol (colored)
+   // Trend Filter
+   CreateLabel("Auto_Hybrid_Trend_Label", hyb_x + 42, hyb_row_y, "Trd:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_Trend_Sym", hyb_x + 62, hyb_row_y, "]", clrGray, 8);
+   // ADX Filter
+   CreateLabel("Auto_Hybrid_ADX_Label", hyb_x + 90, hyb_row_y, "ADX:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX_Sym", hyb_x + 110, hyb_row_y, "]", clrGray, 8);
+   // ATR Filter
+   CreateLabel("Auto_Hybrid_ATR_Label", hyb_x + 135, hyb_row_y, "ATR:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR_Sym", hyb_x + 155, hyb_row_y, "]", clrGray, 8);
+   // M5 Filter
+   CreateLabel("Auto_Hybrid_M5_Label", hyb_x + 178, hyb_row_y, "M5:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5_Sym", hyb_x + 196, hyb_row_y, "]", clrGray, 8);
 
    left_y += autoStatus_h + gap;  // Add 10px gap after AUTO MODE STATUS
 
@@ -1504,71 +1520,65 @@ string CDashboardPanel::GetRecommendationIcon(string code)
 //+------------------------------------------------------------------+
 //| Update Auto Mode Status                                            |
 //| Display filter states for Sniper and Hybrid auto modes            |
-//| Each filter has its own label for individual color control        |
+//| Only the symbol (✓/✗) is colored, not the label text             |
 //+------------------------------------------------------------------+
 void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnabled,
                                            SniperFilterStates &sniperStates,
                                            HybridFilterStates &hybridStates)
 {
    // ============================================
-   // SNIPER Filters (4 filters)
+   // SNIPER Filters (4 filters) - Update only symbol labels with color
    // ============================================
 
-   // PA Filter
-   string paText = "PA:[" + (sniperStates.PA ? "✓" : "✗") + "]";
-   SetText("Auto_Sniper_PA", paText);
-   SetColor("Auto_Sniper_PA", sniperStates.PA ? m_buy_color : m_sell_color);
+   // PA Filter - Update symbol and color only
+   SetText("Auto_Sniper_PA_Sym", sniperStates.PA ? "✓]" : "✗]");
+   SetColor("Auto_Sniper_PA_Sym", sniperStates.PA ? m_buy_color : m_sell_color);
 
-   // LOC Filter
-   string locText = "LOC:[" + (sniperStates.LOC ? "✓" : "✗") + "]";
-   SetText("Auto_Sniper_LOC", locText);
-   SetColor("Auto_Sniper_LOC", sniperStates.LOC ? m_buy_color : m_sell_color);
+   // LOC Filter - Update symbol and color only
+   SetText("Auto_Sniper_LOC_Sym", sniperStates.LOC ? "✓]" : "✗]");
+   SetColor("Auto_Sniper_LOC_Sym", sniperStates.LOC ? m_buy_color : m_sell_color);
 
-   // VOL Filter
-   string volText = "VOL:[" + (sniperStates.VOL ? "✓" : "✗") + "]";
-   SetText("Auto_Sniper_VOL", volText);
-   SetColor("Auto_Sniper_VOL", sniperStates.VOL ? m_buy_color : m_sell_color);
+   // VOL Filter - Update symbol and color only
+   SetText("Auto_Sniper_VOL_Sym", sniperStates.VOL ? "✓]" : "✗]");
+   SetColor("Auto_Sniper_VOL_Sym", sniperStates.VOL ? m_buy_color : m_sell_color);
 
-   // ZONE Filter
-   string zoneText = "ZONE:[" + (sniperStates.ZONE ? "✓" : "✗") + "]";
-   SetText("Auto_Sniper_ZONE", zoneText);
-   SetColor("Auto_Sniper_ZONE", sniperStates.ZONE ? m_buy_color : m_sell_color);
+   // ZONE Filter - Update symbol and color only
+   SetText("Auto_Sniper_ZONE_Sym", sniperStates.ZONE ? "✓]" : "✗]");
+   SetColor("Auto_Sniper_ZONE_Sym", sniperStates.ZONE ? m_buy_color : m_sell_color);
 
    // ============================================
-   // HYBRID Filters (4 filters)
+   // HYBRID Filters (4 filters) - Update only symbol labels with color
    // ============================================
 
-   // Trend Filter (includes score)
+   // Trend Filter - Update symbol with score and color
    string trendSign = hybridStates.TrendScore >= 0 ? "+" : "";
-   string trendText = "Trend:[" + (hybridStates.Trend ? "✓" : "✗") + " " + trendSign + IntegerToString(hybridStates.TrendScore) + "]";
-   SetText("Auto_Hybrid_Trend", trendText);
-   SetColor("Auto_Hybrid_Trend", hybridStates.Trend ? m_buy_color : m_sell_color);
+   string trendSymText = (hybridStates.Trend ? "✓" : "✗") + " " + trendSign + IntegerToString(hybridStates.TrendScore) + "]";
+   SetText("Auto_Hybrid_Trend_Sym", trendSymText);
+   SetColor("Auto_Hybrid_Trend_Sym", hybridStates.Trend ? m_buy_color : m_sell_color);
 
-   // ADX Filter
-   string adxText = "ADX:[" + (hybridStates.ADX ? "✓" : "✗") + "]";
-   SetText("Auto_Hybrid_ADX", adxText);
-   SetColor("Auto_Hybrid_ADX", hybridStates.ADX ? m_buy_color : m_sell_color);
+   // ADX Filter - Update symbol and color only
+   SetText("Auto_Hybrid_ADX_Sym", hybridStates.ADX ? "✓]" : "✗]");
+   SetColor("Auto_Hybrid_ADX_Sym", hybridStates.ADX ? m_buy_color : m_sell_color);
 
-   // ATR Filter
-   string atrText = "ATR:[" + (hybridStates.ATR ? "✓" : "✗") + "]";
-   SetText("Auto_Hybrid_ATR", atrText);
-   SetColor("Auto_Hybrid_ATR", hybridStates.ATR ? m_buy_color : m_sell_color);
+   // ATR Filter - Update symbol and color only
+   SetText("Auto_Hybrid_ATR_Sym", hybridStates.ATR ? "✓]" : "✗]");
+   SetColor("Auto_Hybrid_ATR_Sym", hybridStates.ATR ? m_buy_color : m_sell_color);
 
    // M5 Filter (has 3 states: ✓ pass, ⚠ warning, ⏳ not ready)
-   string m5Text;
+   string m5SymText;
    color m5Color;
    if(!hybridStates.M5) {
-      m5Text = "M5:[⏳]";
+      m5SymText = "⏳]";
       m5Color = clrGray;
    } else if(hybridStates.M5Match) {
-      m5Text = "M5:[✓]";
+      m5SymText = "✓]";
       m5Color = m_buy_color;
    } else {
-      m5Text = "M5:[⚠]";
+      m5SymText = "⚠]";
       m5Color = C'200,150,50';  // Orange for warning
    }
-   SetText("Auto_Hybrid_M5", m5Text);
-   SetColor("Auto_Hybrid_M5", m5Color);
+   SetText("Auto_Hybrid_M5_Sym", m5SymText);
+   SetColor("Auto_Hybrid_M5_Sym", m5Color);
 }
 
 //+------------------------------------------------------------------+
