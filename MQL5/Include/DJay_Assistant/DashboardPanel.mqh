@@ -504,22 +504,23 @@ void CDashboardPanel::CreatePanel()
    // Label "SNIPER:" (gray)
    CreateLabel("Auto_Sniper_Label", snip_x, snip_row_y, "SNIPER:", clrGray, 8);
    // Individual filter labels - split into 3 parts: text (gray), symbol (colored), bracket (gray)
+   // Increased spacing to prevent overlap - evenly distributed across available width
    // PA Filter
-   CreateLabel("Auto_Sniper_PA_Label", snip_x + 42, snip_row_y, "PA:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_PA_Sym", snip_x + 58, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_PA_Bracket", snip_x + 66, snip_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Sniper_PA_Label", snip_x + 40, snip_row_y, "PA:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_PA_Sym", snip_x + 52, snip_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Sniper_PA_Bracket", snip_x + 58, snip_row_y, "]", clrGray, 8);
    // LOC Filter
-   CreateLabel("Auto_Sniper_LOC_Label", snip_x + 85, snip_row_y, "LOC:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC_Sym", snip_x + 101, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_LOC_Bracket", snip_x + 109, snip_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC_Label", snip_x + 95, snip_row_y, "LOC:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC_Sym", snip_x + 107, snip_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Sniper_LOC_Bracket", snip_x + 113, snip_row_y, "]", clrGray, 8);
    // VOL Filter
-   CreateLabel("Auto_Sniper_VOL_Label", snip_x + 128, snip_row_y, "VOL:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL_Sym", snip_x + 144, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_VOL_Bracket", snip_x + 152, snip_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL_Label", snip_x + 150, snip_row_y, "VOL:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL_Sym", snip_x + 162, snip_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Sniper_VOL_Bracket", snip_x + 168, snip_row_y, "]", clrGray, 8);
    // ZONE Filter
-   CreateLabel("Auto_Sniper_ZONE_Label", snip_x + 171, snip_row_y, "ZONE:[", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE_Sym", snip_x + 187, snip_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Sniper_ZONE_Bracket", snip_x + 195, snip_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE_Label", snip_x + 205, snip_row_y, "ZONE:[", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE_Sym", snip_x + 217, snip_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Sniper_ZONE_Bracket", snip_x + 223, snip_row_y, "]", clrGray, 8);
 
    // ============================================
    // Row 2: HYBRID Filters (Trend, ADX, ATR, M5)
@@ -529,23 +530,24 @@ void CDashboardPanel::CreatePanel()
 
    // Label "HYBRID:" (gray)
    CreateLabel("Auto_Hybrid_Label", hyb_x, hyb_row_y, "HYBRID:", clrGray, 8);
-   // Individual filter labels - split into 3 parts: text (gray), symbol+score (colored), bracket (gray)
-   // Trend Filter
-   CreateLabel("Auto_Hybrid_Trend_Label", hyb_x + 42, hyb_row_y, "Trd:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Trend_Sym", hyb_x + 58, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_Trend_Score", hyb_x + 66, hyb_row_y, " +2]", clrGray, 7);
+   // Individual filter labels - split into 3 parts: text (gray), symbol (colored), score+bracket (gray)
+   // Increased spacing - Trend needs more room for score, others evenly distributed
+   // Trend Filter (more space for score)
+   CreateLabel("Auto_Hybrid_Trend_Label", hyb_x + 40, hyb_row_y, "Trd:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_Trend_Sym", hyb_x + 52, hyb_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Hybrid_Trend_Score", hyb_x + 58, hyb_row_y, " +2]", clrGray, 7);
    // ADX Filter
-   CreateLabel("Auto_Hybrid_ADX_Label", hyb_x + 103, hyb_row_y, "ADX:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX_Sym", hyb_x + 119, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ADX_Bracket", hyb_x + 127, hyb_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX_Label", hyb_x + 105, hyb_row_y, "ADX:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX_Sym", hyb_x + 117, hyb_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ADX_Bracket", hyb_x + 123, hyb_row_y, "]", clrGray, 8);
    // ATR Filter
-   CreateLabel("Auto_Hybrid_ATR_Label", hyb_x + 151, hyb_row_y, "ATR:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR_Sym", hyb_x + 167, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_ATR_Bracket", hyb_x + 175, hyb_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR_Label", hyb_x + 160, hyb_row_y, "ATR:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR_Sym", hyb_x + 172, hyb_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Hybrid_ATR_Bracket", hyb_x + 178, hyb_row_y, "]", clrGray, 8);
    // M5 Filter
-   CreateLabel("Auto_Hybrid_M5_Label", hyb_x + 194, hyb_row_y, "M5:[", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5_Sym", hyb_x + 210, hyb_row_y, "✓", clrGray, 8);
-   CreateLabel("Auto_Hybrid_M5_Bracket", hyb_x + 218, hyb_row_y, "]", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5_Label", hyb_x + 215, hyb_row_y, "M5:[", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5_Sym", hyb_x + 227, hyb_row_y, "✓", clrGray, 8);
+   CreateLabel("Auto_Hybrid_M5_Bracket", hyb_x + 233, hyb_row_y, "]", clrGray, 8);
 
    left_y += autoStatus_h + gap;  // Add 10px gap after AUTO MODE STATUS
 
