@@ -292,7 +292,8 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblPrice", left_x + full_width - 100, mi_y_start, "0.00000", C'255,223,0', 12, "Arial Bold", "right");
    CreateButton("BtnOpenSettings", left_x + full_width - 85, mi_y_start + 2, 20, 20, "⚙", clrGray, clrWhite, 12);
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, mi_y_start + 175, C'5,5,15', true, C'45,45,60');
+   // InfoBG: Fix height parameter (was mi_y_start + 175, should be just 175)
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 157, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
@@ -350,8 +351,8 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("Strategy_Rec_Code", left_x + pad + 35, strat_y_start + strat_row_h * 2, "⏳", clrGray, 11);
    CreateLabel("Strategy_Rec_Text", left_x + pad + 55, strat_y_start + strat_row_h * 2, "WAIT", clrGray, 9, "Arial Bold");
 
-   // Row 3: Reasoning (Increased to 8)
-   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 8);
+   // Row 3: Reasoning (Increased to 9 to match other rows)
+   CreateLabel("Strategy_Reasoning", left_x + pad + 5, strat_y_start + strat_row_h * 3, "Analyzing market...", clrGray, 9);
 
    // Row 4: Entry + Targets combined (Increased to 9)
    CreateLabel("Strategy_Entry_Row", left_x + pad + 5, strat_y_start + strat_row_h * 4, "ENTRY: -- | TP: -- | SL: --", clrGray, 9);
