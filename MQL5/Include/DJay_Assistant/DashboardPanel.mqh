@@ -1495,22 +1495,22 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
    // ============================================
 
    // PA Filter
-   string paText = StringFormat("PA:[%c]", sniperStates.PA ? '✓' : '✗');
+   string paText = "PA:[" + (sniperStates.PA ? "✓" : "✗") + "]";
    SetText("Auto_Sniper_PA", paText);
    SetColor("Auto_Sniper_PA", sniperStates.PA ? m_buy_color : m_sell_color);
 
    // LOC Filter
-   string locText = StringFormat("LOC:[%c]", sniperStates.LOC ? '✓' : '✗');
+   string locText = "LOC:[" + (sniperStates.LOC ? "✓" : "✗") + "]";
    SetText("Auto_Sniper_LOC", locText);
    SetColor("Auto_Sniper_LOC", sniperStates.LOC ? m_buy_color : m_sell_color);
 
    // VOL Filter
-   string volText = StringFormat("VOL:[%c]", sniperStates.VOL ? '✓' : '✗');
+   string volText = "VOL:[" + (sniperStates.VOL ? "✓" : "✗") + "]";
    SetText("Auto_Sniper_VOL", volText);
    SetColor("Auto_Sniper_VOL", sniperStates.VOL ? m_buy_color : m_sell_color);
 
    // ZONE Filter
-   string zoneText = StringFormat("ZONE:[%c]", sniperStates.ZONE ? '✓' : '✗');
+   string zoneText = "ZONE:[" + (sniperStates.ZONE ? "✓" : "✗") + "]";
    SetText("Auto_Sniper_ZONE", zoneText);
    SetColor("Auto_Sniper_ZONE", sniperStates.ZONE ? m_buy_color : m_sell_color);
 
@@ -1519,17 +1519,18 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
    // ============================================
 
    // Trend Filter (includes score)
-   string trendText = StringFormat("Trend:[%c %+d]", hybridStates.Trend ? '✓' : '✗', hybridStates.TrendScore);
+   string trendSign = hybridStates.TrendScore >= 0 ? "+" : "";
+   string trendText = "Trend:[" + (hybridStates.Trend ? "✓" : "✗") + " " + trendSign + IntegerToString(hybridStates.TrendScore) + "]";
    SetText("Auto_Hybrid_Trend", trendText);
    SetColor("Auto_Hybrid_Trend", hybridStates.Trend ? m_buy_color : m_sell_color);
 
    // ADX Filter
-   string adxText = StringFormat("ADX:[%c]", hybridStates.ADX ? '✓' : '✗');
+   string adxText = "ADX:[" + (hybridStates.ADX ? "✓" : "✗") + "]";
    SetText("Auto_Hybrid_ADX", adxText);
    SetColor("Auto_Hybrid_ADX", hybridStates.ADX ? m_buy_color : m_sell_color);
 
    // ATR Filter
-   string atrText = StringFormat("ATR:[%c]", hybridStates.ATR ? '✓' : '✗');
+   string atrText = "ATR:[" + (hybridStates.ATR ? "✓" : "✗") + "]";
    SetText("Auto_Hybrid_ATR", atrText);
    SetColor("Auto_Hybrid_ATR", hybridStates.ATR ? m_buy_color : m_sell_color);
 
@@ -1537,13 +1538,13 @@ void CDashboardPanel::UpdateAutoModeStatus(bool sniperEnabled, bool hybridEnable
    string m5Text;
    color m5Color;
    if(!hybridStates.M5) {
-      m5Text = StringFormat("M5:[⏳]");
+      m5Text = "M5:[⏳]";
       m5Color = clrGray;
    } else if(hybridStates.M5Match) {
-      m5Text = StringFormat("M5:[✓]");
+      m5Text = "M5:[✓]";
       m5Color = m_buy_color;
    } else {
-      m5Text = StringFormat("M5:[⚠]");
+      m5Text = "M5:[⚠]";
       m5Color = C'200,150,50';  // Orange for warning
    }
    SetText("Auto_Hybrid_M5", m5Text);
