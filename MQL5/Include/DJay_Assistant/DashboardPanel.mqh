@@ -294,9 +294,9 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStats", left_x + full_width - 60, mi_y_start + 2, 20, 20, "📋", clrGray, clrWhite, 12);
    // InfoBG: Calculate correct height to cover all sections (Market Snapshot + Trade Strategy + Auto Mode)
    // Starts at mi_y_start + 18 = 76
-   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 2 + 12 - 10 = 244 + 36 + 12 - 10 = 282
-   // Height = 282 - 76 = 206 (includes bottom padding)
-   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 206, C'5,5,15', true, C'45,45,60');
+   // Ends at bottom_y_start with 10px gap: auto_y_start + strat_row_h * 3 + 12 - 10 = 244 + 54 + 12 - 10 = 300
+   // Height = 300 - 76 = 224 (includes bottom padding)
+   CreateRect("InfoBG", left_x, mi_y_start + 18, full_width, 224, C'5,5,15', true, C'45,45,60');
 
    // ============================================
    // SUBSECTION 1: MARKET SNAPSHOT (For Everyone)
@@ -374,17 +374,14 @@ void CDashboardPanel::CreatePanel()
 
    CreateLabel("Auto_Header", left_x + pad, auto_y_start, "🤖 AUTO MODE STATUS", C'100,200,100', 10, "Arial Bold");
 
-   // Combined Sniper + Hybrid row using full width (like Market Snapshot)
-   // Format: SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]  |  HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]
-   // Split into 2 labels for better full-width utilization
+   // Split into 2 separate rows to prevent text cutoff (each uses full width)
    CreateLabel("Auto_Sniper_Row", left_x + pad + 5, auto_y_start + strat_row_h, "SNIPER: PA:[ ] LOC:[ ] VOL:[ ] ZONE:[ ]", clrGray, 9);
-   // Hybrid row positioned to use remaining width (starts where column 3 would start)
-   CreateLabel("Auto_Hybrid_Row", left_x + pad + col_w * 2, auto_y_start + strat_row_h, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
+   CreateLabel("Auto_Hybrid_Row", left_x + pad + 5, auto_y_start + strat_row_h * 2, "HYBRID: Trend:[ ] ADX:[ ] ATR:[ ] M5:[ ]", clrGray, 9);
 
    // ============================================
    // BOTTOM SPLIT PANEL (LEFT: Settings/Filters/Auto, RIGHT: Manual Trade/Zones)
    // ============================================
-   int bottom_y_start = auto_y_start + strat_row_h * 2 + 12;  // After Auto Mode Status (2 rows now: header + combined row)
+   int bottom_y_start = auto_y_start + strat_row_h * 3 + 12;  // After Auto Mode Status (3 rows now: header + sniper + hybrid)
    int row_h = 20;
    int gap = 10;
 
