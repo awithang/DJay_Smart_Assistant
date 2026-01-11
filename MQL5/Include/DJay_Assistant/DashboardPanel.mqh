@@ -450,8 +450,8 @@ void CDashboardPanel::CreatePanel()
    // ============================================
    // LEFT PANEL SECTION 3: AUTO STRATEGY
    // ============================================
-   CreateLabel("LblStratTitle", left_x_pos + pad, left_y + 3, "AUTO STRATEGY", m_header_color, 10, "Arial Bold");
-   CreateButton("BtnMode", left_x_pos + bottom_half_width - 65, left_y + 3, 60, row_h, "OFF", clrGray, clrWhite, 9);
+   CreateLabel("LblStratTitle", left_x_pos + pad, left_y, "AUTO STRATEGY", m_header_color, 10, "Arial Bold");
+   CreateButton("BtnMode", left_x_pos + bottom_half_width - 65, left_y, 60, row_h, "OFF", clrGray, clrWhite, 9);
    left_y += row_h;
 
    CreateRect("StratBG", left_x_pos, left_y, bottom_half_width, 50, C'5,5,15', true, C'45,45,60');
