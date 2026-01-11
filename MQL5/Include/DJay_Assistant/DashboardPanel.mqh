@@ -472,9 +472,6 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStratHybrid", left_x_pos + 120, left_y, 15, 15, "", clrGray);
    CreateLabel("L_Hybrid", left_x_pos + 140, left_y, "HYBRID", clrCyan, 9, "Arial Bold");
 
-   // Last auto trade info
-   CreateLabel("LblLastAuto", left_x_pos + 10, left_y + 20, "Last: ---", C'80,80,80', 7);
-
    left_y += 35;
 
    // ============================================
@@ -567,6 +564,8 @@ void CDashboardPanel::CreatePanel()
    CreateLabel("LblAct", x + pad, orderY, "ACTIVE ORDERS (0)", m_header_color, 10, "Arial Bold");
    CreateLabel("LblBalance", x + 150, orderY, "Balance: $--", clrWhite, 9, "Arial Bold");
    CreateLabel("LblTotalProfit", x + 280, orderY, "Profit: $0.00", clrGray, 9, "Arial Bold");
+   // Last auto trade info (moved from Auto Strategy section)
+   CreateLabel("LblLastAuto", x + m_panel_width - 175, orderY, "Last: ---", C'80,80,80', 7);
    CreateButton("BtnCloseAll", x + m_panel_width - 75, orderY - 2, 65, 18, "CLOSE ALL", m_sell_color, clrWhite, 8);
 
    CreateRect("OrderListBG", x + 5, orderY + 20, m_panel_width - 20, 105, C'5,5,15', true, C'45,45,60');
