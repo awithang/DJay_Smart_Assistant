@@ -472,7 +472,12 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnStratHybrid", left_x_pos + 120, left_y, 15, 15, "", clrGray);
    CreateLabel("L_Hybrid", left_x_pos + 140, left_y, "HYBRID", clrCyan, 9, "Arial Bold");
 
-   left_y += gap;  // 10px gap - same as other sections
+   // Move past StratBG (height 50) before adding gap
+   // StratBG started at (left_y before row1) with height 50
+   // Current left_y is at: start + 10 + 22 = start + 32
+   // Need to move to: start + 50 = current + 18
+   left_y += 18;  // Reach end of StratBG
+   left_y += gap;  // 10px gap after AUTO STRATEGY
 
    // ============================================
    // LEFT PANEL SECTION 4: AUTO MODE STATUS (For Auto Traders)
