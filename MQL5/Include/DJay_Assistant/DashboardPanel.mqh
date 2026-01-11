@@ -379,7 +379,7 @@ void CDashboardPanel::CreatePanel()
    // bottom_y_start is right after with small gap
    int bottom_y_start = strat_y_start + strat_row_h * 6 + 10;  // After Trade Strategy (6 rows: header + 5 data)
    int row_h = 20;
-   int gap = 10;
+   int gap = 5;  // Reduced from 10 to 5 for more compact layout
 
    // ============================================
    // LEFT PANEL: Settings, Smart Filters, Auto Strategy
@@ -445,7 +445,12 @@ void CDashboardPanel::CreatePanel()
    CreateButton("BtnFilterAggr", left_x_pos + 10, left_y, 15, 15, "", clrGray, clrWhite, 8);
    CreateLabel("L_F_Aggr", left_x_pos + 30, left_y, "Aggressive (Ignore All)", C'255,100,100', 8);
 
-   left_y += gap;  // 10px gap - same as other sections
+   // Move past FilterBG (height 60) before adding gap
+   // FilterBG started at (left_y before row1) with height 60
+   // Current left_y is at: start + 10 + 25 = start + 35
+   // Need to move to: start + 60 = current + 25
+   left_y += 25;  // Reach end of FilterBG
+   left_y += gap;  // 5px gap after SMART FILTERS
 
    // ============================================
    // LEFT PANEL SECTION 3: AUTO STRATEGY
