@@ -483,8 +483,6 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   ulong start = GetMicrosecondCount();
-
    // 1. Session & Run Time Logic
    MqlDateTime dt;
    TimeToStruct(TimeCurrent(), dt);
@@ -767,7 +765,6 @@ void OnTimer()
       signalEngine.GetSniperFilterStates(cachedSniperStates);
       signalEngine.GetHybridFilterStates(cachedHybridStates);
       last_filter_update = GetMicrosecondCount();
-      Print("INFO: Filter states refreshed (every 60 seconds)");
    }
 
    // Get mode enablement from runtime state (updated by checkbox toggles)
@@ -823,10 +820,6 @@ void OnTimer()
 
    // REMOVED: dashboardPanel.Redraw() - ChartRedraw every 1 second was blocking button clicks
    // Individual ObjectSetInteger calls update immediately without full redraw
-
-   ulong duration = GetMicrosecondCount() - start;
-   if(duration > 10000) // Print if > 10ms
-      Print("WARNING: OnTimer took ", duration/1000, " ms");
 }
 
 //+------------------------------------------------------------------+
